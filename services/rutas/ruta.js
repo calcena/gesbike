@@ -538,104 +538,145 @@ const guardarRutaManual = async () => {
   }
 };
 
-function renderResult(result, hasHR = false) {
-  const container = document.getElementById("output-container");
-  if (!container) {
-    console.error("❌ #output-container no encontrado");
-    return;
-  }
+const editarRutaManual = (id, fecha, kms, observaciones) => {
+  // Limpiar valores primero
+  document.getElementById("kms_ruta").value = "";
+  document.getElementById("obs_ruta").value = "";
+  document.getElementById("fecha_ruta").value = "";
+  
+  // Cambiar a la pestaña de manual
+  const tab2Tab = document.getElementById("tab2-tab");
+  const tab2 = document.getElementById("tab2");
+  const tab1Tab = document.getElementById("tab1-tab");
+  const tab1 = document.getElementById("tab1");
+  
+  tab1Tab.classList.remove("active");
+  tab1.classList.remove("show", "active");
+  tab2Tab.classList.add("active");
+  tab2.classList.add("show", "active");
+  
+  // Cargar los datos de la ruta
+  setTimeout(() => {
+    document.getElementById("kms_ruta").value = kms;
+    document.getElementById("obs_ruta").value = observaciones.replace(/'/g, "\\'");
+    document.getElementById("fecha_ruta").value = fecha.split(' ')[0];
+    
+    // Cambiar el botón de guardar para que haga update en lugar de insert
+    const saveBtn = document.querySelector('img[onclick="guardarRutaManual()"]');
+    if (saveBtn) {
+      saveBtn.setAttribute("onclick", `actualizarRutaManual('${id}')`);
+      saveBtn.setAttribute("title", "Actualizar ruta");
+    }
+    
+    // Mostrar botón cancelar
+    const cancelBtn = document.getElementById("cancelar_btn");
+    if (cancelBtn) {
+      cancelBtn.style.display = "block";
+    }
+  }, 100);
+};
 
-  const formatDate = (iso) => {
-    if (!iso) return "—";
-    const date = new Date(iso);
-    return date.toLocaleString("es-ES", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+const actualizarRutaManual = async (id) => {
+  const data = {
+    id: id,
+    vehiculo_id: sessionStorage.getItem("vehiculo_id"),
+    kms: document.getElementById("kms_ruta").value,
+    observaciones: document.getElementById("obs_ruta").value,
+    fecha: document.getElementById("fecha_ruta").value,
   };
-
-  const fields = [
-    { label: "📆 Inicio", value: formatDate(result.inicio) },
-    { label: "📆 Fin", value: formatDate(result.fin) },
-    { label: "🕑 Tiempo transcurrido", value: result.tiempoTranscurrido },
-    { label: "⌚ Tiempo en movimiento", value: result.tiempoEnMovimiento },
-    { label: "📏 Distancia", value: `${result.distanciaKm} km` },
-    {
-      label: "🏎️ Velocidad media",
-      value: `${result.velocidadMediaEnMovimientoKmh} km/h`,
-    },
-    {
-      label: "🚀 Velocidad máxima",
-      value: `${result.velocidadMaximaKmh} km/h`,
-    },
-    { label: "⏫ Ascenso", value: `${result.ascensoMetros} m` },
-    { label: "⏬ Descenso", value: `${result.descensoMetros} m` },
-    { label: "⛰️ Altitud máxima", value: `${result.altitudMaximaMetros} m` },
-    { label: "⚡ Potencia promedio", value: `${result.potenciaPromedioW} W` },
-    { label: "💥 Calorías", value: `${result.caloriasKcal} kcal` },
-
-    {
-      label: `⬆️ Subida (${result.tiempoSubida})`,
-      value: `${result.subidaPerc}%`,
-    },
-    {
-      label: `➡️ Plano (${result.tiempoPlano})`,
-      value: `${result.planoPerc}%`,
-    },
-    {
-      label: `⬇️ Bajada (${result.tiempoBajada})`,
-      value: `${result.bajadaPerc}%`,
-    },
-  ];
-  console.log("renderizado => ", result);
-  if (
-    hasHR ||
-    (result.frecuenciaCardiacaPromedio !== undefined &&
-      result.frecuenciaCardiacaPromedio !== null)
-  ) {
-    fields.push(
+  try {
+    const response = await axios.post(
+      `../../api/rutas/ruta.php?actualizarRutaManual`,
+      { data },
       {
-        label: "❤️ FC promedio",
-        value: `${result.frecuenciaCardiacaPromedio} bpm`,
-      },
-      {
-        label: "❤️‍🔥 FC máxima",
-        value: `${result.frecuenciaCardiacaMaxima || "—"} bpm`,
+        headers: {
+          "Content-Type": "application/json",
+        },
       }
     );
-  }
 
-  let html = "";
-  for (let i = 0; i < fields.length; i += 2) {
-    const left = fields[i];
-    const right = fields[i + 1];
-
-    html += `
-      <div class="col-12 col-md-6">
-        <div class="d-flex justify-content-between border-bottom">
-          <span class="fw-bold text-primary">${left.label}:</span>
-          <span class="text-end">${left.value}</span>
-        </div>
-      </div>
-    `;
-    if (right) {
-      html += `
-        <div class="col-12 col-md-6">
-          <div class="d-flex justify-content-between border-bottom">
-            <span class="fw-bold text-primary">${right.label}:</span>
-            <span class="text-end">${right.value}</span>
-          </div>
-        </div>
-      `;
+    if (response.data.success) {
+      await Swal.fire({
+        text: "✅ Ruta actualizada correctamente",
+        icon: "success",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      
+      // Restaurar el botón original
+      const saveBtn = document.querySelector('img[onclick*="actualizarRutaManual"]');
+      if (saveBtn) {
+        saveBtn.setAttribute("onclick", "guardarRutaManual()");
+        saveBtn.setAttribute("title", "Guardar ruta");
+      }
+      
+      // Limpiar formulario
+      document.getElementById("kms_ruta").value = "";
+      document.getElementById("obs_ruta").value = "";
+      document.getElementById("fecha_ruta").value = "";
+      
+      // Ocultar botón cancelar
+      const cancelBtn = document.getElementById("cancelar_btn");
+      if (cancelBtn) {
+        cancelBtn.style.display = "none";
+      }
+      
+      // Volver a la pestaña principal y recargar
+      const tab1Tab = document.getElementById("tab1-tab");
+      const tab1 = document.getElementById("tab1");
+      const tab2Tab = document.getElementById("tab2-tab");
+      const tab2 = document.getElementById("tab2");
+      
+      tab2Tab.classList.remove("active");
+      tab2.classList.remove("show", "active");
+      tab1Tab.classList.add("active");
+      tab1.classList.add("show", "active");
+      
+      await getRutasByVehiculo();
+      await crearBackup();
+    } else {
+      throw new Error(response.data.message || "Error del servidor");
     }
+  } catch (err) {
+    console.error("Error actualizando ruta:", err);
+    await Swal.fire({
+      text: "❌ Error al actualizar la ruta",
+      icon: "error",
+      confirmButtonText: "OK",
+    });
   }
+};
 
-  container.innerHTML = html;
-  console.log("✅ Resultado renderizado correctamente");
-}
+const cancelarEdicionRuta = () => {
+  // Restaurar el botón original
+  const saveBtn = document.querySelector('img[onclick*="actualizarRutaManual"]');
+  if (saveBtn) {
+    saveBtn.setAttribute("onclick", "guardarRutaManual()");
+    saveBtn.setAttribute("title", "Guardar ruta");
+  }
+  
+  // Limpiar formulario
+  document.getElementById("kms_ruta").value = "";
+  document.getElementById("obs_ruta").value = "";
+  document.getElementById("fecha_ruta").value = "";
+  
+  // Ocultar botón cancelar
+  const cancelBtn = document.getElementById("cancelar_btn");
+  if (cancelBtn) {
+    cancelBtn.style.display = "none";
+  }
+  
+  // Volver a la pestaña principal
+  const tab1Tab = document.getElementById("tab1-tab");
+  const tab1 = document.getElementById("tab1");
+  const tab2Tab = document.getElementById("tab2-tab");
+  const tab2 = document.getElementById("tab2");
+  
+  tab2Tab.classList.remove("active");
+  tab2.classList.remove("show", "active");
+  tab1Tab.classList.add("active");
+  tab1.classList.add("show", "active");
+};
 
 const eliminaRutaManual = async (idRuta) => {
   const data = {
@@ -879,9 +920,13 @@ const parseHtmlCardsRutas = async (data) => {
         item.origen === "gpx"
           ? `<img height="25px" src="../../assets/images/icons/gpx.png" alt="GPX" onclick="showGpxDetails(${item.id})" style="cursor: pointer;" title="Ver detalles GPX">`
           : `<img class="me-3" height="20px" src="../../assets/images/icons/papelera.png" alt="Eliminar" onclick="eliminaRutaManual('${item.id}')" style="cursor: pointer;" title="Ver observaciones">`;
+      const cardClickHandler = item.origen !== "gpx" ? 
+        `onclick="editarRutaManual('${item.id}', '${item.fecha_inicio}', '${item.kms}', '${item.observaciones || ''}')" style="cursor: pointer;"` : 
+        '';
+      
       return `
         <div class="col-12 mb-2">
-          <div class="card shadow-sm">
+          <div class="card shadow-sm" ${cardClickHandler}>
             <div class="card-body d-flex align-items-center p-2">
               <div class="flex-grow-1">
                 <div class="d-flex justify-content-between align-items-baseline">
@@ -1051,5 +1096,24 @@ const generarAcordeonAnual = (anio, meses, expandir) => {
 };
 
 const gotoBackMantenimientos = async () => {
-  window.location.href = "../main.php";
+  // Verificar si estamos en modo edición (botón cancelar visible)
+  const cancelBtn = document.getElementById("cancelar_btn");
+  if (cancelBtn && cancelBtn.style.display !== "none") {
+    // Si estamos en modo edición, volver a la pestaña principal
+    const tab1Tab = document.getElementById("tab1-tab");
+    const tab1 = document.getElementById("tab1");
+    const tab2Tab = document.getElementById("tab2-tab");
+    const tab2 = document.getElementById("tab2");
+    
+    tab2Tab.classList.remove("active");
+    tab2.classList.remove("show", "active");
+    tab1Tab.classList.add("active");
+    tab1.classList.add("show", "active");
+    
+    // Restaurar botones y limpiar formulario
+    cancelarEdicionRuta();
+  } else {
+    // Si no estamos en modo edición, ir a main.php
+    window.location.href = "../main.php";
+  }
 };

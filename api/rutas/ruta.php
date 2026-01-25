@@ -19,6 +19,7 @@ switch ($action) {
     case 'getRutasByVehiculo':
     case 'getRutasById':
     case 'guardarRutaManual':
+    case 'actualizarRutaManual':
     case 'eliminaRutaManual':
     // case 'getResumenByUser':
     case 'getResumenBiker':

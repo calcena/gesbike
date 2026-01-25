@@ -101,9 +101,10 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
                 </div>
                 <div class="row mt-2 justify-content-around">
                     <img class="action-icon" src="../../assets/images/icons/papelera.png" alt="">
-                    <img class="action-icon" src="../../assets/images/icons/cancelar_icon.png" alt="">
+                    <img class="action-icon" src="../../assets/images/icons/cancelar_icon.png" alt="" 
+                        onclick="cancelarEdicionRuta()" id="cancelar_btn" style="display: none;">
                     <img class="action-icon" src="../../assets/images/icons/validate_icon.png" alt=""
-                        onclick="guardarRutaManual()">
+                        onclick="guardarRutaManual()" id="guardar_btn">
                 </div>
             </div>
             <div class="tab-pane fade" id="tab3" role="tabpanel" aria-labelledby="tab3-tab">

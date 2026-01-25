@@ -113,6 +113,31 @@ function handle_crear_ruta_manual()
     }
 }
 
+function handle_actualizar_ruta_manual()
+{
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['success' => false, 'error' => 'Método no permitido']);
+        return;
+    }
+    $input = json_decode(file_get_contents('php://input'), true);
+    $params = $input['data'];
+
+    try {
+        $entity = actualizar_ruta_manual($params);
+        echo json_encode([
+            'success' => true,
+            'content' => $entity
+        ]);
+    } catch (Exception $e) {
+        http_response_code(404);
+        echo json_encode([
+            'success' => false,
+            'error' => $e
+        ]);
+    }
+}
+
 function handle_eliminar_ruta_manual()
 {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -179,6 +204,9 @@ switch ($action) {
         break;
     case 'guardarRutaManual':
         handle_crear_ruta_manual();
+        break;
+    case 'actualizarRutaManual':
+        handle_actualizar_ruta_manual();
         break;
     case 'eliminaRutaManual':
         handle_eliminar_ruta_manual();

@@ -120,6 +120,33 @@ function add_ruta_manual($params)
     return (int) $db->lastInsertId();
 }
 
+function update_ruta_manual($params) {
+    $db = conectar();
+    
+    $upd = $db->prepare("
+        UPDATE rutas SET
+            kms = ?,
+            observaciones = ?,
+            fecha_inicio = ?,
+            activo = 1,
+            origen = 'manual'
+        WHERE id = ? AND vehiculo_id = ? AND origen = 'manual'
+    ");
+    
+    $result = $upd->execute([
+        (float) ($params['kms'] ?? 0.0),
+        $params['observaciones'] ?? null,
+        $params['fecha'],
+        $params['id'],
+        $params['vehiculo_id']
+    ]);
+    
+    if ($result && $upd->rowCount() > 0) {
+        return (int) $params['id'];
+    }
+    
+    throw new Exception("No se pudo actualizar la ruta manual");
+}
 
 function create_ruta_file($params)
 {

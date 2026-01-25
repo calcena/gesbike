@@ -25,6 +25,12 @@ function crear_ruta_manual($params) {
     return $entity;
 }
 
+function actualizar_ruta_manual($params) {
+    global $db;
+    $entity = update_ruta_manual($params);
+    return $entity;
+}
+
 function eliminar_ruta_manual($params) {
     $entity = eliminar_ruta($params);
     return $entity;
