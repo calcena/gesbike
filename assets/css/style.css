@@ -1,0 +1,250 @@
+.form-select:focus,
+.form-control:focus {
+  border-color: #28a745 !important;
+  box-shadow: 0 0 0 0.25rem rgba(40, 167, 69, 0.25) !important;
+  outline: 0 !important;
+}
+
+.action-icon {
+  width: auto;
+  height: 35px;
+}
+
+.icon-tab {
+  height: 25px;
+  width: auto;
+}
+
+.icon-card {
+  height: 1.8rem;
+  width: auto;
+}
+
+.page-title {
+  color: #3d3d3d;
+  font-weight: 600;
+}
+.repeat-card {
+  background-color: #e2e2e270 !important;
+}
+
+.menu-text-option {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.text-card-info {
+  font-weight: 700;
+  color: gray;
+  font-size: small;
+}
+
+.hidden-object {
+  display: none;
+}
+
+.flag-icon {
+  height: 35px;
+  cursor: pointer;
+}
+
+.header-button {
+  height: 30px;
+  width: 35px;
+}
+
+.header-button-option {
+  height: 35px;
+}
+
+.header-text {
+  font-weight: normal;
+  color: blue;
+}
+
+.pointer {
+  cursor: pointer;
+}
+
+.logo-body {
+  height: 30rem;
+  width: 30rem;
+}
+
+.footer-location {
+  margin-top: 2rem;
+}
+
+.logo-footer {
+  height: 2rem;
+  width: 2rem;
+}
+
+.button-menu {
+  background-color: olivedrab;
+}
+
+.button-menu:hover {
+  background-color: dimgray;
+}
+
+.button-menu.selected {
+  background-color: dimgray !important;
+  color: white !important;
+  border-color: #333 !important;
+  box-shadow: none !important;
+}
+
+.button-menu.selected,
+.button-menu.active {
+  background-color: dimgray !important;
+  color: white !important;
+  border-color: #333 !important;
+  box-shadow: none !important;
+}
+
+.button-menu-text {
+  font-size: 0.875rem;
+  color: white;
+}
+
+.button-actual-day {
+  background-color: darkolivegreen;
+  color: white;
+}
+
+.day-text {
+  font-size: 0.875rem;
+  color: gold;
+  margin-right: 0.5rem;
+}
+
+.button-text {
+  font-weight: 500;
+  font-size: 1.3rem;
+  color: white;
+}
+
+/* Altura fija para la tabla en tablet */
+.table-container {
+  max-height: 500px; /* Ajusta según necesites */
+  overflow-y: auto;
+  margin-top: 1rem;
+}
+
+/* Evitar que los inputs se vean muy grandes */
+.form-control.time-input {
+  width: 90px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+/* Ajuste para tablet */
+@media (max-width: 768px) {
+  .table th,
+  .table td {
+    padding: 0.3rem 0.4rem !important;
+    font-size: 0.875rem;
+  }
+  .time-input {
+    width: 80px;
+  }
+}
+
+/* Fondo de fila alternada */
+.table tbody tr:nth-child(even) {
+  background-color: #f8f9fa;
+}
+
+/* Tarjetas con capacidad de swipe */
+.swipeable-card {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s ease-out, opacity 0.2s ease;
+  cursor: grab;
+}
+
+.swipeable-card:active {
+  cursor: grabbing;
+}
+
+/* Feedback visual durante el deslizamiento */
+.swipeable-card.swiping::after {
+  content: "🗑️";
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.2rem;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Opcional: sombra ligera al deslizar */
+.swipeable-card.swiping {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+}
+
+.swipeable-card {
+  touch-action: pan-y;
+}
+
+.recambio-icon {
+  width: 2.1rem;
+}
+
+.icon-submenu-izquierda {
+  width: 1.5rem;
+  margin-right: 10px;
+}
+
+.icon-register-action {
+  height: 2rem;
+}
+
+.header-table-mini {
+  font-size: 0.875rem;
+}
+
+.body-table-mini {
+  font-size: 0.875rem;
+  color: dimgray;
+}
+
+.date-card-style {
+  font-size: 0.9rem;
+  color: #525252;
+  font-weight: 700;
+}
+
+.date-text {
+  font-size: 0.785rem;
+  color: #505050;
+  font-weight: 600;
+}
+
+.supplier-text {
+  font-size: 0.785rem;
+  color: #505050;
+  font-weight: 700;
+}
+
+.price-text {
+  font-size: 0.8rem;
+  color: #2e4dff;
+  font-weight: 700;
+}
+
+.und-text {
+  font-size: 0.9rem;
+  color: #048000;
+  font-weight: 700;
+}
+
+select {
+  -webkit-appearance: none; /* Quita el estilo nativo en Safari/Chrome */
+  -moz-appearance: none; /* Quita el estilo en Firefox */
+  appearance: none;
+  background-color: white;
+  color: blue
+}

@@ -1,0 +1,163 @@
+.header {
+  background-color: lightgreen;
+  border-radius: 10px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  border: 1px green solid;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: none;
+}
+
+.card-header .card-title {
+  margin: 0;
+  font-weight: 500;
+  color: #ffffff;
+}
+
+.card-body {
+  max-height: 200px; /* o la altura que desees */
+  overflow-y: auto; /* scroll vertical si excede */
+  overflow-x: hidden; /* evita scroll horizontal no deseado */
+}
+
+.card-footer {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-top: none;
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+}
+
+.column-title {
+  font-weight: bold;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-bottom: 2px solid #dee2e6;
+  text-align: center;
+  color: #495057;
+}
+
+/* --- COLORES POR COLUMNA --- */
+
+/* PENDIENTE - Gris */
+.card.asignado {
+  border: 1px solid #c7ffb9;
+}
+.card.asignado .card-header,
+.card.asignado .card-footer {
+  background-color: #478a4a; /* Gris "oscuro" suave */
+  color: #ffffff;
+  padding-left: 8px !important;
+  padding-top: 5px !important;
+  padding-bottom: 5px !important;
+}
+.card.asignado .card-body {
+  background-color: #fafafa; /* Gris mucho más clarito */
+  padding: 3px !important;
+  margin: 3px !important;
+}
+
+/* FINALIZADO - Verde */
+.card.pendiente {
+  border: 1px solid #eac7c7;
+}
+.card.pendiente .card-header,
+.card.pendiente .card-footer {
+  background-color: #eac7c7; /* Verde "oscuro" suave */
+  color: #125a15;
+}
+.card.pendiente .card-body {
+  background-color: #ffecec; /* Verde mucho más clarito */
+}
+
+/* Opcional: sombra y hover */
+.card {
+  box-shadow: 0 0.15rem 0.5rem rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border-radius: 8px;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0.3rem 0.8rem rgba(0, 0, 0, 0.1);
+}
+
+.footer-icon {
+  height: 1.6rem;
+  margin-right: 0.5rem;
+  cursor: pointer;
+}
+
+.footer-text{
+font-size: 1.2rem;
+}
+
+.icon-table{
+  width: 2.4rem;
+}
+
+.icon-menu{
+  height: 2.4rem;
+}
+
+/* Menú lateral */
+.lateral-menu {
+  position: fixed;
+  top: 0;
+  right: -320px; /* Fuera de la pantalla */
+  width: 200px;
+  height: 100vh;
+  background: white;
+  box-shadow: -4px 0 12px rgba(0,0,0,0.15);
+  z-index: 1050;
+  transition: right 0.3s ease;
+  overflow-y: auto;
+}
+
+.lateral-menu.open {
+  right: 0;
+}
+
+.menu-icon {
+  width: auto;
+  height: 32px;
+}
+
+.menu-item {
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.menu-item:hover {
+  background-color: #f8f9fa;
+}
+
+/* Overlay oscuro */
+.menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.4);
+  z-index: 1040;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s, visibility 0.3s;
+}
+
+.menu-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
