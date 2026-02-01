@@ -269,7 +269,8 @@ function setupGPXUpload() {
       let result;
       console.log("📁 Procesando archivo GPX...");
       result = processGPX(text);
-      renderResult(result, file.name.endsWith(".tcx")); // pasamos flag para HR
+      const container = document.getElementById("output-container");
+      container.innerHTML = generarContenidoRuta(result, file.name.endsWith(".tcx"));
       await sendToAPI(result);
     } catch (err) {
       console.error("💥 Error:", err);
