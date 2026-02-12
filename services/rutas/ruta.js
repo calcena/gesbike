@@ -10,6 +10,52 @@ const MASSBIKER = 52;
 // Variable global para almacenar los datos de la ruta actual
 window.rutaActual = null;
 
+// Función helper para obtener la URL base de la API
+function getApiBaseUrl() {
+  const protocol = window.location.protocol;
+  const host = window.location.host;
+  const pathname = window.location.pathname;
+  
+  // Caso 1: Estamos en una subcarpeta tipo /gesBike/views/rutas/ruta.php
+  const viewsIndex = pathname.indexOf('/views/');
+  if (viewsIndex !== -1) {
+    return `${protocol}//${host}${pathname.substring(0, viewsIndex)}`;
+  }
+  
+  // Caso 2: Estamos en la raíz tipo /views/rutas/ruta.php
+  // La raíz es justo antes de /views/
+  if (pathname.startsWith('/views/')) {
+    return `${protocol}//${host}`;
+  }
+  
+  // Caso 3: Fallback - buscar rutas/ en el path
+  const rutasIndex = pathname.indexOf('/rutas/');
+  if (rutasIndex !== -1) {
+    // Subir dos niveles desde /rutas/
+    const basePath = pathname.substring(0, rutasIndex);
+    return `${protocol}//${host}${basePath}`;
+  }
+  
+  // Último recurso: usar el path actual hasta el archivo
+  const lastSlash = pathname.lastIndexOf('/');
+  if (lastSlash !== -1) {
+    const dirPath = pathname.substring(0, lastSlash);
+    // Subir un nivel más (estamos en /rutas/)
+    const parentSlash = dirPath.lastIndexOf('/');
+    if (parentSlash !== -1) {
+      return `${protocol}//${host}${pathname.substring(0, parentSlash)}`;
+    }
+  }
+  
+  return `${protocol}//${host}`;
+}
+
+// Función helper para construir URLs de API
+function getApiUrl(endpoint) {
+  const baseUrl = getApiBaseUrl();
+  return `${baseUrl}/api/rutas/${endpoint}`;
+}
+
 function haversine(lat1, lon1, lat2, lon2) {
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
@@ -248,6 +294,9 @@ async function initRutas() {
 
 const cambiarVehiculo = async (id) => {
   await setVehiculo(id);
+  // Limpiar campo de búsqueda al cambiar de vehículo
+  const searchInput = document.getElementById("searchRutas");
+  if (searchInput) searchInput.value = "";
   await getRutasByVehiculo();
 };
 
@@ -390,7 +439,7 @@ async function sendToAPISilent(result) {
   };
 
   const response = await axios.post(
-    `../../api/rutas/ruta.php?guardarRutaGPX`,
+    getApiUrl('ruta.php?guardarRutaGPX'),
     { data },
     {
       headers: {
@@ -465,7 +514,7 @@ async function sendToAPI(result) {
 
   try {
     const response = await axios.post(
-      `../../api/rutas/ruta.php?guardarRutaGPX`,
+      getApiUrl('ruta.php?guardarRutaGPX'),
       { data },
       {
         headers: {
@@ -489,9 +538,7 @@ async function sendToAPI(result) {
   } catch (err) {
     console.error("Error al enviar a API:", err);
     await Swal.fire({
-      text: `❌ Error al guardar: ${
-        err.response?.data?.message || err.message
-      }`,
+      text: `❌ Error al guardar: ${err.response?.data?.message || err.message}`,
       icon: "error",
       timer: 3000,
     });
@@ -507,7 +554,7 @@ const guardarRutaManual = async () => {
   };
   try {
     const response = await axios.post(
-      `../../api/rutas/ruta.php?guardarRutaManual`,
+      getApiUrl('ruta.php?guardarRutaManual'),
       { data },
       {
         headers: {
@@ -587,7 +634,7 @@ const actualizarRutaManual = async (id) => {
   };
   try {
     const response = await axios.post(
-      `../../api/rutas/ruta.php?actualizarRutaManual`,
+      getApiUrl('ruta.php?actualizarRutaManual'),
       { data },
       {
         headers: {
@@ -686,7 +733,7 @@ const eliminaRutaManual = async (idRuta) => {
 
   try {
     const response = await axios.post(
-      `../../api/rutas/ruta.php?eliminaRutaManual`,
+      getApiUrl('ruta.php?eliminaRutaManual'),
       { data },
       {
         headers: {
@@ -827,7 +874,7 @@ const showGpxDetails = async (ruta_id) => {
 
   try {
     const response = await axios.post(
-      `../../api/rutas/ruta.php?getRutasById`,
+      getApiUrl('ruta.php?getRutasById'),
       { data },
       {
         headers: {
@@ -878,7 +925,7 @@ const getRutasByVehiculo = async () => {
 
   try {
     const response = await axios.post(
-      `../../api/rutas/ruta.php?getRutasByVehiculo`,
+      getApiUrl('ruta.php?getRutasByVehiculo'),
       { data },
       {
         headers: {
@@ -888,6 +935,36 @@ const getRutasByVehiculo = async () => {
     );
 
     if (response.data.success) {
+      // Almacenar datos originales con formato de búsqueda para filtrado
+      const rutasConFormato = response.data.content.map(item => {
+        const formatFechaTimeISO = (fecha) => {
+          if (!fecha) return "";
+          try {
+            const dateObj = new Date(fecha);
+            if (isNaN(dateObj.getTime())) return "";
+            const dia = String(dateObj.getDate()).padStart(2, "0");
+            const mes = String(dateObj.getMonth() + 1).padStart(2, "0");
+            const año = dateObj.getFullYear();
+            const horas = String(dateObj.getHours()).padStart(2, "0");
+            const minutos = String(dateObj.getMinutes()).padStart(2, "0");
+            return `${dia}/${mes}/${año} ${horas}:${minutos}`;
+          } catch (error) {
+            return "";
+          }
+        };
+        
+        // Normalizar formato de kms para búsqueda (manejar punto y coma)
+        const kmsValor = item.kms ? parseFloat(item.kms) : 0;
+        const acumuladoKmsValor = item.acumulado_kms ? parseFloat(item.acumulado_kms) : 0;
+        
+        return {
+          ...item,
+          fecha_formateada: formatFechaTimeISO(item.fecha_inicio),
+          kms_str: kmsValor.toFixed(2).replace('.', ','),
+          acumulado_kms_str: acumuladoKmsValor.toFixed(2).replace('.', ',')
+        };
+      });
+      window.rutasOriginales = rutasConFormato;
       document.getElementById("main_cards").innerHTML =
         await parseHtmlCardsRutas(response.data.content);
       await formatKilometersBadges();
@@ -956,7 +1033,7 @@ const getResumenBiker = async () => {
 
   try {
     const response = await axios.post(
-      `../../api/rutas/ruta.php?getResumenBiker`,
+      getApiUrl('ruta.php?getResumenBiker'),
       { data }
     );
 
@@ -1118,3 +1195,156 @@ const gotoBackMantenimientos = async () => {
     window.location.href = "../main.php";
   }
 };
+
+// ========== FUNCIÓN DE FILTRADO DE RUTAS ==========
+async function filtrarRutas(searchTerm) {
+  console.log("🔍 Buscando:", searchTerm);
+  const container = document.getElementById("main_cards");
+  
+  if (!window.rutasOriginales || window.rutasOriginales.length === 0) {
+    console.log("⚠️ No hay rutas cargadas");
+    return;
+  }
+  
+  console.log("📊 Total rutas cargadas:", window.rutasOriginales.length);
+  const term = searchTerm.toLowerCase().trim();
+  
+  if (term === "") {
+    // Si no hay término de búsqueda, mostrar todas las rutas
+    const rutasParaMostrar = window.rutasOriginales.map(item => ({
+      id: item.id,
+      vehiculo_id: item.vehiculo_id,
+      fecha_inicio: item.fecha_inicio,
+      kms: item.kms,
+      acumulado_kms: item.acumulado_kms,
+      origen: item.origen,
+      observaciones: item.observaciones
+    }));
+    container.innerHTML = await parseHtmlCardsRutas(rutasParaMostrar);
+    await formatKilometersBadges();
+    
+    // Activar la primera pestaña para mostrar los resultados
+    const tab1Tab = document.getElementById("tab1-tab");
+    const tab1 = document.getElementById("tab1");
+    
+    // Remover active de todas las pestañas
+    document.querySelectorAll('.nav-link').forEach(tab => {
+      tab.classList.remove('active');
+    });
+    document.querySelectorAll('.tab-pane').forEach(pane => {
+      pane.classList.remove('show', 'active');
+    });
+    
+    // Activar tab1
+    tab1Tab.classList.add('active');
+    tab1.classList.add('show', 'active');
+    return;
+  }
+  
+  // Filtrar rutas por fecha, kms o kms acumulados
+  const rutasFiltradas = window.rutasOriginales.filter(item => {
+    const fechaISO = item.fecha_inicio ? item.fecha_inicio.toLowerCase() : "";
+    const fechaFormateada = item.fecha_formateada ? item.fecha_formateada.toLowerCase() : "";
+    const kms = item.kms ? item.kms.toString() : "";
+    const kmsStr = item.kms_str ? item.kms_str.toLowerCase() : "";
+    const kmsTotal = item.acumulado_kms ? item.acumulado_kms.toString() : "";
+    const kmsTotalStr = item.acumulado_kms_str ? item.acumulado_kms_str.toLowerCase() : "";
+    
+    const match = fechaISO.includes(term) || 
+           fechaFormateada.includes(term) || 
+           kms.includes(term) || 
+           kmsStr.includes(term) || 
+           kmsTotal.includes(term) || 
+           kmsTotalStr.includes(term);
+    
+    if (match && term.length > 0) {
+      console.log("✅ Coincidencia encontrada:", {
+        fechaISO: fechaISO.substring(0, 20),
+        fechaFormateada: fechaFormateada,
+        kms: kms,
+        kmsStr: kmsStr
+      });
+    }
+    
+    return match;
+  });
+  
+  console.log("📋 Rutas filtradas:", rutasFiltradas.length);
+  
+  // Extraer solo los datos originales sin los campos formateados adicionales
+  const rutasParaMostrar = rutasFiltradas.map(item => ({
+    id: item.id,
+    vehiculo_id: item.vehiculo_id,
+    fecha_inicio: item.fecha_inicio,
+    kms: item.kms,
+    acumulado_kms: item.acumulado_kms,
+    origen: item.origen,
+    observaciones: item.observaciones
+  }));
+  
+  // Mostrar resultados filtrados
+  container.innerHTML = await parseHtmlCardsRutas(rutasParaMostrar);
+  await formatKilometersBadges();
+  
+  // Activar la primera pestaña para mostrar los resultados
+  const tab1Tab = document.getElementById("tab1-tab");
+  const tab1 = document.getElementById("tab1");
+  
+  // Remover active de todas las pestañas
+  document.querySelectorAll('.nav-link').forEach(tab => {
+    tab.classList.remove('active');
+  });
+  document.querySelectorAll('.tab-pane').forEach(pane => {
+    pane.classList.remove('show', 'active');
+  });
+  
+  // Activar tab1
+  tab1Tab.classList.add('active');
+  tab1.classList.add('show', 'active');
+}
+
+// ========== FUNCIÓN PARA MOSTRAR/OCULTAR INPUT DE BÚSQUEDA EN MÓVIL ==========
+let searchExpanded = false;
+
+function toggleSearchMobile() {
+  const inputMobile = document.getElementById("searchRutasMobile");
+  const inputDesktop = document.getElementById("searchRutas");
+  
+  if (!searchExpanded) {
+    // Expandir input
+    inputMobile.style.width = "100px";
+    inputMobile.style.padding = "0.25rem 0.4rem";
+    inputMobile.style.border = "1px solid #ced4da";
+    inputMobile.style.borderRadius = "4px 4px 0 0";
+    inputMobile.style.borderBottom = "2px solid #dee2e6";
+    inputMobile.focus();
+    searchExpanded = true;
+  } else {
+    // Colapsar input
+    inputMobile.style.width = "0";
+    inputMobile.style.padding = "0";
+    inputMobile.style.border = "none";
+    inputMobile.value = "";
+    // Limpiar búsqueda al cerrar
+    if (inputDesktop) {
+      inputDesktop.value = "";
+    }
+    filtrarRutas("");
+    searchExpanded = false;
+  }
+}
+
+// Cerrar input de búsqueda al hacer clic fuera
+document.addEventListener('click', function(event) {
+  const searchContainer = document.getElementById('searchContainer');
+  const inputMobile = document.getElementById("searchRutasMobile");
+  
+  if (searchExpanded && searchContainer && !searchContainer.contains(event.target)) {
+    inputMobile.style.width = "0";
+    inputMobile.style.padding = "0";
+    inputMobile.style.border = "none";
+    inputMobile.value = "";
+    filtrarRutas("");
+    searchExpanded = false;
+  }
+});

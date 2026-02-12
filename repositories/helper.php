@@ -23,7 +23,7 @@ function set_kilometros_by_vehiculo($params)
     global $db;
     $db = conectar();
     $vehiculo_id = $params['vehiculo_id'];
-    $kms = $params['kms'];
+    $kms = (int) $params['kms'];
     $sql = "
         INSERT INTO ultimos_kms (vehiculo_id, kms)
         VALUES (:vehiculo_id, :kms)

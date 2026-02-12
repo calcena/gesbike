@@ -27,7 +27,8 @@ create table
     if not exists ultimos_kms (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         vehiculo_id INTEGER NOT NULL UNIQUE,
-        kms INTEGER
+        kms INTEGER,
+        fecha_actualizacion DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
 create table

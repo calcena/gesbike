@@ -21,7 +21,6 @@ switch ($action) {
     case 'guardarRutaManual':
     case 'actualizarRutaManual':
     case 'eliminaRutaManual':
-    // case 'getResumenByUser':
     case 'getResumenBiker':
         $controllerFile = ROOT_PATH . '/controllers/ruta.php';
         if (!file_exists($controllerFile)) {
@@ -41,10 +40,7 @@ switch ($action) {
         header('Content-Type: application/json');
         echo json_encode([
             'success' => false,
-            'error' => $e
+            'error' => 'Accion no valida: ' . $action
         ]);
         exit;
 }
-
-
-

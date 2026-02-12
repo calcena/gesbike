@@ -50,28 +50,56 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
         <!-- Pestañas (Nav Tabs) -->
         <ul class="nav nav-tabs" id="myTab" role="tablist">
             <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="tab1-tab" data-bs-toggle="tab" data-bs-target="#tab1" type="button"
+                <button class="nav-link active px-2 px-md-3" id="tab1-tab" data-bs-toggle="tab" data-bs-target="#tab1" type="button"
                     role="tab" aria-controls="tab1" aria-selected="true">
-                    <span style="font-size: 25px">📋</span>
+                    <span style="font-size: 22px" class="d-md-none">📋</span>
+                    <span style="font-size: 25px" class="d-none d-md-inline">📋</span>
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="tab2-tab" data-bs-toggle="tab" data-bs-target="#tab2" type="button"
+                <button class="nav-link px-2 px-md-3" id="tab2-tab" data-bs-toggle="tab" data-bs-target="#tab2" type="button"
                     role="tab" aria-controls="tab2" aria-selected="false" onclick="">
-                    <span style="font-size: 25px">📌</span>
+                    <span style="font-size: 22px" class="d-md-none">📌</span>
+                    <span style="font-size: 25px" class="d-none d-md-inline">📌</span>
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="tab3-tab" data-bs-toggle="tab" data-bs-target="#tab3" type="button"
+                <button class="nav-link px-2 px-md-3" id="tab3-tab" data-bs-toggle="tab" data-bs-target="#tab3" type="button"
                     role="tab" aria-controls="tab3" aria-selected="false" onclick="">
-                    <span style="font-size: 25px">⌚</span>
+                    <span style="font-size: 22px" class="d-md-none">⌚</span>
+                    <span style="font-size: 25px" class="d-none d-md-inline">⌚</span>
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="tab4-tab" data-bs-toggle="tab" data-bs-target="#tab4" type="button"
+                <button class="nav-link px-2 px-md-3" id="tab4-tab" data-bs-toggle="tab" data-bs-target="#tab4" type="button"
                     role="tab" aria-controls="tab4" aria-selected="false" onclick="getResumenBiker()">
-                    <span style="font-size: 25px">📊</span>
+                    <span style="font-size: 22px" class="d-md-none">📊</span>
+                    <span style="font-size: 25px" class="d-none d-md-inline">📊</span>
                 </button>
+            </li>
+            <li class="nav-item ms-auto d-flex align-items-end" role="presentation" style="padding-left: 5px;">
+                <div class="input-group" style="margin-bottom: -1px;" id="searchContainer">
+                    <!-- Icono de búsqueda visible en móvil -->
+                    <span class="input-group-text d-md-none" 
+                          style="background: transparent; border: none; cursor: pointer; padding: 0 5px 8px 0;"
+                          onclick="toggleSearchMobile()">
+                        <i class="fas fa-search" style="font-size: 18px;"></i>
+                    </span>
+                    <!-- Input visible en desktop -->
+                    <span class="input-group-text d-none d-md-flex" 
+                          style="background: transparent; border: none; padding: 0 5px 8px 0;">
+                        <i class="fas fa-search" style="font-size: 14px;"></i>
+                    </span>
+                    <input type="text" id="searchRutas" class="form-control form-control-sm d-none d-md-block" 
+                        placeholder="Buscar..." 
+                        style="width: 110px; border-radius: 4px 4px 0 0; border-bottom: 2px solid #dee2e6; padding: 0.25rem 0.4rem; font-size: 0.8rem;"
+                        onkeyup="filtrarRutas(this.value)">
+                    <!-- Input móvil expandido -->
+                    <input type="text" id="searchRutasMobile" class="form-control form-control-sm d-md-none" 
+                        placeholder="Buscar..." 
+                        style="width: 0; padding: 0; border: none; transition: all 0.3s ease; font-size: 0.8rem;"
+                        onkeyup="filtrarRutas(this.value)">
+                </div>
             </li>
         </ul>
         <!-- Contenido de las pestañas -->

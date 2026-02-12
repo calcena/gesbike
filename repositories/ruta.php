@@ -23,12 +23,25 @@ function get_rutas_by_id($params)
 function eliminar_ruta($params)
 {
     $db = conectar();
+    
+    // Obtener el vehiculo_id antes de eliminar
+    $stmt = $db->prepare("SELECT vehiculo_id FROM rutas WHERE id = ?");
+    $stmt->execute([$params['ruta_id']]);
+    $vehiculo_id = $stmt->fetchColumn();
+    
     $stmt = $db->prepare("
                                 delete from rutas
                                 where id = ?
                             ");
     $stmt->execute([$params['ruta_id']]);
-    return $stmt->rowCount();
+    $deleted = $stmt->rowCount();
+    
+    // Actualizar tabla ultimos_kms si se eliminó correctamente
+    if ($deleted > 0 && $vehiculo_id) {
+        actualizar_ultimos_kms($db, $vehiculo_id);
+    }
+    
+    return $deleted;
 }
 
 
@@ -101,7 +114,12 @@ function add_ruta_manual($params)
         // Existe → devolver ID
         $sel = $db->prepare("SELECT id FROM rutas WHERE vehiculo_id = ? AND fecha_inicio = ?");
         $sel->execute([$params['vehiculo_id'], $params['fecha']]);
-        return (int) $sel->fetchColumn();
+        $ruta_id = (int) $sel->fetchColumn();
+        
+        // Actualizar tabla ultimos_kms con la suma de kms del vehiculo
+        actualizar_ultimos_kms($db, $params['vehiculo_id']);
+        
+        return $ruta_id;
     }
 
     // 2. Si no existe, INSERT
@@ -117,7 +135,12 @@ function add_ruta_manual($params)
         $params['observaciones'] ?? null,
     ]);
 
-    return (int) $db->lastInsertId();
+    $ruta_id = (int) $db->lastInsertId();
+    
+    // Actualizar tabla ultimos_kms con la suma de kms del vehiculo
+    actualizar_ultimos_kms($db, $params['vehiculo_id']);
+    
+    return $ruta_id;
 }
 
 function update_ruta_manual($params) {
@@ -142,6 +165,9 @@ function update_ruta_manual($params) {
     ]);
     
     if ($result && $upd->rowCount() > 0) {
+        // Actualizar tabla ultimos_kms con la suma de kms del vehiculo
+        actualizar_ultimos_kms($db, $params['vehiculo_id']);
+        
         return (int) $params['id'];
     }
     
@@ -203,7 +229,12 @@ function create_ruta_file($params)
         // Existe → devolver ID
         $sel = $db->prepare("SELECT id FROM rutas WHERE vehiculo_id = ? AND fecha_inicio = ?");
         $sel->execute([$params['vehiculo_id'], $params['fecha_inicio']]);
-        return (int) $sel->fetchColumn();
+        $ruta_id = (int) $sel->fetchColumn();
+        
+        // Actualizar tabla ultimos_kms con la suma de kms del vehiculo
+        actualizar_ultimos_kms($db, $params['vehiculo_id']);
+        
+        return $ruta_id;
     }
 
     // 2. Si no existe, INSERT
@@ -236,7 +267,37 @@ function create_ruta_file($params)
         $params['tiempo_bajada']
     ]);
 
-    return (int) $db->lastInsertId();
+    $ruta_id = (int) $db->lastInsertId();
+    
+    // Actualizar tabla ultimos_kms con la suma de kms del vehiculo
+    actualizar_ultimos_kms($db, $params['vehiculo_id']);
+    
+    return $ruta_id;
+}
+
+function actualizar_ultimos_kms($db, $vehiculo_id) {
+    // Calcular la suma total de kms para el vehiculo
+    $stmt = $db->prepare("SELECT COALESCE(SUM(kms), 0) as total_kms FROM rutas WHERE vehiculo_id = ? AND activo = 1");
+    $stmt->execute([$vehiculo_id]);
+    $total_kms = $stmt->fetchColumn();
+    
+    // Tomar solo la parte entera sin redondear
+    $total_kms = (int) $total_kms;
+    
+    // Verificar si ya existe un registro para este vehiculo
+    $stmt = $db->prepare("SELECT id FROM ultimos_kms WHERE vehiculo_id = ?");
+    $stmt->execute([$vehiculo_id]);
+    $existe = $stmt->fetchColumn();
+    
+    if ($existe) {
+        // Actualizar registro existente
+        $stmt = $db->prepare("UPDATE ultimos_kms SET kms = ?, fecha_actualizacion = datetime('now') WHERE vehiculo_id = ?");
+        $stmt->execute([$total_kms, $vehiculo_id]);
+    } else {
+        // Insertar nuevo registro
+        $stmt = $db->prepare("INSERT INTO ultimos_kms (vehiculo_id, kms, fecha_actualizacion) VALUES (?, ?, datetime('now'))");
+        $stmt->execute([$vehiculo_id, $total_kms]);
+    }
 }
 
 // function get_resumem_usuario($params)

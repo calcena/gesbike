@@ -57,12 +57,12 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-const deleteKmsDetail = async () => {
+async function deleteKmsDetail() {
   document.getElementById("kms_realizados").value = null;
   await applyKmsDetail(document.getElementById("kms_realizados").value);
-};
+}
 
-const applyKmsDetail = async (kms) => {
+async function applyKmsDetail(kms) {
   sessionStorage.setItem("kms_actuales", kms);
   if (window.location.href.includes("detalle.php")) {
     basePath = "../..";
@@ -101,7 +101,7 @@ const applyKmsDetail = async (kms) => {
   }
 };
 
-const getKmsDetail = async () => {
+async function getKmsDetail() {
   if (window.location.href.includes("views/main.php")) {
     basePath = "..";
   } else {
