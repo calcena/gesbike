@@ -5,6 +5,11 @@ const REGISTROS_POR_PAGINA = 10;
 window.paginaActual = 1;
 window.totalPaginas = 1;
 
+// Clave para sessionStorage
+const SESSION_KEY_PAGE = 'main_pagina_actual';
+const SESSION_KEY_EXPANDED = 'main_cards_expandidos';
+const SESSION_KEY_VEHICULO = 'main_vehiculo_id';
+
 const parseHtmlCardMantenimientos = (data) => {
   // Agrupar registros por fecha y kms
   const grupos = [];
@@ -243,6 +248,9 @@ const getListMantenimientosByVehiculo = async () => {
       await formatKilometersBadges();
       configurarLongPressMantenimientos(); // Configurar pulsación larga
       renderizarControlesPaginacionMain();
+      
+      // Restaurar cards expandidos (incluso si no hay paginación)
+      restaurarCardsExpandidos();
     }
   } catch (error) {
     console.error("Error en getListMantenimientosByVehiculo:", error.message);
@@ -283,6 +291,36 @@ function renderizarControlesPaginacionMain() {
   `;
 
   container.insertAdjacentHTML('beforeend', controlesHTML);
+  
+  // Restaurar estado expandido de cards
+  restaurarCardsExpandidos();
+}
+
+// Función para restaurar cards expandidos
+function restaurarCardsExpandidos() {
+  const cardsExpandidosStr = sessionStorage.getItem(SESSION_KEY_EXPANDED);
+  if (!cardsExpandidosStr) return;
+  
+  try {
+    const cardsExpandidos = JSON.parse(cardsExpandidosStr);
+    const vehiculoGuardado = sessionStorage.getItem(SESSION_KEY_VEHICULO);
+    const vehiculoActual = sessionStorage.getItem("vehiculo_id");
+    
+    // Solo restaurar si es el mismo vehículo
+    if (vehiculoGuardado === vehiculoActual) {
+      cardsExpandidos.forEach(mantId => {
+        const card = document.querySelector(`.mantenimiento-card[data-mant-id="${mantId}"]`);
+        if (card && card.classList.contains('has-related')) {
+          card.classList.add('expanded');
+        }
+      });
+    }
+    
+    // Limpiar el storage después de restaurar (para no mantenerlo indefinidamente)
+    sessionStorage.removeItem(SESSION_KEY_EXPANDED);
+  } catch (e) {
+    console.error('Error al restaurar cards expandidos:', e);
+  }
 }
 
 // Función para cambiar de página
@@ -302,13 +340,35 @@ const showObservacionesMantenimiento = (valor) => {
 };
 
 const editMantenimiento = async (id) => {
+  // Guardar estado actual antes de navegar
   sessionStorage.setItem("mantenimiento_id", id);
+  sessionStorage.setItem(SESSION_KEY_PAGE, window.paginaActual);
+  sessionStorage.setItem(SESSION_KEY_VEHICULO, sessionStorage.getItem("vehiculo_id"));
+  
+  // Guardar IDs de cards expandidos
+  const cardsExpandidos = [];
+  document.querySelectorAll('.mantenimiento-card.expanded').forEach(card => {
+    cardsExpandidos.push(card.dataset.mantId);
+  });
+  sessionStorage.setItem(SESSION_KEY_EXPANDED, JSON.stringify(cardsExpandidos));
+  
   window.location.href = "mantenimientos/mantenimiento.php";
 };
 
 const initMain = async () => {
   await resetSessionStorage();
   await getVehiculosByUser();
+  
+  // Restaurar página guardada si estamos volviendo del detalle
+  const paginaGuardada = sessionStorage.getItem(SESSION_KEY_PAGE);
+  const vehiculoGuardado = sessionStorage.getItem(SESSION_KEY_VEHICULO);
+  const vehiculoActual = sessionStorage.getItem("vehiculo_id");
+  
+  // Solo restaurar página si es el mismo vehículo
+  if (paginaGuardada && vehiculoGuardado === vehiculoActual) {
+    window.paginaActual = parseInt(paginaGuardada);
+  }
+  
   if (sessionStorage.getItem("login_parent") === "true") {
     sessionStorage.setItem("login_parent", "false");
     setTimeout(async () => {
