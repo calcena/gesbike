@@ -15,19 +15,19 @@ function getApiBaseUrl() {
   const protocol = window.location.protocol;
   const host = window.location.host;
   const pathname = window.location.pathname;
-  
+
   // Caso 1: Estamos en una subcarpeta tipo /gesBike/views/rutas/ruta.php
   const viewsIndex = pathname.indexOf('/views/');
   if (viewsIndex !== -1) {
     return `${protocol}//${host}${pathname.substring(0, viewsIndex)}`;
   }
-  
+
   // Caso 2: Estamos en la raíz tipo /views/rutas/ruta.php
   // La raíz es justo antes de /views/
   if (pathname.startsWith('/views/')) {
     return `${protocol}//${host}`;
   }
-  
+
   // Caso 3: Fallback - buscar rutas/ en el path
   const rutasIndex = pathname.indexOf('/rutas/');
   if (rutasIndex !== -1) {
@@ -35,7 +35,7 @@ function getApiBaseUrl() {
     const basePath = pathname.substring(0, rutasIndex);
     return `${protocol}//${host}${basePath}`;
   }
-  
+
   // Último recurso: usar el path actual hasta el archivo
   const lastSlash = pathname.lastIndexOf('/');
   if (lastSlash !== -1) {
@@ -46,7 +46,7 @@ function getApiBaseUrl() {
       return `${protocol}//${host}${pathname.substring(0, parentSlash)}`;
     }
   }
-  
+
   return `${protocol}//${host}`;
 }
 
@@ -144,7 +144,6 @@ function calcularTiemposTerreno(trkpts) {
 }
 
 function processGPX(text) {
-  console.log("Iniciando processGPX");
 
   const parser = new DOMParser();
   const doc = parser.parseFromString(text, "application/xml");
@@ -175,7 +174,6 @@ function processGPX(text) {
     )
     .sort((a, b) => a.time - b.time);
 
-  console.log(`Puntos GPX procesados: ${trkpts.length}`);
 
   if (trkpts.length < 2)
     throw new Error("Menos de 2 puntos válidos en el archivo GPX.");
@@ -316,7 +314,6 @@ function setupGPXUpload() {
     try {
       const text = await file.text();
       let result;
-      console.log("📁 Procesando archivo GPX...");
       result = processGPX(text);
       const container = document.getElementById("output-container");
       container.innerHTML = generarContenidoRuta(result, file.name.endsWith(".tcx"));
@@ -351,9 +348,6 @@ async function handleMultipleGPXFiles(e) {
   if (files.length === 0) return;
 
   const loadingIndicator = document.getElementById("loading-indicator");
-
-  console.log(`Archivos seleccionados: ${files.length}`);
-
   if (loadingIndicator) {
     loadingIndicator.style.display = "block";
     loadingIndicator.innerHTML = `Procesando 0/${files.length} archivos...`;
@@ -370,15 +364,11 @@ async function handleMultipleGPXFiles(e) {
           files.length
         }: ${file.name}`;
       }
-
-      console.log(`Procesando archivo: ${file.name}`);
       const text = await file.text();
       const result = processGPX(text);
 
       await sendToAPISilent(result);
       successCount++;
-
-      console.log(`✅ ${file.name} procesado correctamente`);
     } catch (err) {
       console.error(`💥 Error al procesar ${file.name}:`, err);
       errorCount++;
@@ -591,31 +581,31 @@ const editarRutaManual = (id, fecha, kms, observaciones) => {
   document.getElementById("kms_ruta").value = "";
   document.getElementById("obs_ruta").value = "";
   document.getElementById("fecha_ruta").value = "";
-  
+
   // Cambiar a la pestaña de manual
   const tab2Tab = document.getElementById("tab2-tab");
   const tab2 = document.getElementById("tab2");
   const tab1Tab = document.getElementById("tab1-tab");
   const tab1 = document.getElementById("tab1");
-  
+
   tab1Tab.classList.remove("active");
   tab1.classList.remove("show", "active");
   tab2Tab.classList.add("active");
   tab2.classList.add("show", "active");
-  
+
   // Cargar los datos de la ruta
   setTimeout(() => {
     document.getElementById("kms_ruta").value = kms;
     document.getElementById("obs_ruta").value = observaciones.replace(/'/g, "\\'");
     document.getElementById("fecha_ruta").value = fecha.split(' ')[0];
-    
+
     // Cambiar el botón de guardar para que haga update en lugar de insert
     const saveBtn = document.querySelector('img[onclick="guardarRutaManual()"]');
     if (saveBtn) {
       saveBtn.setAttribute("onclick", `actualizarRutaManual('${id}')`);
       saveBtn.setAttribute("title", "Actualizar ruta");
     }
-    
+
     // Mostrar botón cancelar
     const cancelBtn = document.getElementById("cancelar_btn");
     if (cancelBtn) {
@@ -650,36 +640,36 @@ const actualizarRutaManual = async (id) => {
         timer: 2000,
         showConfirmButton: false,
       });
-      
+
       // Restaurar el botón original
       const saveBtn = document.querySelector('img[onclick*="actualizarRutaManual"]');
       if (saveBtn) {
         saveBtn.setAttribute("onclick", "guardarRutaManual()");
         saveBtn.setAttribute("title", "Guardar ruta");
       }
-      
+
       // Limpiar formulario
       document.getElementById("kms_ruta").value = "";
       document.getElementById("obs_ruta").value = "";
       document.getElementById("fecha_ruta").value = "";
-      
+
       // Ocultar botón cancelar
       const cancelBtn = document.getElementById("cancelar_btn");
       if (cancelBtn) {
         cancelBtn.style.display = "none";
       }
-      
+
       // Volver a la pestaña principal y recargar
       const tab1Tab = document.getElementById("tab1-tab");
       const tab1 = document.getElementById("tab1");
       const tab2Tab = document.getElementById("tab2-tab");
       const tab2 = document.getElementById("tab2");
-      
+
       tab2Tab.classList.remove("active");
       tab2.classList.remove("show", "active");
       tab1Tab.classList.add("active");
       tab1.classList.add("show", "active");
-      
+
       await getRutasByVehiculo();
       await crearBackup();
     } else {
@@ -702,28 +692,66 @@ const cancelarEdicionRuta = () => {
     saveBtn.setAttribute("onclick", "guardarRutaManual()");
     saveBtn.setAttribute("title", "Guardar ruta");
   }
-  
+
   // Limpiar formulario
   document.getElementById("kms_ruta").value = "";
   document.getElementById("obs_ruta").value = "";
   document.getElementById("fecha_ruta").value = "";
-  
+
   // Ocultar botón cancelar
   const cancelBtn = document.getElementById("cancelar_btn");
   if (cancelBtn) {
     cancelBtn.style.display = "none";
   }
-  
+
   // Volver a la pestaña principal
   const tab1Tab = document.getElementById("tab1-tab");
   const tab1 = document.getElementById("tab1");
   const tab2Tab = document.getElementById("tab2-tab");
   const tab2 = document.getElementById("tab2");
-  
+
   tab2Tab.classList.remove("active");
   tab2.classList.remove("show", "active");
   tab1Tab.classList.add("active");
   tab1.classList.add("show", "active");
+};
+
+const confirmarEliminarRutaGPX = async (idRuta, fecha, kms) => {
+  const formatFechaTimeISO = (fechaStr) => {
+    if (!fechaStr) return "";
+    try {
+      const dateObj = new Date(fechaStr);
+      if (isNaN(dateObj.getTime())) return "";
+      const dia = String(dateObj.getDate()).padStart(2, "0");
+      const mes = String(dateObj.getMonth() + 1).padStart(2, "0");
+      const año = dateObj.getFullYear();
+      return `${dia}/${mes}/${año}`;
+    } catch (error) {
+      return "";
+    }
+  };
+
+  const result = await Swal.fire({
+    title: 'Eliminar ruta GPX',
+    html: `
+      <div style="text-align: left;">
+        <p>¿Está seguro que desea eliminar esta ruta?</p>
+        <p><strong>Fecha:</strong> ${formatFechaTimeISO(fecha)}</p>
+        <p><strong>Kilómetros:</strong> ${kms} km</p>
+        <p class="text-danger mt-3"><small>Esta acción no se puede deshacer.</small></p>
+      </div>
+    `,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    cancelButtonColor: '#3085d6',
+    confirmButtonText: 'Sí, eliminar',
+    cancelButtonText: 'Cancelar'
+  });
+
+  if (result.isConfirmed) {
+    await eliminaRutaManual(idRuta);
+  }
 };
 
 const eliminaRutaManual = async (idRuta) => {
@@ -754,6 +782,119 @@ const eliminaRutaManual = async (idRuta) => {
     });
   }
 };
+
+// Configurar eventos de pulsación larga (long press) para tarjetas GPX
+function configurarLongPressCards() {
+  const LONG_PRESS_DURATION = 1000; // milisegundos (1 segundo)
+  let pressTimer;
+  let isPressing = false;
+  let currentCard = null;
+  let progressIndicator = null;
+
+  // Función para crear indicador de progreso
+  const createProgressIndicator = (card) => {
+    const indicator = document.createElement('div');
+    indicator.style.cssText = `
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #dc3545, #ff6b7a);
+      width: 0%;
+      transition: width ${LONG_PRESS_DURATION}ms linear;
+      border-radius: 0 0 0 4px;
+      z-index: 10;
+    `;
+    card.style.position = 'relative';
+    card.appendChild(indicator);
+
+    // Forzar reflow para activar la transición
+    indicator.offsetHeight;
+    indicator.style.width = '100%';
+
+    return indicator;
+  };
+
+  // Función para iniciar la pulsación
+  const startPress = (card, e) => {
+    if (e.button !== 0 && e.type === 'mousedown') return; // Solo click izquierdo
+
+    isPressing = true;
+    currentCard = card;
+
+    // Feedback visual - cambiar apariencia
+    card.style.transform = 'scale(0.98)';
+    card.style.transition = 'transform 0.2s, box-shadow 0.2s';
+    card.style.boxShadow = '0 4px 8px rgba(220, 53, 69, 0.3)';
+
+    // Crear indicador de progreso
+    progressIndicator = createProgressIndicator(card);
+
+    pressTimer = setTimeout(() => {
+      if (isPressing && currentCard === card) {
+        // Pulsación larga completada
+        isPressing = false;
+
+        // Restaurar estilos
+        card.style.transform = 'scale(1)';
+        card.style.boxShadow = '';
+        if (progressIndicator && progressIndicator.parentNode) {
+          progressIndicator.remove();
+        }
+        progressIndicator = null;
+
+        // Obtener datos del dataset
+        const id = card.dataset.gpxId;
+        const fecha = card.dataset.gpxFecha;
+        const kms = card.dataset.gpxKms;
+
+        // Mostrar confirmación
+        confirmarEliminarRutaGPX(id, fecha, kms);
+      }
+    }, LONG_PRESS_DURATION);
+  };
+
+  // Función para cancelar la pulsación
+  const cancelPress = (card) => {
+    if (pressTimer) {
+      clearTimeout(pressTimer);
+      pressTimer = null;
+    }
+    isPressing = false;
+    currentCard = null;
+
+    // Restaurar estilos
+    card.style.transform = 'scale(1)';
+    card.style.boxShadow = '';
+
+    // Eliminar indicador de progreso
+    if (progressIndicator && progressIndicator.parentNode) {
+      progressIndicator.remove();
+    }
+    progressIndicator = null;
+  };
+
+  // Configurar eventos para todas las tarjetas GPX
+  const gpxCards = document.querySelectorAll('[data-gpx-id]');
+  gpxCards.forEach(card => {
+    // Mouse events
+    card.addEventListener('mousedown', (e) => startPress(card, e));
+    card.addEventListener('mouseup', () => cancelPress(card));
+    card.addEventListener('mouseleave', () => cancelPress(card));
+
+    // Touch events (para móviles)
+    card.addEventListener('touchstart', (e) => {
+      // No prevenir default para permitir scroll, solo para el timer
+      startPress(card, e);
+    }, { passive: true });
+    card.addEventListener('touchend', () => cancelPress(card));
+    card.addEventListener('touchcancel', () => cancelPress(card));
+    card.addEventListener('touchmove', () => cancelPress(card)); // Cancelar si se mueve el dedo
+
+    // Prevenir el menú contextual en móviles
+    card.addEventListener('contextmenu', (e) => e.preventDefault());
+  });
+}
 
 // Función para generar el contenido HTML de la ruta
 function generarContenidoRuta(ruta, hasHR = false) {
@@ -800,7 +941,6 @@ function generarContenidoRuta(ruta, hasHR = false) {
       value: `${ruta.pct_bajada}%`,
     },
   ];
-  console.log("render =>", ruta);
   if (
     hasHR ||
     (ruta.frecuencia_cardiaca_promedio !== undefined &&
@@ -952,11 +1092,11 @@ const getRutasByVehiculo = async () => {
             return "";
           }
         };
-        
+
         // Normalizar formato de kms para búsqueda (manejar punto y coma)
         const kmsValor = item.kms ? parseFloat(item.kms) : 0;
         const acumuladoKmsValor = item.acumulado_kms ? parseFloat(item.acumulado_kms) : 0;
-        
+
         return {
           ...item,
           fecha_formateada: formatFechaTimeISO(item.fecha_inicio),
@@ -968,6 +1108,7 @@ const getRutasByVehiculo = async () => {
       document.getElementById("main_cards").innerHTML =
         await parseHtmlCardsRutas(response.data.content);
       await formatKilometersBadges();
+      configurarLongPressCards(); // Configurar pulsación larga para cards GPX
     }
   } catch (err) {
     console.error("Error al obtener rutas:", err);
@@ -996,15 +1137,18 @@ const parseHtmlCardsRutas = async (data) => {
     .map((item) => {
       const iconType =
         item.origen === "gpx"
-          ? `<img height="25px" src="../../assets/images/icons/gpx.png" alt="GPX" onclick="showGpxDetails(${item.id})" style="cursor: pointer;" title="Ver detalles GPX">`
+          ? `<img height="25px" src="../../assets/images/icons/gpx.png" alt="GPX" onclick="event.stopPropagation(); showGpxDetails(${item.id})" style="cursor: pointer;" title="Ver detalles GPX">`
           : `<img class="me-3" height="20px" src="../../assets/images/icons/papelera.png" alt="Eliminar" onclick="eliminaRutaManual('${item.id}')" style="cursor: pointer;" title="Ver observaciones">`;
-      const cardClickHandler = item.origen !== "gpx" ? 
-        `onclick="editarRutaManual('${item.id}', '${item.fecha_inicio}', '${item.kms}', '${item.observaciones || ''}')" style="cursor: pointer;"` : 
-        '';
-      
+
+      // Para rutas manuales: modo edición al pulsar
+      // Para rutas GPX: eliminación con pulsación larga (long press)
+      const cardAttributes = item.origen !== "gpx" ?
+        `onclick="editarRutaManual('${item.id}', '${item.fecha_inicio}', '${item.kms}', '${item.observaciones || ''}')" style="cursor: pointer;"` :
+        `data-gpx-id="${item.id}" data-gpx-fecha="${item.fecha_inicio}" data-gpx-kms="${item.kms}" class="gpx-card" style="cursor: pointer; user-select: none;" title="Mantenga pulsado para eliminar"`;
+
       return `
         <div class="col-12 mb-2">
-          <div class="card shadow-sm" ${cardClickHandler}>
+          <div class="card shadow-sm" ${cardAttributes}>
             <div class="card-body d-flex align-items-center p-2">
               <div class="flex-grow-1">
                 <div class="d-flex justify-content-between align-items-baseline">
@@ -1182,12 +1326,12 @@ const gotoBackMantenimientos = async () => {
     const tab1 = document.getElementById("tab1");
     const tab2Tab = document.getElementById("tab2-tab");
     const tab2 = document.getElementById("tab2");
-    
+
     tab2Tab.classList.remove("active");
     tab2.classList.remove("show", "active");
     tab1Tab.classList.add("active");
     tab1.classList.add("show", "active");
-    
+
     // Restaurar botones y limpiar formulario
     cancelarEdicionRuta();
   } else {
@@ -1198,17 +1342,13 @@ const gotoBackMantenimientos = async () => {
 
 // ========== FUNCIÓN DE FILTRADO DE RUTAS ==========
 async function filtrarRutas(searchTerm) {
-  console.log("🔍 Buscando:", searchTerm);
   const container = document.getElementById("main_cards");
-  
+
   if (!window.rutasOriginales || window.rutasOriginales.length === 0) {
-    console.log("⚠️ No hay rutas cargadas");
     return;
   }
-  
-  console.log("📊 Total rutas cargadas:", window.rutasOriginales.length);
   const term = searchTerm.toLowerCase().trim();
-  
+
   if (term === "") {
     // Si no hay término de búsqueda, mostrar todas las rutas
     const rutasParaMostrar = window.rutasOriginales.map(item => ({
@@ -1222,11 +1362,12 @@ async function filtrarRutas(searchTerm) {
     }));
     container.innerHTML = await parseHtmlCardsRutas(rutasParaMostrar);
     await formatKilometersBadges();
-    
+    configurarLongPressCards(); // Configurar pulsación larga para cards GPX
+
     // Activar la primera pestaña para mostrar los resultados
     const tab1Tab = document.getElementById("tab1-tab");
     const tab1 = document.getElementById("tab1");
-    
+
     // Remover active de todas las pestañas
     document.querySelectorAll('.nav-link').forEach(tab => {
       tab.classList.remove('active');
@@ -1234,13 +1375,13 @@ async function filtrarRutas(searchTerm) {
     document.querySelectorAll('.tab-pane').forEach(pane => {
       pane.classList.remove('show', 'active');
     });
-    
+
     // Activar tab1
     tab1Tab.classList.add('active');
     tab1.classList.add('show', 'active');
     return;
   }
-  
+
   // Filtrar rutas por fecha, kms o kms acumulados
   const rutasFiltradas = window.rutasOriginales.filter(item => {
     const fechaISO = item.fecha_inicio ? item.fecha_inicio.toLowerCase() : "";
@@ -1249,28 +1390,16 @@ async function filtrarRutas(searchTerm) {
     const kmsStr = item.kms_str ? item.kms_str.toLowerCase() : "";
     const kmsTotal = item.acumulado_kms ? item.acumulado_kms.toString() : "";
     const kmsTotalStr = item.acumulado_kms_str ? item.acumulado_kms_str.toLowerCase() : "";
-    
-    const match = fechaISO.includes(term) || 
-           fechaFormateada.includes(term) || 
-           kms.includes(term) || 
-           kmsStr.includes(term) || 
-           kmsTotal.includes(term) || 
+
+    const match = fechaISO.includes(term) ||
+           fechaFormateada.includes(term) ||
+           kms.includes(term) ||
+           kmsStr.includes(term) ||
+           kmsTotal.includes(term) ||
            kmsTotalStr.includes(term);
-    
-    if (match && term.length > 0) {
-      console.log("✅ Coincidencia encontrada:", {
-        fechaISO: fechaISO.substring(0, 20),
-        fechaFormateada: fechaFormateada,
-        kms: kms,
-        kmsStr: kmsStr
-      });
-    }
-    
     return match;
   });
-  
-  console.log("📋 Rutas filtradas:", rutasFiltradas.length);
-  
+
   // Extraer solo los datos originales sin los campos formateados adicionales
   const rutasParaMostrar = rutasFiltradas.map(item => ({
     id: item.id,
@@ -1281,15 +1410,16 @@ async function filtrarRutas(searchTerm) {
     origen: item.origen,
     observaciones: item.observaciones
   }));
-  
+
   // Mostrar resultados filtrados
   container.innerHTML = await parseHtmlCardsRutas(rutasParaMostrar);
   await formatKilometersBadges();
-  
+  configurarLongPressCards(); // Configurar pulsación larga para cards GPX
+
   // Activar la primera pestaña para mostrar los resultados
   const tab1Tab = document.getElementById("tab1-tab");
   const tab1 = document.getElementById("tab1");
-  
+
   // Remover active de todas las pestañas
   document.querySelectorAll('.nav-link').forEach(tab => {
     tab.classList.remove('active');
@@ -1297,7 +1427,7 @@ async function filtrarRutas(searchTerm) {
   document.querySelectorAll('.tab-pane').forEach(pane => {
     pane.classList.remove('show', 'active');
   });
-  
+
   // Activar tab1
   tab1Tab.classList.add('active');
   tab1.classList.add('show', 'active');
@@ -1309,7 +1439,7 @@ let searchExpanded = false;
 function toggleSearchMobile() {
   const inputMobile = document.getElementById("searchRutasMobile");
   const inputDesktop = document.getElementById("searchRutas");
-  
+
   if (!searchExpanded) {
     // Expandir input
     inputMobile.style.width = "100px";
@@ -1338,7 +1468,7 @@ function toggleSearchMobile() {
 document.addEventListener('click', function(event) {
   const searchContainer = document.getElementById('searchContainer');
   const inputMobile = document.getElementById("searchRutasMobile");
-  
+
   if (searchExpanded && searchContainer && !searchContainer.contains(event.target)) {
     inputMobile.style.width = "0";
     inputMobile.style.padding = "0";

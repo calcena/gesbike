@@ -2,15 +2,29 @@
 session_start();
 header('Content-Type: application/json');
 
+// Definir la ruta base del proyecto
+define('ROOT_PATH', dirname(__DIR__));
 
 function realizarBackupSQLite() // ... (código de la función aquí)
 {
-    $dbPath = $_SESSION['base_project'] . '/database/app.db';
-    $backupDir = $_SESSION['base_project'] . '/database/backups/';
+    $dbPath = ROOT_PATH . '/database/app.db';
+    $backupDir = ROOT_PATH . '/database/backups/';
 
-    if (!file_exists($dbPath)) { /* ... */
+    if (!file_exists($dbPath)) {
+        return [
+            'success' => false,
+            'message' => "ERROR: No se encontró la base de datos en: " . $dbPath
+        ];
     }
-    if (!is_dir($backupDir)) { /* ... */
+    
+    if (!is_dir($backupDir)) {
+        // Intentar crear el directorio
+        if (!mkdir($backupDir, 0755, true)) {
+            return [
+                'success' => false,
+                'message' => "ERROR: No se pudo crear el directorio de backups: " . $backupDir
+            ];
+        }
     }
 
     // Lógica de copia...
