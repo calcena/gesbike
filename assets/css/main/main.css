@@ -161,3 +161,92 @@ font-size: 1.2rem;
   visibility: visible;
 }
 
+/* Estilos para cards expandibles de mantenimientos */
+.mantenimiento-card {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.mantenimiento-card:hover {
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
+}
+
+/* Contenedor de registros relacionados (inicialmente oculto) */
+.related-records {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out;
+  background-color: #f8f9fa;
+}
+
+/* Cuando está expandido */
+.mantenimiento-card.expanded .related-records {
+  max-height: 500px;
+  transition: max-height 0.3s ease-in;
+}
+
+/* Indicador visual de expandible */
+.expand-indicator {
+  font-size: 12px;
+  color: #6c757d;
+  transition: transform 0.3s ease;
+  margin-left: 8px;
+}
+
+.mantenimiento-card.expanded .expand-indicator {
+  transform: rotate(180deg);
+}
+
+/* Fila de registro relacionado */
+.related-row {
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 15px;
+  transition: background-color 0.2s ease;
+}
+
+.related-row:hover {
+  background-color: #e3f2fd;
+}
+
+.related-row:not(:last-child) {
+  border-bottom: 1px solid #e0e0e0;
+}
+
+/* Iconos en filas relacionadas */
+.related-row .icon-table {
+  width: 30px;
+  height: 30px;
+  opacity: 0.8;
+}
+
+/* Card principal */
+.main-record {
+  background-color: #ffffff;
+}
+
+/* Animación suave */
+.mantenimiento-card .card-body {
+  transition: background-color 0.2s ease;
+}
+
+/* Barra de progreso para pulsación larga */
+.long-press-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #87CEEB, #ADD8E6);
+  width: 0%;
+  transition: width 0.1s linear;
+  border-radius: 4px 4px 0 0;
+  z-index: 10;
+}
+
+/* Posición relativa para la card */
+.mantenimiento-card.has-related {
+  position: relative;
+}
+
