@@ -1,18 +1,18 @@
+#!/usr/bin/env php
 <?php
-$root = dirname(__DIR__);
-require_once $root . '/helpers/helper.php';
-require_once $root . '/models/attach.php';
-
-header('Content-Type: application/json');
-
 /**
- * Comprime una imagen para que no exceda el tamaño máximo especificado (200KB por defecto)
- * 
- * @param string $sourcePath Ruta de la imagen original
- * @param string $targetPath Ruta donde guardar la imagen comprimida
- * @param int $maxSizeKB Tamaño máximo en KB (default: 200)
- * @return bool True si la compresión fue exitosa
+ * Script para comprimir todas las imágenes existentes en la carpeta attachments
+ * Uso: php compress_existing_images.php
  */
+
+// Configuración
+$attachmentsDir = __DIR__ . '/attachments/';
+$maxSizeKB = 200;
+$processedCount = 0;
+$compressedCount = 0;
+$errorCount = 0;
+
+// Función para comprimir imagen (copiada de attach.php)
 function compressImage($sourcePath, $targetPath, $maxSizeKB = 200) {
     $maxSizeBytes = $maxSizeKB * 1024;
     
@@ -31,7 +31,6 @@ function compressImage($sourcePath, $targetPath, $maxSizeKB = 200) {
             break;
         case 'image/png':
             $image = imagecreatefrompng($sourcePath);
-            // Preservar transparencia para PNG
             imagealphablending($image, false);
             imagesavealpha($image, true);
             break;
@@ -64,10 +63,8 @@ function compressImage($sourcePath, $targetPath, $maxSizeKB = 200) {
             $newWidth = intval($width * $maxDimension / $height);
         }
         
-        // Redimensionar
         $resized = imagecreatetruecolor($newWidth, $newHeight);
         
-        // Preservar transparencia para PNG
         if ($mime === 'image/png') {
             imagealphablending($resized, false);
             imagesavealpha($resized, true);
@@ -80,18 +77,16 @@ function compressImage($sourcePath, $targetPath, $maxSizeKB = 200) {
         $image = $resized;
     }
     
-    // Intentar diferentes niveles de calidad hasta obtener el tamaño deseado
+    // Intentar diferentes niveles de calidad
     $quality = 90;
     $tempFile = $targetPath . '.temp';
     
     do {
-        // Guardar imagen comprimida temporalmente
         switch ($mime) {
             case 'image/jpeg':
                 imagejpeg($image, $tempFile, $quality);
                 break;
             case 'image/png':
-                // PNG usa compresión 0-9 (donde 9 es máxima compresión)
                 $pngCompression = intval((100 - $quality) / 11);
                 imagepng($image, $tempFile, $pngCompression);
                 break;
@@ -105,19 +100,16 @@ function compressImage($sourcePath, $targetPath, $maxSizeKB = 200) {
         
         $fileSize = filesize($tempFile);
         
-        // Si el archivo es menor que el máximo, moverlo y salir
         if ($fileSize <= $maxSizeBytes || $quality <= 30) {
             rename($tempFile, $targetPath);
             imagedestroy($image);
             return true;
         }
         
-        // Reducir calidad y reintentar
         $quality -= 10;
         
     } while ($quality >= 30);
     
-    // Si llegamos aquí, incluso con calidad 30 sigue siendo muy grande
     // Intentar redimensionar más
     $width = imagesx($image);
     $height = imagesy($image);
@@ -186,116 +178,99 @@ function compressImage($sourcePath, $targetPath, $maxSizeKB = 200) {
     imagedestroy($image);
     @unlink($tempFile);
     
-    return file_exists($targetPath) && filesize($targetPath) <= $maxSizeBytes * 1.5; // Permitir hasta 300KB como último recurso
+    return file_exists($targetPath);
 }
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Método no permitido']);
-    exit;
+// Verificar que la carpeta existe
+if (!is_dir($attachmentsDir)) {
+    echo "Error: No se encuentra la carpeta attachments/\n";
+    echo "Ruta esperada: $attachmentsDir\n";
+    exit(1);
 }
 
-if (!isset($_FILES['archivo']) || $_FILES['archivo']['error'] !== UPLOAD_ERR_OK) {
-    $errors = [
-        UPLOAD_ERR_INI_SIZE => 'El archivo excede el límite permitido.',
-        UPLOAD_ERR_FORM_SIZE => 'El archivo excede el límite del formulario.',
-        UPLOAD_ERR_PARTIAL => 'El archivo se subió parcialmente.',
-        UPLOAD_ERR_NO_FILE => 'No se seleccionó ningún archivo.',
-        UPLOAD_ERR_NO_TMP_DIR => 'Falta carpeta temporal.',
-        UPLOAD_ERR_CANT_WRITE => 'Error al escribir en disco.',
-        UPLOAD_ERR_EXTENSION => 'Extensión bloqueó la subida.',
-    ];
-    $code = $_FILES['archivo']['error'] ?? UPLOAD_ERR_NO_FILE;
-    $msg = $errors[$code] ?? 'Error desconocido.';
-    echo json_encode(['success' => false, 'message' => $msg]);
-    exit;
-}
+echo "=== Compresión de imágenes existentes ===\n";
+echo "Carpeta: $attachmentsDir\n";
+echo "Tamaño máximo: {$maxSizeKB}KB\n\n";
 
-$file = $_FILES['archivo'];
+// Extensiones de imagen soportadas
+$imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
 
-$allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-if (!in_array($file['type'], $allowedTypes)) {
-    echo json_encode(['success' => false, 'message' => 'Solo imágenes permitidas.']);
-    exit;
-}
+// Obtener todos los archivos de la carpeta
+$files = scandir($attachmentsDir);
 
-if ($file['size'] > 5 * 1024 * 1024) {
-    echo json_encode(['success' => false, 'message' => 'Máx. 5 MB.']);
-    exit;
-}
-
-$source = $_POST['source'];
-$vehiculo_id = $_POST['vehiculo_id'] ?? null;
-$mantenimiento_id = $_POST['mantenimiento_id'] ?? null;
-
-switch ($source) {
-    case 'recambio':
-        $uploadDir = __DIR__ . '/../assets/images/Recambios/';
-        $basePath = '../assets/images/Recambios/';
-        break;
-    default:
-        $uploadDir = __DIR__ . '/../attachments/';
-        $basePath = '../attachments/';
-        break;
-}
-if (!is_dir($uploadDir)) {
-    if (!mkdir($uploadDir, 0755, true)) {
-        echo json_encode(['success' => false, 'message' => 'No se pudo crear la carpeta de adjuntos']);
-        exit;
+foreach ($files as $file) {
+    // Ignorar directorios . y ..
+    if ($file === '.' || $file === '..') {
+        continue;
+    }
+    
+    $filePath = $attachmentsDir . $file;
+    
+    // Verificar que es un archivo (no directorio)
+    if (!is_file($filePath)) {
+        continue;
+    }
+    
+    // Obtener extensión
+    $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+    
+    // Verificar que es una imagen
+    if (!in_array($ext, $imageExtensions)) {
+        continue;
+    }
+    
+    $processedCount++;
+    $originalSize = filesize($filePath);
+    $originalSizeKB = round($originalSize / 1024, 2);
+    
+    echo "Procesando: $file ({$originalSizeKB}KB) ... ";
+    
+    // Si ya es menor de 200KB, saltar
+    if ($originalSize <= ($maxSizeKB * 1024)) {
+        echo "✓ Ya está comprimida (menor de {$maxSizeKB}KB)\n";
+        continue;
+    }
+    
+    // Crear backup del archivo original
+    $backupPath = $filePath . '.backup';
+    if (!copy($filePath, $backupPath)) {
+        echo "✗ Error al crear backup\n";
+        $errorCount++;
+        continue;
+    }
+    
+    // Comprimir imagen
+    $tempPath = $filePath . '.compressed';
+    
+    if (compressImage($filePath, $tempPath, $maxSizeKB)) {
+        $newSize = filesize($tempPath);
+        $newSizeKB = round($newSize / 1024, 2);
+        $savings = round((($originalSize - $newSize) / $originalSize) * 100, 1);
+        
+        // Reemplazar archivo original con el comprimido
+        if (rename($tempPath, $filePath)) {
+            // Eliminar backup si todo salió bien
+            @unlink($backupPath);
+            echo "✓ Comprimida a {$newSizeKB}KB (ahorro: {$savings}%)\n";
+            $compressedCount++;
+        } else {
+            // Restaurar backup si falló el reemplazo
+            rename($backupPath, $filePath);
+            @unlink($tempPath);
+            echo "✗ Error al reemplazar archivo\n";
+            $errorCount++;
+        }
+    } else {
+        // Restaurar backup si falló la compresión
+        rename($backupPath, $filePath);
+        @unlink($tempPath);
+        echo "✗ Error al comprimir\n";
+        $errorCount++;
     }
 }
 
-if (!$vehiculo_id) {
-    echo json_encode(['success' => false, 'message' => 'vehiculo_id es requerido']);
-    exit;
-}
-
-$ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-$uuid = new_guui_generator(); // asumo que está en helper.php
-$safeName = $uuid . '.jpg'; // Forzar extensión jpg para mejor compresión
-$targetPath = $uploadDir . $safeName;
-
-// Comprimir imagen antes de guardar
-if (!compressImage($file['tmp_name'], $targetPath, 200)) {
-    echo json_encode(['success' => false, 'message' => 'Error al comprimir la imagen.']);
-    exit;
-}
-
-// Limpiar archivo temporal
-@unlink($file['tmp_name']);
-
-try {
-    switch ($source) {
-        case 'adjunto':
-            $adjuntoId = createAdjuntoModel([
-                'guid' => $uuid,
-                'nombre_original' => $file['name'],
-                'ruta' => $safeName,
-                'vehiculo_id' => (int) $vehiculo_id,
-                'mantenimiento_id' => $mantenimiento_id
-            ]);
-            break;
-        default:
-
-            break;
-    }
-    echo json_encode([
-        'success' => true,
-        'message' => 'Archivo subido y registrado',
-        'data' => [
-            'id' => $adjuntoId ?? null,
-            'guid' => $uuid,
-            'file' => $safeName,
-            'file_path' => $basePath . $safeName
-        ]
-    ]);
-
-} catch (Exception $e) {
-    // En producción, logea y no expongas el error
-    error_log("Error BD adjunto: " . $e->getMessage());
-    @unlink($targetPath); // intenta borrar archivo huérfano
-    echo json_encode([
-        'success' => false,
-        'message' => $e->getMessage()
-    ]);
-}
+echo "\n=== Resumen ===\n";
+echo "Total imágenes procesadas: $processedCount\n";
+echo "Imágenes comprimidas: $compressedCount\n";
+echo "Errores: $errorCount\n";
+echo "\nProceso completado.\n";
