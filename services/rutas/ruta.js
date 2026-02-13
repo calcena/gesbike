@@ -10,6 +10,11 @@ const MASSBIKER = 52;
 // Variable global para almacenar los datos de la ruta actual
 window.rutaActual = null;
 
+// Variables de paginación
+const REGISTROS_POR_PAGINA = 10;
+window.paginaActual = 1;
+window.totalPaginas = 1;
+
 // Función helper para obtener la URL base de la API
 function getApiBaseUrl() {
   const protocol = window.location.protocol;
@@ -295,6 +300,8 @@ const cambiarVehiculo = async (id) => {
   // Limpiar campo de búsqueda al cambiar de vehículo
   const searchInput = document.getElementById("searchRutas");
   if (searchInput) searchInput.value = "";
+  // Resetear paginación al cambiar de vehículo
+  window.paginaActual = 1;
   await getRutasByVehiculo();
 };
 
@@ -1105,15 +1112,70 @@ const getRutasByVehiculo = async () => {
         };
       });
       window.rutasOriginales = rutasConFormato;
+
+      // Calcular paginación
+      window.totalPaginas = Math.ceil(rutasConFormato.length / REGISTROS_POR_PAGINA);
+      if (window.paginaActual > window.totalPaginas) {
+        window.paginaActual = window.totalPaginas || 1;
+      }
+
+      // Obtener registros de la página actual
+      const inicio = (window.paginaActual - 1) * REGISTROS_POR_PAGINA;
+      const fin = inicio + REGISTROS_POR_PAGINA;
+      const rutasPagina = response.data.content.slice(inicio, fin);
+
       document.getElementById("main_cards").innerHTML =
-        await parseHtmlCardsRutas(response.data.content);
+        await parseHtmlCardsRutas(rutasPagina);
       await formatKilometersBadges();
       configurarLongPressCards(); // Configurar pulsación larga para cards GPX
+      renderizarControlesPaginacion();
     }
   } catch (err) {
     console.error("Error al obtener rutas:", err);
   }
 };
+
+// Función para renderizar controles de paginación
+function renderizarControlesPaginacion() {
+  const container = document.getElementById("main_cards");
+  const paginacionExistente = document.getElementById("paginacion-container");
+  if (paginacionExistente) {
+    paginacionExistente.remove();
+  }
+
+  if (window.totalPaginas <= 1) return;
+
+  const controlesHTML = `
+    <div id="paginacion-container" class="col-12 mt-1 mb-1">
+      <div class="d-flex justify-content-center align-items-center" style="gap: 15px;">
+        <button
+          class="btn btn-sm btn-outline-secondary ${window.paginaActual === 1 ? 'disabled' : ''}"
+          onclick="cambiarPagina(${window.paginaActual - 1})"
+          ${window.paginaActual === 1 ? 'disabled' : ''}>
+          <i class="fas fa-chevron-left"></i>
+        </button>
+        <span class="text-muted">
+          Página ${window.paginaActual} de ${window.totalPaginas}
+        </span>
+        <button
+          class="btn btn-sm btn-outline-secondary ${window.paginaActual === window.totalPaginas ? 'disabled' : ''}"
+          onclick="cambiarPagina(${window.paginaActual + 1})"
+          ${window.paginaActual === window.totalPaginas ? 'disabled' : ''}>
+          <i class="fas fa-chevron-right"></i>
+        </button>
+      </div>
+    </div>
+  `;
+
+  container.insertAdjacentHTML('beforeend', controlesHTML);
+}
+
+// Función para cambiar de página
+function cambiarPagina(nuevaPagina) {
+  if (nuevaPagina < 1 || nuevaPagina > window.totalPaginas) return;
+  window.paginaActual = nuevaPagina;
+  getRutasByVehiculo();
+}
 
 const parseHtmlCardsRutas = async (data) => {
   const formatFechaTimeISO = (fecha) => {
@@ -1137,8 +1199,8 @@ const parseHtmlCardsRutas = async (data) => {
     .map((item) => {
       const iconType =
         item.origen === "gpx"
-          ? `<img height="25px" src="../../assets/images/icons/gpx.png" alt="GPX" onclick="event.stopPropagation(); showGpxDetails(${item.id})" style="cursor: pointer;" title="Ver detalles GPX">`
-          : `<img class="me-3" height="20px" src="../../assets/images/icons/papelera.png" alt="Eliminar" onclick="eliminaRutaManual('${item.id}')" style="cursor: pointer;" title="Ver observaciones">`;
+          ? `<i class="fas fa-map-marker-alt" style="font-size: 20px; color: #000; cursor: pointer;" onclick="event.stopPropagation(); showGpxDetails(${item.id})" title="Ruta GPX - Ver detalles"></i>`
+          : `<i class="fas fa-pen-to-square" style="font-size: 18px; color: #000; cursor: pointer;" onclick="eliminaRutaManual('${item.id}')" title="Ruta manual - Ver observaciones"></i>`;
 
       // Para rutas manuales: modo edición al pulsar
       // Para rutas GPX: eliminación con pulsación larga (long press)
@@ -1151,17 +1213,15 @@ const parseHtmlCardsRutas = async (data) => {
           <div class="card shadow-sm" ${cardAttributes}>
             <div class="card-body d-flex align-items-center p-2">
               <div class="flex-grow-1">
-                <div class="d-flex justify-content-between align-items-baseline">
-                  <p class="text-card-info mb-1">${formatFechaTimeISO(
-                    item.fecha_inicio
-                  )}</p>
-                  <div class="mt-1">${iconType}</div>
-                  <span name="kms" class="text-secondary me-1">${
-                    item.kms || 0
-                  }</span>
-                  <span name="kms" class="text-primary">${
-                    item.acumulado_kms || 0
-                  }</span>
+                <div class="d-flex justify-content-between align-items-center">
+                  <div class="d-flex align-items-center" style="gap: 10px;">
+                    <div style="min-width: 25px;">${iconType}</div>
+                    <p class="text-card-info mb-0">${formatFechaTimeISO(item.fecha_inicio)}</p>
+                  </div>
+                  <div class="d-flex align-items-center" style="gap: 25px; margin-left: auto; margin-right: 5px;">
+                    <span name="kms" class="text-secondary" style="min-width: 60px; text-align: right;">${(parseFloat(item.kms) || 0).toFixed(2).replace('.', ',')}</span>
+                    <span name="kms" class="text-primary" style="min-width: 60px; text-align: right;">${(parseFloat(item.acumulado_kms) || 0).toFixed(2).replace('.', ',')}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1340,6 +1400,9 @@ const gotoBackMantenimientos = async () => {
   }
 };
 
+// Variable para rastrear la última búsqueda
+let ultimoTerminoBusqueda = "";
+
 // ========== FUNCIÓN DE FILTRADO DE RUTAS ==========
 async function filtrarRutas(searchTerm) {
   const container = document.getElementById("main_cards");
@@ -1349,59 +1412,47 @@ async function filtrarRutas(searchTerm) {
   }
   const term = searchTerm.toLowerCase().trim();
 
-  if (term === "") {
-    // Si no hay término de búsqueda, mostrar todas las rutas
-    const rutasParaMostrar = window.rutasOriginales.map(item => ({
-      id: item.id,
-      vehiculo_id: item.vehiculo_id,
-      fecha_inicio: item.fecha_inicio,
-      kms: item.kms,
-      acumulado_kms: item.acumulado_kms,
-      origen: item.origen,
-      observaciones: item.observaciones
-    }));
-    container.innerHTML = await parseHtmlCardsRutas(rutasParaMostrar);
-    await formatKilometersBadges();
-    configurarLongPressCards(); // Configurar pulsación larga para cards GPX
-
-    // Activar la primera pestaña para mostrar los resultados
-    const tab1Tab = document.getElementById("tab1-tab");
-    const tab1 = document.getElementById("tab1");
-
-    // Remover active de todas las pestañas
-    document.querySelectorAll('.nav-link').forEach(tab => {
-      tab.classList.remove('active');
-    });
-    document.querySelectorAll('.tab-pane').forEach(pane => {
-      pane.classList.remove('show', 'active');
-    });
-
-    // Activar tab1
-    tab1Tab.classList.add('active');
-    tab1.classList.add('show', 'active');
-    return;
+  // Resetear a página 1 si el término de búsqueda cambió
+  if (term !== ultimoTerminoBusqueda) {
+    window.paginaActual = 1;
+    ultimoTerminoBusqueda = term;
   }
 
-  // Filtrar rutas por fecha, kms o kms acumulados
-  const rutasFiltradas = window.rutasOriginales.filter(item => {
-    const fechaISO = item.fecha_inicio ? item.fecha_inicio.toLowerCase() : "";
-    const fechaFormateada = item.fecha_formateada ? item.fecha_formateada.toLowerCase() : "";
-    const kms = item.kms ? item.kms.toString() : "";
-    const kmsStr = item.kms_str ? item.kms_str.toLowerCase() : "";
-    const kmsTotal = item.acumulado_kms ? item.acumulado_kms.toString() : "";
-    const kmsTotalStr = item.acumulado_kms_str ? item.acumulado_kms_str.toLowerCase() : "";
+  let rutasParaProcesar = window.rutasOriginales;
 
-    const match = fechaISO.includes(term) ||
-           fechaFormateada.includes(term) ||
-           kms.includes(term) ||
-           kmsStr.includes(term) ||
-           kmsTotal.includes(term) ||
-           kmsTotalStr.includes(term);
-    return match;
-  });
+  if (term !== "") {
+    // Filtrar rutas por fecha, kms o kms acumulados
+    rutasParaProcesar = window.rutasOriginales.filter(item => {
+      const fechaISO = item.fecha_inicio ? item.fecha_inicio.toLowerCase() : "";
+      const fechaFormateada = item.fecha_formateada ? item.fecha_formateada.toLowerCase() : "";
+      const kms = item.kms ? item.kms.toString() : "";
+      const kmsStr = item.kms_str ? item.kms_str.toLowerCase() : "";
+      const kmsTotal = item.acumulado_kms ? item.acumulado_kms.toString() : "";
+      const kmsTotalStr = item.acumulado_kms_str ? item.acumulado_kms_str.toLowerCase() : "";
+
+      const match = fechaISO.includes(term) ||
+             fechaFormateada.includes(term) ||
+             kms.includes(term) ||
+             kmsStr.includes(term) ||
+             kmsTotal.includes(term) ||
+             kmsTotalStr.includes(term);
+      return match;
+    });
+  }
+
+  // Calcular paginación para resultados filtrados
+  window.totalPaginas = Math.ceil(rutasParaProcesar.length / REGISTROS_POR_PAGINA);
+  if (window.paginaActual > window.totalPaginas) {
+    window.paginaActual = window.totalPaginas || 1;
+  }
+
+  // Obtener registros de la página actual
+  const inicio = (window.paginaActual - 1) * REGISTROS_POR_PAGINA;
+  const fin = inicio + REGISTROS_POR_PAGINA;
+  const rutasPagina = rutasParaProcesar.slice(inicio, fin);
 
   // Extraer solo los datos originales sin los campos formateados adicionales
-  const rutasParaMostrar = rutasFiltradas.map(item => ({
+  const rutasParaMostrar = rutasPagina.map(item => ({
     id: item.id,
     vehiculo_id: item.vehiculo_id,
     fecha_inicio: item.fecha_inicio,
@@ -1411,10 +1462,11 @@ async function filtrarRutas(searchTerm) {
     observaciones: item.observaciones
   }));
 
-  // Mostrar resultados filtrados
+  // Mostrar resultados
   container.innerHTML = await parseHtmlCardsRutas(rutasParaMostrar);
   await formatKilometersBadges();
   configurarLongPressCards(); // Configurar pulsación larga para cards GPX
+  renderizarControlesPaginacion();
 
   // Activar la primera pestaña para mostrar los resultados
   const tab1Tab = document.getElementById("tab1-tab");

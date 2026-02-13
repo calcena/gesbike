@@ -1,0 +1,88 @@
+/* Prevenir scroll horizontal en móviles */
+html, body {
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
+}
+
+/* Contenedor principal - asegurar que no exceda el viewport */
+.container {
+    max-width: 100%;
+    padding-left: 8px;
+    padding-right: 8px;
+}
+
+/* Cards de rutas - asegurar ancho completo sin overflow */
+.card {
+    width: 100%;
+    max-width: 100%;
+}
+
+/* Contenedor de cards */
+#main_cards {
+    width: 100%;
+    max-width: 100%;
+}
+
+/* Asegurar que las filas no causen overflow */
+.row {
+    margin-left: 0;
+    margin-right: 0;
+    width: 100%;
+}
+
+/* Pestañas - evitar que se desborden */
+.nav-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.nav-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+/* Contenedor de contenido de pestañas */
+.tab-content {
+    width: 100%;
+    max-width: 100%;
+}
+
+/* Ajustes específicos para móvil */
+@media (max-width: 768px) {
+    /* Reducir padding en móviles */
+    .container {
+        padding-left: 4px;
+        padding-right: 4px;
+    }
+    
+    /* Asegurar que las cards no tengan margen extra */
+    .col-12 {
+        padding-left: 4px;
+        padding-right: 4px;
+    }
+    
+    /* Ajustar el cuerpo de la card */
+    .card-body {
+        padding: 0.5rem !important;
+    }
+    
+    /* Controles de paginación - asegurar que quepan */
+    #paginacion-container {
+        width: 100%;
+        padding-left: 0;
+        padding-right: 0;
+    }
+    
+    /* Input de búsqueda móvil */
+    #searchRutasMobile {
+        max-width: 100%;
+    }
+}
+
+/* Prevenir que cualquier elemento cause scroll horizontal */
+* {
+    box-sizing: border-box;
+}
