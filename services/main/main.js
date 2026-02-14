@@ -1,7 +1,7 @@
 let hammerInstances = [];
 
 // Variables de paginación
-const REGISTROS_POR_PAGINA = 10;
+const REGISTROS_POR_PAGINA = 6;
 window.paginaActual = 1;
 window.totalPaginas = 1;
 
@@ -10,30 +10,8 @@ const SESSION_KEY_PAGE = 'main_pagina_actual';
 const SESSION_KEY_EXPANDED = 'main_cards_expandidos';
 const SESSION_KEY_VEHICULO = 'main_vehiculo_id';
 
-const parseHtmlCardMantenimientos = (data) => {
-  // Agrupar registros por fecha y kms
-  const grupos = [];
-  let grupoActual = null;
-  
-  data.forEach((item) => {
-    const esNuevoGrupo = !grupoActual || 
-                         grupoActual.fecha !== item.fecha || 
-                         grupoActual.kms !== item.kms;
-    
-    if (esNuevoGrupo) {
-      grupoActual = {
-        fecha: item.fecha,
-        kms: item.kms,
-        principal: item,
-        relacionados: []
-      };
-      grupos.push(grupoActual);
-    } else {
-      grupoActual.relacionados.push(item);
-    }
-  });
-
-  // Generar HTML para cada grupo
+const parseHtmlCardMantenimientos = (grupos) => {
+  // Generar HTML para cada grupo (grupos ya vienen paginados)
   return grupos
     .map((grupo, index) => {
       const item = grupo.principal;
@@ -43,8 +21,8 @@ const parseHtmlCardMantenimientos = (data) => {
       // Generar filas para registros relacionados (cada uno es clicable)
       const filasRelacionados = grupo.relacionados
         .map((rel) => `
-          <div class="related-row" style="justify-content: space-around; cursor: pointer;" 
-               data-rel-id="${rel.id}" 
+          <div class="related-row" style="justify-content: space-around; cursor: pointer;"
+               data-rel-id="${rel.id}"
                onclick="editMantenimiento('${rel.id}')">
             <img src="../assets/images/icons/Operaciones/${rel.img_operacion}" alt="Operación" class="icon-table">
             <img src="../assets/images/icons/Grupos/${rel.img_grupo}" alt="Grupo" class="icon-table">
@@ -101,16 +79,16 @@ const parseHtmlCardMantenimientos = (data) => {
 function configurarLongPressMantenimientos() {
   const LONG_PRESS_DURATION = 800;
   const container = document.getElementById('main-cards');
-  
+
   if (!container) return;
-  
+
   // Limpiar listeners anteriores clonando el contenedor
   const newContainer = container.cloneNode(true);
   container.parentNode.replaceChild(newContainer, container);
-  
+
   // Estado para cada card individual (usando WeakMap)
   const cardStates = new WeakMap();
-  
+
   const getCardState = (card) => {
     if (!cardStates.has(card)) {
       cardStates.set(card, {
@@ -122,20 +100,20 @@ function configurarLongPressMantenimientos() {
     }
     return cardStates.get(card);
   };
-  
+
   const createProgressBar = (card) => {
     const existing = card.querySelector('.long-press-progress');
     if (existing) existing.remove();
-    
+
     const bar = document.createElement('div');
     bar.className = 'long-press-progress';
     card.appendChild(bar);
     return bar;
   };
-  
+
   const startPress = (card, state) => {
     if (!card.classList.contains('has-related')) return;
-    
+
     // Limpiar timer previo
     if (state.pressTimer) {
       clearTimeout(state.pressTimer);
@@ -143,40 +121,40 @@ function configurarLongPressMantenimientos() {
     if (state.progressBar) {
       state.progressBar.remove();
     }
-    
+
     state.isPressing = true;
     state.longPressTriggered = false;
     state.progressBar = createProgressBar(card);
-    
+
     // Forzar reflow
     void state.progressBar.offsetWidth;
-    
+
     state.progressBar.style.width = '100%';
     state.progressBar.style.transition = `width ${LONG_PRESS_DURATION}ms linear`;
-    
+
     card.style.transform = 'scale(0.98)';
     card.style.transition = 'transform 0.2s';
-    
+
     state.pressTimer = setTimeout(() => {
       if (state.isPressing) {
         state.isPressing = false;
         state.longPressTriggered = true;
         card.style.transform = 'scale(1)';
-        
+
         if (state.progressBar) {
           state.progressBar.remove();
           state.progressBar = null;
         }
-        
+
         card.classList.toggle('expanded');
-        
+
         if (navigator.vibrate) {
           navigator.vibrate(50);
         }
       }
     }, LONG_PRESS_DURATION);
   };
-  
+
   const cancelPress = (card, state) => {
     if (state.pressTimer) {
       clearTimeout(state.pressTimer);
@@ -184,83 +162,83 @@ function configurarLongPressMantenimientos() {
     }
     state.isPressing = false;
     card.style.transform = 'scale(1)';
-    
+
     if (state.progressBar) {
       state.progressBar.remove();
       state.progressBar = null;
     }
   };
-  
+
   // Event delegation en el contenedor
   newContainer.addEventListener('mousedown', (e) => {
     const card = e.target.closest('.mantenimiento-card');
     if (!card || e.button !== 0) return;
-    
+
     const state = getCardState(card);
     startPress(card, state);
   });
-  
+
   newContainer.addEventListener('mouseup', (e) => {
     const card = e.target.closest('.mantenimiento-card');
     if (!card) return;
-    
+
     const state = getCardState(card);
     cancelPress(card, state);
   });
-  
+
   newContainer.addEventListener('mouseleave', (e) => {
     const card = e.target.closest('.mantenimiento-card');
     if (!card) return;
-    
+
     const state = getCardState(card);
     cancelPress(card, state);
   });
-  
+
   // Touch events
   newContainer.addEventListener('touchstart', (e) => {
     const card = e.target.closest('.mantenimiento-card');
     if (!card) return;
-    
+
     const state = getCardState(card);
     startPress(card, state);
   }, { passive: true });
-  
+
   newContainer.addEventListener('touchend', (e) => {
     const card = e.target.closest('.mantenimiento-card');
     if (!card) return;
-    
+
     const state = getCardState(card);
     cancelPress(card, state);
   });
-  
+
   newContainer.addEventListener('touchcancel', (e) => {
     const card = e.target.closest('.mantenimiento-card');
     if (!card) return;
-    
+
     const state = getCardState(card);
     cancelPress(card, state);
   });
-  
+
   newContainer.addEventListener('touchmove', (e) => {
     const card = e.target.closest('.mantenimiento-card');
     if (!card) return;
-    
+
     const state = getCardState(card);
     cancelPress(card, state);
   });
-  
+
   // Click handler con verificación de long press
   newContainer.addEventListener('click', (e) => {
     const card = e.target.closest('.mantenimiento-card');
     if (!card) return;
-    
+
     // Ignorar clicks en filas relacionadas (tienen su propio onclick)
     if (e.target.closest('.related-row')) {
       return;
     }
-    
+
     const state = getCardState(card);
-    
+
     // Si fue long press, ignorar y resetear
     if (state.longPressTriggered) {
       e.preventDefault();
@@ -268,14 +246,14 @@ function configurarLongPressMantenimientos() {
       state.longPressTriggered = false;
       return;
     }
-    
+
     // Click normal - abrir edición
     const mantId = card.dataset.mantId;
     if (mantId) {
       editMantenimiento(mantId);
     }
   });
-  
+
   // Prevenir menú contextual en cards con related
   newContainer.addEventListener('contextmenu', (e) => {
     const card = e.target.closest('.mantenimiento-card.has-related');
@@ -284,6 +262,32 @@ function configurarLongPressMantenimientos() {
     }
   });
 }
+
+// Función para agrupar mantenimientos por fecha y kms
+const agruparMantenimientos = (data) => {
+  const grupos = [];
+  let grupoActual = null;
+
+  data.forEach((item) => {
+    const esNuevoGrupo = !grupoActual ||
+                         grupoActual.fecha !== item.fecha ||
+                         grupoActual.kms !== item.kms;
+
+    if (esNuevoGrupo) {
+      grupoActual = {
+        fecha: item.fecha,
+        kms: item.kms,
+        principal: item,
+        relacionados: []
+      };
+      grupos.push(grupoActual);
+    } else {
+      grupoActual.relacionados.push(item);
+    }
+  });
+
+  return grupos;
+};
 
 const getListMantenimientosByVehiculo = async () => {
   const vehiculoId = sessionStorage.getItem("vehiculo_id");
@@ -297,24 +301,27 @@ const getListMantenimientosByVehiculo = async () => {
     );
 
     if (response.data.success) {
-      // Calcular paginación
-      window.totalPaginas = Math.ceil(response.data.content.length / REGISTROS_POR_PAGINA);
+      // Agrupar todos los mantenimientos primero
+      const todosLosGrupos = agruparMantenimientos(response.data.content);
+
+      // Calcular paginación basada en GRUPOS, no en registros individuales
+      window.totalPaginas = Math.ceil(todosLosGrupos.length / REGISTROS_POR_PAGINA);
       if (window.paginaActual > window.totalPaginas) {
         window.paginaActual = window.totalPaginas || 1;
       }
 
-      // Obtener registros de la página actual
+      // Obtener GRUPOS de la página actual
       const inicio = (window.paginaActual - 1) * REGISTROS_POR_PAGINA;
       const fin = inicio + REGISTROS_POR_PAGINA;
-      const mantenimientosPagina = response.data.content.slice(inicio, fin);
+      const gruposPagina = todosLosGrupos.slice(inicio, fin);
 
-      const html = parseHtmlCardMantenimientos(mantenimientosPagina);
+      const html = parseHtmlCardMantenimientos(gruposPagina);
       document.getElementById("main-cards").innerHTML = html;
       await formatKilometersBadges();
-      configurarLongPressMantenimientos(); // Configurar pulsación larga
+      configurarLongPressMantenimientos();
       renderizarControlesPaginacionMain();
-      
-      // Restaurar cards expandidos (incluso si no hay paginación)
+
+      // Restaurar cards expandidos
       restaurarCardsExpandidos();
     }
   } catch (error) {
@@ -336,8 +343,8 @@ function renderizarControlesPaginacionMain() {
   const controlesHTML = `
     <div id="paginacion-container-main" class="col-12 mt-1 mb-1">
       <div class="d-flex justify-content-center align-items-center" style="gap: 15px;">
-        <button 
-          class="btn btn-sm btn-outline-secondary ${window.paginaActual === 1 ? 'disabled' : ''}" 
+        <button
+          class="btn btn-sm btn-outline-secondary ${window.paginaActual === 1 ? 'disabled' : ''}"
           onclick="cambiarPaginaMain(${window.paginaActual - 1})"
           ${window.paginaActual === 1 ? 'disabled' : ''}>
           <i class="fas fa-chevron-left"></i>
@@ -345,8 +352,8 @@ function renderizarControlesPaginacionMain() {
         <span class="text-muted">
           Página ${window.paginaActual} de ${window.totalPaginas}
         </span>
-        <button 
-          class="btn btn-sm btn-outline-secondary ${window.paginaActual === window.totalPaginas ? 'disabled' : ''}" 
+        <button
+          class="btn btn-sm btn-outline-secondary ${window.paginaActual === window.totalPaginas ? 'disabled' : ''}"
           onclick="cambiarPaginaMain(${window.paginaActual + 1})"
           ${window.paginaActual === window.totalPaginas ? 'disabled' : ''}>
           <i class="fas fa-chevron-right"></i>
@@ -356,7 +363,7 @@ function renderizarControlesPaginacionMain() {
   `;
 
   container.insertAdjacentHTML('beforeend', controlesHTML);
-  
+
   // Restaurar estado expandido de cards
   restaurarCardsExpandidos();
 }
@@ -365,12 +372,12 @@ function renderizarControlesPaginacionMain() {
 function restaurarCardsExpandidos() {
   const cardsExpandidosStr = sessionStorage.getItem(SESSION_KEY_EXPANDED);
   if (!cardsExpandidosStr) return;
-  
+
   try {
     const cardsExpandidos = JSON.parse(cardsExpandidosStr);
     const vehiculoGuardado = sessionStorage.getItem(SESSION_KEY_VEHICULO);
     const vehiculoActual = sessionStorage.getItem("vehiculo_id");
-    
+
     // Solo restaurar si es el mismo vehículo
     if (vehiculoGuardado === vehiculoActual) {
       cardsExpandidos.forEach(mantId => {
@@ -380,7 +387,7 @@ function restaurarCardsExpandidos() {
         }
       });
     }
-    
+
     // Limpiar el storage después de restaurar (para no mantenerlo indefinidamente)
     sessionStorage.removeItem(SESSION_KEY_EXPANDED);
   } catch (e) {
@@ -409,31 +416,31 @@ const editMantenimiento = async (id) => {
   sessionStorage.setItem("mantenimiento_id", id);
   sessionStorage.setItem(SESSION_KEY_PAGE, window.paginaActual);
   sessionStorage.setItem(SESSION_KEY_VEHICULO, sessionStorage.getItem("vehiculo_id"));
-  
+
   // Guardar IDs de cards expandidos
   const cardsExpandidos = [];
   document.querySelectorAll('.mantenimiento-card.expanded').forEach(card => {
     cardsExpandidos.push(card.dataset.mantId);
   });
   sessionStorage.setItem(SESSION_KEY_EXPANDED, JSON.stringify(cardsExpandidos));
-  
+
   window.location.href = "mantenimientos/mantenimiento.php";
 };
 
 const initMain = async () => {
   await resetSessionStorage();
   await getVehiculosByUser();
-  
+
   // Restaurar página guardada si estamos volviendo del detalle
   const paginaGuardada = sessionStorage.getItem(SESSION_KEY_PAGE);
   const vehiculoGuardado = sessionStorage.getItem(SESSION_KEY_VEHICULO);
   const vehiculoActual = sessionStorage.getItem("vehiculo_id");
-  
+
   // Solo restaurar página si es el mismo vehículo
   if (paginaGuardada && vehiculoGuardado === vehiculoActual) {
     window.paginaActual = parseInt(paginaGuardada);
   }
-  
+
   if (sessionStorage.getItem("login_parent") === "true") {
     sessionStorage.setItem("login_parent", "false");
     setTimeout(async () => {
