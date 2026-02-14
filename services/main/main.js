@@ -99,123 +99,188 @@ const parseHtmlCardMantenimientos = (data) => {
 
 // Configurar eventos de pulsación larga para cards de mantenimiento
 function configurarLongPressMantenimientos() {
-  const LONG_PRESS_DURATION = 800; // milisegundos
-  let pressTimer;
-  let isPressing = false;
-  let currentCard = null;
-  let longPressTriggered = false;
-  let progressBar = null;
-  let progressInterval = null;
-
-  // Función para crear barra de progreso
+  const LONG_PRESS_DURATION = 800;
+  const container = document.getElementById('main-cards');
+  
+  if (!container) return;
+  
+  // Limpiar listeners anteriores clonando el contenedor
+  const newContainer = container.cloneNode(true);
+  container.parentNode.replaceChild(newContainer, container);
+  
+  // Estado para cada card individual (usando WeakMap)
+  const cardStates = new WeakMap();
+  
+  const getCardState = (card) => {
+    if (!cardStates.has(card)) {
+      cardStates.set(card, {
+        pressTimer: null,
+        isPressing: false,
+        longPressTriggered: false,
+        progressBar: null
+      });
+    }
+    return cardStates.get(card);
+  };
+  
   const createProgressBar = (card) => {
+    const existing = card.querySelector('.long-press-progress');
+    if (existing) existing.remove();
+    
     const bar = document.createElement('div');
     bar.className = 'long-press-progress';
     card.appendChild(bar);
     return bar;
   };
-
-  // Función para iniciar la pulsación
-  const startPress = (card, e) => {
-    if (!card.classList.contains('has-related')) return; // Solo para cards con relacionados
+  
+  const startPress = (card, state) => {
+    if (!card.classList.contains('has-related')) return;
     
-    if (e.button !== 0 && e.type === 'mousedown') return; // Solo click izquierdo
+    // Limpiar timer previo
+    if (state.pressTimer) {
+      clearTimeout(state.pressTimer);
+    }
+    if (state.progressBar) {
+      state.progressBar.remove();
+    }
     
-    isPressing = true;
-    longPressTriggered = false;
-    currentCard = card;
+    state.isPressing = true;
+    state.longPressTriggered = false;
+    state.progressBar = createProgressBar(card);
     
-    // Crear barra de progreso
-    progressBar = createProgressBar(card);
+    // Forzar reflow
+    void state.progressBar.offsetWidth;
     
-    // Animar barra de progreso
-    setTimeout(() => {
-      if (progressBar) {
-        progressBar.style.width = '100%';
-        progressBar.style.transition = `width ${LONG_PRESS_DURATION}ms linear`;
-      }
-    }, 10);
+    state.progressBar.style.width = '100%';
+    state.progressBar.style.transition = `width ${LONG_PRESS_DURATION}ms linear`;
     
-    // Feedback visual - cambiar apariencia
     card.style.transform = 'scale(0.98)';
     card.style.transition = 'transform 0.2s';
     
-    pressTimer = setTimeout(() => {
-      if (isPressing && currentCard === card) {
-        // Pulsación larga completada
-        isPressing = false;
-        longPressTriggered = true;
+    state.pressTimer = setTimeout(() => {
+      if (state.isPressing) {
+        state.isPressing = false;
+        state.longPressTriggered = true;
         card.style.transform = 'scale(1)';
         
-        // Eliminar barra de progreso
-        if (progressBar) {
-          progressBar.remove();
-          progressBar = null;
+        if (state.progressBar) {
+          state.progressBar.remove();
+          state.progressBar = null;
         }
         
-        // Expandir/colapsar
         card.classList.toggle('expanded');
         
-        // Vibración en móviles (si está disponible)
         if (navigator.vibrate) {
           navigator.vibrate(50);
         }
       }
     }, LONG_PRESS_DURATION);
   };
-
-  // Función para cancelar la pulsación
-  const cancelPress = (card) => {
-    if (pressTimer) {
-      clearTimeout(pressTimer);
-      pressTimer = null;
+  
+  const cancelPress = (card, state) => {
+    if (state.pressTimer) {
+      clearTimeout(state.pressTimer);
+      state.pressTimer = null;
     }
-    isPressing = false;
-    currentCard = null;
+    state.isPressing = false;
     card.style.transform = 'scale(1)';
     
-    // Eliminar barra de progreso
-    if (progressBar) {
-      progressBar.remove();
-      progressBar = null;
+    if (state.progressBar) {
+      state.progressBar.remove();
+      state.progressBar = null;
     }
   };
-
-  // Configurar eventos para todas las cards
-  const cards = document.querySelectorAll('.mantenimiento-card');
-  cards.forEach(card => {
-    // Click simple para edición del mantenimiento principal
-    // Solo si no fue long press y no se hizo click en una fila relacionada
-    card.addEventListener('click', (e) => {
-      // Verificar si el click fue en una fila relacionada
-      if (e.target.closest('.related-row')) {
-        return; // No hacer nada, la fila relacionada tiene su propio onclick
-      }
-      
-      if (!longPressTriggered) {
-        const mantId = card.dataset.mantId;
-        editMantenimiento(mantId);
-      }
-      longPressTriggered = false; // Resetear para próxima vez
-    });
-
-    // Solo configurar long press si tiene registros relacionados
-    if (card.classList.contains('has-related')) {
-      // Mouse events
-      card.addEventListener('mousedown', (e) => startPress(card, e));
-      card.addEventListener('mouseup', () => cancelPress(card));
-      card.addEventListener('mouseleave', () => cancelPress(card));
-      
-      // Touch events (para móviles)
-      card.addEventListener('touchstart', (e) => {
-        startPress(card, e);
-      }, { passive: true });
-      card.addEventListener('touchend', () => cancelPress(card));
-      card.addEventListener('touchcancel', () => cancelPress(card));
-      card.addEventListener('touchmove', () => cancelPress(card)); // Cancelar si se mueve el dedo
-      
-      // Prevenir el menú contextual en móviles
-      card.addEventListener('contextmenu', (e) => e.preventDefault());
+  
+  // Event delegation en el contenedor
+  newContainer.addEventListener('mousedown', (e) => {
+    const card = e.target.closest('.mantenimiento-card');
+    if (!card || e.button !== 0) return;
+    
+    const state = getCardState(card);
+    startPress(card, state);
+  });
+  
+  newContainer.addEventListener('mouseup', (e) => {
+    const card = e.target.closest('.mantenimiento-card');
+    if (!card) return;
+    
+    const state = getCardState(card);
+    cancelPress(card, state);
+  });
+  
+  newContainer.addEventListener('mouseleave', (e) => {
+    const card = e.target.closest('.mantenimiento-card');
+    if (!card) return;
+    
+    const state = getCardState(card);
+    cancelPress(card, state);
+  });
+  
+  // Touch events
+  newContainer.addEventListener('touchstart', (e) => {
+    const card = e.target.closest('.mantenimiento-card');
+    if (!card) return;
+    
+    const state = getCardState(card);
+    startPress(card, state);
+  }, { passive: true });
+  
+  newContainer.addEventListener('touchend', (e) => {
+    const card = e.target.closest('.mantenimiento-card');
+    if (!card) return;
+    
+    const state = getCardState(card);
+    cancelPress(card, state);
+  });
+  
+  newContainer.addEventListener('touchcancel', (e) => {
+    const card = e.target.closest('.mantenimiento-card');
+    if (!card) return;
+    
+    const state = getCardState(card);
+    cancelPress(card, state);
+  });
+  
+  newContainer.addEventListener('touchmove', (e) => {
+    const card = e.target.closest('.mantenimiento-card');
+    if (!card) return;
+    
+    const state = getCardState(card);
+    cancelPress(card, state);
+  });
+  
+  // Click handler con verificación de long press
+  newContainer.addEventListener('click', (e) => {
+    const card = e.target.closest('.mantenimiento-card');
+    if (!card) return;
+    
+    // Ignorar clicks en filas relacionadas (tienen su propio onclick)
+    if (e.target.closest('.related-row')) {
+      return;
+    }
+    
+    const state = getCardState(card);
+    
+    // Si fue long press, ignorar y resetear
+    if (state.longPressTriggered) {
+      e.preventDefault();
+      e.stopPropagation();
+      state.longPressTriggered = false;
+      return;
+    }
+    
+    // Click normal - abrir edición
+    const mantId = card.dataset.mantId;
+    if (mantId) {
+      editMantenimiento(mantId);
+    }
+  });
+  
+  // Prevenir menú contextual en cards con related
+  newContainer.addEventListener('contextmenu', (e) => {
+    const card = e.target.closest('.mantenimiento-card.has-related');
+    if (card) {
+      e.preventDefault();
     }
   });
 }
