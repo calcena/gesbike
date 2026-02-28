@@ -1274,43 +1274,47 @@ const getResumenBiker = async () => {
 
       // 3. Generar HTML del resumen superior
       let htmlResumen = `
-        <div class="d-flex justify-content-around flex-wrap mb-1 p-1 bg-white shadow-sm rounded border" style="font-size: 0.75rem;">
-          <div class="text-center px-1 py-1" title="Kms Pulmonar">
-            <div class="text-muted mb-0" style="font-size: 0.65rem;">🫁 Kms</div>
-            <div class="fw-bold text-primary">${totalesGlobales.kmsPulmonar.toLocaleString(
-              undefined,
-              { minimumFractionDigits: 0, maximumFractionDigits: 1 }
-            )}</div>
+        <div class="mb-1 p-1 bg-white shadow-sm rounded border">
+          <div class="d-flex justify-content-around" style="font-size: 0.9rem;">
+            <div class="text-center px-1 py-1" style="min-width: 80px;" title="Kms Pulmonar">
+              <div class="text-muted mb-0" style="font-size: 0.75rem;">🫁 Kms</div>
+              <div class="fw-bold text-primary text-end">${totalesGlobales.kmsPulmonar.toLocaleString(
+                undefined,
+                { minimumFractionDigits: 0, maximumFractionDigits: 1 }
+              )}</div>
+            </div>
+            <div class="text-center px-1 py-1" style="min-width: 80px;" title="Kms Eléctrica">
+              <div class="text-muted mb-0" style="font-size: 0.75rem;">🔌 Kms</div>
+              <div class="fw-bold text-success text-end">${totalesGlobales.kmsElectrica.toLocaleString(
+                undefined,
+                { minimumFractionDigits: 0, maximumFractionDigits: 1 }
+              )}</div>
+            </div>
+            <div class="text-center px-1 py-1" style="min-width: 80px;" title="Total Kms">
+              <div class="text-muted mb-0" style="font-size: 0.75rem;">🧭 Total</div>
+              <div class="fw-bold text-dark text-end">${totalKms.toLocaleString(
+                undefined,
+                { minimumFractionDigits: 0, maximumFractionDigits: 1 }
+              )}</div>
+            </div>
           </div>
-          <div class="text-center px-1 py-1" title="Kms Eléctrica">
-            <div class="text-muted mb-0" style="font-size: 0.65rem;">🔌 Kms</div>
-            <div class="fw-bold text-success">${totalesGlobales.kmsElectrica.toLocaleString(
-              undefined,
-              { minimumFractionDigits: 0, maximumFractionDigits: 1 }
-            )}</div>
-          </div>
-          <div class="text-center px-1 py-1" title="Total Kms">
-            <div class="text-muted mb-0" style="font-size: 0.65rem;">🧭 Total</div>
-            <div class="fw-bold text-dark">${totalKms.toLocaleString(
-              undefined,
-              { minimumFractionDigits: 0, maximumFractionDigits: 1 }
-            )}</div>
-          </div>
-          <div class="text-center px-1 py-1" title="Rutas Pulmonar">
-            <div class="text-muted mb-0" style="font-size: 0.65rem;">🫁 Rutas</div>
-            <div class="fw-bold text-primary">${
-              totalesGlobales.rutasPulmonar
-            }</div>
-          </div>
-          <div class="text-center px-1 py-1" title="Rutas Eléctrica">
-            <div class="text-muted mb-0" style="font-size: 0.65rem;">🔌 Rutas</div>
-            <div class="fw-bold text-success">${
-              totalesGlobales.rutasElectrica
-            }</div>
-          </div>
-          <div class="text-center px-1 py-1" title="Total Rutas">
-            <div class="text-muted mb-0" style="font-size: 0.65rem;">🚴‍♂️ Total</div>
-            <div class="fw-bold text-dark">${totalRutas}</div>
+          <div class="d-flex justify-content-around" style="font-size: 0.9rem; margin-top: -5px;">
+            <div class="text-center px-1 py-1" style="min-width: 80px;" title="Rutas Pulmonar">
+              <div class="text-muted mb-0" style="font-size: 0.75rem;">🫁 Rutas</div>
+              <div class="fw-bold text-primary text-end">${
+                totalesGlobales.rutasPulmonar
+              }</div>
+            </div>
+            <div class="text-center px-1 py-1" style="min-width: 80px;" title="Rutas Eléctrica">
+              <div class="text-muted mb-0" style="font-size: 0.75rem;">🔌 Rutas</div>
+              <div class="fw-bold text-success text-end">${
+                totalesGlobales.rutasElectrica
+              }</div>
+            </div>
+            <div class="text-center px-1 py-1" style="min-width: 80px;" title="Total Rutas">
+              <div class="text-muted mb-0" style="font-size: 0.75rem;">🚴‍♂️ Total</div>
+              <div class="fw-bold text-dark text-end">${totalRutas}</div>
+            </div>
           </div>
         </div>
       `;

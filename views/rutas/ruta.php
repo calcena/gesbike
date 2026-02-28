@@ -80,23 +80,23 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
             <li class="nav-item ms-auto d-flex align-items-end" role="presentation" style="padding-left: 5px;">
                 <div class="input-group" style="margin-bottom: -1px;" id="searchContainer">
                     <!-- Icono de búsqueda visible en móvil -->
-                    <span class="input-group-text d-md-none" 
+                    <span class="input-group-text d-md-none"
                           style="background: transparent; border: none; cursor: pointer; padding: 0 5px 8px 0;"
                           onclick="toggleSearchMobile()">
                         <i class="fas fa-search" style="font-size: 18px;"></i>
                     </span>
                     <!-- Input visible en desktop -->
-                    <span class="input-group-text d-none d-md-flex" 
+                    <span class="input-group-text d-none d-md-flex"
                           style="background: transparent; border: none; padding: 0 5px 8px 0;">
                         <i class="fas fa-search" style="font-size: 14px;"></i>
                     </span>
-                    <input type="text" id="searchRutas" class="form-control form-control-sm d-none d-md-block" 
-                        placeholder="Buscar..." 
+                    <input type="text" id="searchRutas" class="form-control form-control-sm d-none d-md-block"
+                        placeholder="Buscar..."
                         style="width: 110px; border-radius: 4px 4px 0 0; border-bottom: 2px solid #dee2e6; padding: 0.25rem 0.4rem; font-size: 0.8rem;"
                         onkeyup="filtrarRutas(this.value)">
                     <!-- Input móvil expandido -->
-                    <input type="text" id="searchRutasMobile" class="form-control form-control-sm d-md-none" 
-                        placeholder="Buscar..." 
+                    <input type="text" id="searchRutasMobile" class="form-control form-control-sm d-md-none"
+                        placeholder="Buscar..."
                         style="width: 0; padding: 0; border: none; transition: all 0.3s ease; font-size: 0.8rem;"
                         onkeyup="filtrarRutas(this.value)">
                 </div>
@@ -129,7 +129,7 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
                 </div>
                 <div class="row mt-2 justify-content-around">
                     <img class="action-icon" src="../../assets/images/icons/papelera.png" alt="">
-                    <img class="action-icon" src="../../assets/images/icons/cancelar_icon.png" alt="" 
+                    <img class="action-icon" src="../../assets/images/icons/cancelar_icon.png" alt=""
                         onclick="cancelarEdicionRuta()" id="cancelar_btn" style="display: none;">
                     <img class="action-icon" src="../../assets/images/icons/validate_icon.png" alt=""
                         onclick="guardarRutaManual()" id="guardar_btn">
@@ -165,7 +165,7 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
                 </div>
             </div>
             <div class="tab-pane fade show" id="tab4" role="tabpanel" aria-labelledby="tab4-tab">
-                <div class="accordion" id="accordionSummary">
+                <div class="accordion mt-0" id="accordionSummary">
                 </div>
 
             </div>
