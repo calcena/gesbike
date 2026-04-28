@@ -7,8 +7,13 @@ const Crr = 0.018;
 const DRIVETRAIN_LOSS = 0.05;
 const MASSBIKER = 52;
 
+// Parámetros de filtrado de velocidad
+const SPEED_WINDOW_SIZE = 5; // Ventana de puntos para promediar velocidad
+
 // Variable global para almacenar los datos de la ruta actual
 window.rutaActual = null;
+// Variable global para controlar si estamos editando una ruta manual
+window.rutaEditandoId = null;
 
 // Variables de paginación
 const REGISTROS_POR_PAGINA = 10;
@@ -88,6 +93,45 @@ function smoothElevation(eles) {
     smoothed.push(sum / count);
   }
   return smoothed;
+}
+
+function calculateSpeedWithFilter(trkpts) {
+  const speeds = new Array(trkpts.length).fill(0);
+  
+  for (let i = 1; i < trkpts.length; i++) {
+    const prev = trkpts[i - 1];
+    const curr = trkpts[i];
+    
+    const dt = (curr.time - prev.time) / 1000;
+    if (dt <= 0) continue;
+    
+    const dist = haversine(prev.lat, prev.lon, curr.lat, curr.lon);
+    const speed = dist / dt;
+    speeds[i] = speed;
+  }
+  
+  const filteredSpeeds = new Array(trkpts.length).fill(0);
+  const windowSize = SPEED_WINDOW_SIZE;
+  const halfWindow = Math.floor(windowSize / 2);
+  
+  for (let i = 1; i < trkpts.length; i++) {
+    let sum = 0;
+    let count = 0;
+    
+    const start = Math.max(1, i - halfWindow);
+    const end = Math.min(trkpts.length - 1, i + halfWindow);
+    
+    for (let j = start; j <= end; j++) {
+      if (speeds[j] > 0) {
+        sum += speeds[j];
+        count++;
+      }
+    }
+    
+    filteredSpeeds[i] = count > 0 ? sum / count : 0;
+  }
+  
+  return filteredSpeeds;
 }
 
 function estimatePower(dist, dt, dAlt, speed) {
@@ -236,6 +280,15 @@ function processGPX(text) {
     totalPowerSec += power * dt;
   }
 
+  const filteredSpeeds = calculateSpeedWithFilter(trkpts);
+  let maxSpeedFiltered = 0;
+  for (let i = 1; i < filteredSpeeds.length; i++) {
+    const speedKmh = filteredSpeeds[i] * 3.6;
+    if (speedKmh > maxSpeedFiltered) {
+      maxSpeedFiltered = speedKmh;
+    }
+  }
+
   // Calcular tiempos por tipo de terreno
   const tiemposTerreno = calcularTiemposTerreno(trkpts);
 
@@ -272,7 +325,7 @@ function processGPX(text) {
     tiempo_bajada: tiemposTerreno.tiempoBajada,
     tiempo_plano: tiemposTerreno.tiempoPlano,
     velocidad_media: Number(avgSpeedMoving.toFixed(1)),
-    velocidad_maxima: Number(maxSpeed.toFixed(1)),
+    velocidad_maxima: Number(maxSpeedFiltered.toFixed(1)),
     potencia_promedio_w: Math.round(avgPower),
     calorias: Math.round(calories),
   };
@@ -303,6 +356,12 @@ const cambiarVehiculo = async (id) => {
   // Resetear paginación al cambiar de vehículo
   window.paginaActual = 1;
   await getRutasByVehiculo();
+
+  // Si la pestaña de velocidades está activa, recargar la gráfica
+  const tab5 = document.getElementById("tab5");
+  if (tab5 && tab5.classList.contains("active")) {
+    await cargarGraficaVelocidades();
+  }
 };
 
 // ========== FUNCIONALIDAD PARA UN SOLO ARCHIVO ==========
@@ -549,9 +608,24 @@ const guardarRutaManual = async () => {
     observaciones: document.getElementById("obs_ruta").value,
     fecha: document.getElementById("fecha_ruta").value,
   };
+
+  let url;
+  let mensaje;
+
+  if (window.rutaEditandoId) {
+    // Modo edición: actualizar ruta existente
+    data.id = window.rutaEditandoId;
+    url = getApiUrl('ruta.php?actualizarRutaManual');
+    mensaje = "✅ Ruta actualizada correctamente";
+  } else {
+    // Modo nueva: insertar ruta
+    url = getApiUrl('ruta.php?guardarRutaManual');
+    mensaje = "✅ Ruta guardada correctamente";
+  }
+
   try {
     const response = await axios.post(
-      getApiUrl('ruta.php?guardarRutaManual'),
+      url,
       { data },
       {
         headers: {
@@ -562,11 +636,33 @@ const guardarRutaManual = async () => {
 
     if (response.data.success) {
       await Swal.fire({
-        text: "✅ Ruta guardada correctamente",
+        text: mensaje,
         icon: "success",
         timer: 2000,
         showConfirmButton: false,
       });
+
+      // Limpiar estado de edición y formulario
+      window.rutaEditandoId = null;
+      document.getElementById("kms_ruta").value = "";
+      document.getElementById("obs_ruta").value = "";
+      document.getElementById("fecha_ruta").value = loadDefaultDate();
+
+      // Ocultar botón cancelar
+      const cancelBtn = document.getElementById("cancelar_btn");
+      if (cancelBtn) cancelBtn.style.display = "none";
+
+      // Volver a la pestaña principal
+      const tab1Tab = document.getElementById("tab1-tab");
+      const tab1 = document.getElementById("tab1");
+      const tab2Tab = document.getElementById("tab2-tab");
+      const tab2 = document.getElementById("tab2");
+
+      tab2Tab.classList.remove("active");
+      tab2.classList.remove("show", "active");
+      tab1Tab.classList.add("active");
+      tab1.classList.add("show", "active");
+
       await getRutasByVehiculo();
       await crearBackup();
     } else {
@@ -584,6 +680,9 @@ const guardarRutaManual = async () => {
 };
 
 const editarRutaManual = (id, fecha, kms, observaciones) => {
+  // Guardar el ID de la ruta que estamos editando
+  window.rutaEditandoId = id;
+
   // Limpiar valores primero
   document.getElementById("kms_ruta").value = "";
   document.getElementById("obs_ruta").value = "";
@@ -604,14 +703,15 @@ const editarRutaManual = (id, fecha, kms, observaciones) => {
   setTimeout(() => {
     document.getElementById("kms_ruta").value = kms;
     document.getElementById("obs_ruta").value = observaciones.replace(/'/g, "\\'");
-    document.getElementById("fecha_ruta").value = fecha.split(' ')[0];
 
-    // Cambiar el botón de guardar para que haga update en lugar de insert
-    const saveBtn = document.querySelector('img[onclick="guardarRutaManual()"]');
-    if (saveBtn) {
-      saveBtn.setAttribute("onclick", `actualizarRutaManual('${id}')`);
-      saveBtn.setAttribute("title", "Actualizar ruta");
+    // Extraer solo la fecha en formato YYYY-MM-DD
+    let fechaValue = fecha;
+    if (fecha.indexOf('T') !== -1) {
+      fechaValue = fecha.split('T')[0];
+    } else if (fecha.indexOf(' ') !== -1) {
+      fechaValue = fecha.split(' ')[0];
     }
+    document.getElementById("fecha_ruta").value = fechaValue;
 
     // Mostrar botón cancelar
     const cancelBtn = document.getElementById("cancelar_btn");
@@ -621,84 +721,88 @@ const editarRutaManual = (id, fecha, kms, observaciones) => {
   }, 100);
 };
 
-const actualizarRutaManual = async (id) => {
-  const data = {
-    id: id,
-    vehiculo_id: sessionStorage.getItem("vehiculo_id"),
-    kms: document.getElementById("kms_ruta").value,
-    observaciones: document.getElementById("obs_ruta").value,
-    fecha: document.getElementById("fecha_ruta").value,
-  };
-  try {
-    const response = await axios.post(
-      getApiUrl('ruta.php?actualizarRutaManual'),
-      { data },
-      {
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    );
+const eliminarRutaFormulario = async () => {
+  if (window.rutaEditandoId) {
+    // Estamos editando una ruta existente: eliminarla
+    const fecha = document.getElementById("fecha_ruta").value;
+    const kms = document.getElementById("kms_ruta").value;
 
-    if (response.data.success) {
-      await Swal.fire({
-        text: "✅ Ruta actualizada correctamente",
-        icon: "success",
-        timer: 2000,
-        showConfirmButton: false,
-      });
-
-      // Restaurar el botón original
-      const saveBtn = document.querySelector('img[onclick*="actualizarRutaManual"]');
-      if (saveBtn) {
-        saveBtn.setAttribute("onclick", "guardarRutaManual()");
-        saveBtn.setAttribute("title", "Guardar ruta");
-      }
-
-      // Limpiar formulario
-      document.getElementById("kms_ruta").value = "";
-      document.getElementById("obs_ruta").value = "";
-      document.getElementById("fecha_ruta").value = "";
-
-      // Ocultar botón cancelar
-      const cancelBtn = document.getElementById("cancelar_btn");
-      if (cancelBtn) {
-        cancelBtn.style.display = "none";
-      }
-
-      // Volver a la pestaña principal y recargar
-      const tab1Tab = document.getElementById("tab1-tab");
-      const tab1 = document.getElementById("tab1");
-      const tab2Tab = document.getElementById("tab2-tab");
-      const tab2 = document.getElementById("tab2");
-
-      tab2Tab.classList.remove("active");
-      tab2.classList.remove("show", "active");
-      tab1Tab.classList.add("active");
-      tab1.classList.add("show", "active");
-
-      await getRutasByVehiculo();
-      await crearBackup();
-    } else {
-      throw new Error(response.data.message || "Error del servidor");
-    }
-  } catch (err) {
-    console.error("Error actualizando ruta:", err);
-    await Swal.fire({
-      text: "❌ Error al actualizar la ruta",
-      icon: "error",
-      confirmButtonText: "OK",
+    const result = await Swal.fire({
+      title: 'Eliminar ruta',
+      html: `
+        <div style="text-align: left;">
+          <p>¿Está seguro que desea eliminar esta ruta?</p>
+          <p><strong>Fecha:</strong> ${fecha}</p>
+          <p><strong>Kilómetros:</strong> ${kms} km</p>
+          <p class="text-danger mt-3"><small>Esta acción no se puede deshacer.</small></p>
+        </div>
+      `,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
     });
+
+    if (result.isConfirmed) {
+      try {
+        const response = await axios.post(
+          getApiUrl('ruta.php?eliminaRutaManual'),
+          { data: { ruta_id: window.rutaEditandoId } },
+          { headers: { "Content-Type": "application/json" } }
+        );
+
+        if (response.data.success) {
+          await Swal.fire({
+            text: "✅ Ruta eliminada correctamente",
+            icon: "success",
+            timer: 2000,
+            showConfirmButton: false,
+          });
+
+          // Limpiar estado y formulario
+          window.rutaEditandoId = null;
+          document.getElementById("kms_ruta").value = "";
+          document.getElementById("obs_ruta").value = "";
+          document.getElementById("fecha_ruta").value = "";
+
+          // Ocultar botón cancelar
+          const cancelBtn = document.getElementById("cancelar_btn");
+          if (cancelBtn) cancelBtn.style.display = "none";
+
+          // Volver a la pestaña principal
+          const tab1Tab = document.getElementById("tab1-tab");
+          const tab1 = document.getElementById("tab1");
+          const tab2Tab = document.getElementById("tab2-tab");
+          const tab2 = document.getElementById("tab2");
+
+          tab2Tab.classList.remove("active");
+          tab2.classList.remove("show", "active");
+          tab1Tab.classList.add("active");
+          tab1.classList.add("show", "active");
+
+          await getRutasByVehiculo();
+        }
+      } catch (err) {
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: "No se pudo eliminar la ruta",
+        });
+      }
+    }
+  } else {
+    // No estamos editando: limpiar formulario
+    document.getElementById("kms_ruta").value = "";
+    document.getElementById("obs_ruta").value = "";
+    document.getElementById("fecha_ruta").value = "";
   }
 };
 
 const cancelarEdicionRuta = () => {
-  // Restaurar el botón original
-  const saveBtn = document.querySelector('img[onclick*="actualizarRutaManual"]');
-  if (saveBtn) {
-    saveBtn.setAttribute("onclick", "guardarRutaManual()");
-    saveBtn.setAttribute("title", "Guardar ruta");
-  }
+  // Limpiar estado de edición
+  window.rutaEditandoId = null;
 
   // Limpiar formulario
   document.getElementById("kms_ruta").value = "";
@@ -1150,6 +1254,12 @@ function renderizarControlesPaginacion() {
       <div class="d-flex justify-content-center align-items-center" style="gap: 15px;">
         <button
           class="btn btn-sm btn-outline-secondary ${window.paginaActual === 1 ? 'disabled' : ''}"
+          onclick="cambiarPagina(1)"
+          ${window.paginaActual === 1 ? 'disabled' : ''}>
+          <i class="fas fa-angles-left"></i>
+        </button>
+        <button
+          class="btn btn-sm btn-outline-secondary ${window.paginaActual === 1 ? 'disabled' : ''}"
           onclick="cambiarPagina(${window.paginaActual - 1})"
           ${window.paginaActual === 1 ? 'disabled' : ''}>
           <i class="fas fa-chevron-left"></i>
@@ -1162,6 +1272,12 @@ function renderizarControlesPaginacion() {
           onclick="cambiarPagina(${window.paginaActual + 1})"
           ${window.paginaActual === window.totalPaginas ? 'disabled' : ''}>
           <i class="fas fa-chevron-right"></i>
+        </button>
+        <button
+          class="btn btn-sm btn-outline-secondary ${window.paginaActual === window.totalPaginas ? 'disabled' : ''}"
+          onclick="cambiarPagina(${window.totalPaginas})"
+          ${window.paginaActual === window.totalPaginas ? 'disabled' : ''}>
+          <i class="fas fa-angles-right"></i>
         </button>
       </div>
     </div>
@@ -1200,7 +1316,7 @@ const parseHtmlCardsRutas = async (data) => {
       const iconType =
         item.origen === "gpx"
           ? `<i class="fas fa-map-marker-alt" style="font-size: 20px; color: #000; cursor: pointer;" onclick="event.stopPropagation(); showGpxDetails(${item.id})" title="Ruta GPX - Ver detalles"></i>`
-          : `<i class="fas fa-pen-to-square" style="font-size: 18px; color: #000; cursor: pointer;" onclick="eliminaRutaManual('${item.id}')" title="Ruta manual - Ver observaciones"></i>`;
+          : `<i class="fas fa-pen-to-square" style="font-size: 18px; color: #000; cursor: pointer;" onclick="event.stopPropagation(); editarRutaManual('${item.id}', '${item.fecha_inicio}', '${item.kms}', '${item.observaciones || ''}')" title="Ruta manual - Editar"></i>`;
 
       // Para rutas manuales: modo edición al pulsar
       // Para rutas GPX: eliminación con pulsación larga (long press)
@@ -1534,3 +1650,191 @@ document.addEventListener('click', function(event) {
     searchExpanded = false;
   }
 });
+
+// ========== GRÁFICA DE VELOCIDADES MENSUALES ==========
+let velocidadesChartInstance = null;
+let datosVelocidadesGlobal = null;
+
+async function cargarGraficaVelocidades() {
+  const usuario_id = sessionStorage.getItem("usuario_id");
+  const vehiculo_id = document.getElementById("vehiculo-select")?.value;
+  if (!usuario_id || !vehiculo_id) return;
+
+  try {
+    const response = await axios.post(
+      getApiUrl('ruta.php?getVelocidadesMensuales'),
+      { data: { usuario_id } },
+      { headers: { "Content-Type": "application/json" } }
+    );
+
+    if (response.data.success) {
+      const datos = response.data.content;
+      datosVelocidadesGlobal = datos;
+      poblarSelectorAnio(datos);
+      actualizarGraficaPorAnio();
+    }
+  } catch (err) {
+    console.error("Error al obtener velocidades:", err);
+  }
+}
+
+function poblarSelectorAnio(datos) {
+  const select = document.getElementById("anio-filtro");
+  if (!select) return;
+
+  // Obtener años únicos
+  const anios = [...new Set(datos.map(d => d.mes_anio.substring(0, 4)))].sort().reverse();
+
+  select.innerHTML = '';
+  anios.forEach(anio => {
+    const option = document.createElement("option");
+    option.value = anio;
+    option.textContent = anio;
+    select.appendChild(option);
+  });
+
+  // Seleccionar año en curso por defecto
+  const anioActual = new Date().getFullYear().toString();
+  if (anios.includes(anioActual)) {
+    select.value = anioActual;
+  }
+}
+
+function actualizarGraficaPorAnio() {
+  if (!datosVelocidadesGlobal) return;
+
+  const vehiculo_id = document.getElementById("vehiculo-select")?.value;
+  const anioSeleccionado = document.getElementById("anio-filtro")?.value;
+
+  if (!vehiculo_id || !anioSeleccionado) return;
+
+  // Filtrar datos por vehículo y año
+  const datosFiltrados = datosVelocidadesGlobal.filter(d =>
+    d.vehiculo_id == vehiculo_id && d.mes_anio.startsWith(anioSeleccionado)
+  );
+
+  renderizarGraficaVelocidades(datosFiltrados, vehiculo_id, anioSeleccionado);
+}
+
+function renderizarGraficaVelocidades(datos, vehiculo_id, anio) {
+  const canvas = document.getElementById("velocidadesChart");
+  if (!canvas) return;
+
+  const ctx = canvas.getContext("2d");
+
+  // Destruir instancia anterior si existe
+  if (velocidadesChartInstance) {
+    velocidadesChartInstance.destroy();
+  }
+
+  if (datos.length === 0) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.font = "16px Arial";
+    ctx.fillStyle = "#666";
+    ctx.textAlign = "center";
+    ctx.fillText("No hay datos de velocidad para este vehículo en " + anio, canvas.width / 2, canvas.height / 2);
+    return;
+  }
+
+  // Obtener nombre del vehículo
+  const vehiculoNombre = datos[0].vehiculo_anagrama + " - " + datos[0].vehiculo_nombre;
+
+  // Ordenar datos por mes
+  const datosOrdenados = datos.sort((a, b) => a.mes_anio.localeCompare(b.mes_anio));
+
+  // Obtener todos los meses
+  const todosMeses = datosOrdenados.map(d => d.mes_anio);
+
+  // Preparar datos para velocidad media
+  const velocidadesMedias = datosOrdenados.map(d => parseFloat(d.velocidad_media_promedio));
+
+  // Preparar datos para velocidad máxima
+  const velocidadesMaximas = datosOrdenados.map(d => parseFloat(d.velocidad_maxima_maxima));
+
+  // Formatear etiquetas de mes
+  const etiquetas = todosMeses.map(mes => {
+    const [year, month] = mes.split('-');
+    const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    return meses[parseInt(month) - 1];
+  });
+
+  // Crear datasets para Chart.js
+  const datasets = [
+    {
+      label: vehiculoNombre + ' (Media)',
+      data: velocidadesMedias,
+      borderColor: '#007bff',
+      backgroundColor: '#007bff20',
+      borderWidth: 2,
+      fill: false,
+      tension: 0.2,
+      pointRadius: 4,
+      pointHoverRadius: 6
+    },
+    {
+      label: vehiculoNombre + ' (Máxima)',
+      data: velocidadesMaximas,
+      borderColor: '#dc3545',
+      backgroundColor: '#dc354520',
+      borderWidth: 2,
+      borderDash: [5, 5],
+      fill: false,
+      tension: 0.2,
+      pointRadius: 4,
+      pointHoverRadius: 6
+    }
+  ];
+
+  // Crear gráfico
+  velocidadesChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: etiquetas,
+      datasets: datasets
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        title: {
+          display: true,
+          text: 'Velocidad media y maxima - ' + anio,
+          font: { size: 16 }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const value = context.parsed.y;
+              const isMedia = context.dataset.label.includes('Media');
+              const label = isMedia ? 'Media' : 'Maxima';
+              return label + ': ' + value + ' km/h';
+            }
+          }
+        },
+        legend: {
+          position: 'bottom',
+          labels: {
+            padding: 15,
+            usePointStyle: true,
+            font: { size: 11 }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Velocidad (km/h)'
+          }
+        },
+        x: {
+          title: {
+            display: true,
+            text: 'Mes'
+          }
+        }
+      }
+    }
+  });
+}

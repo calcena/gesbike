@@ -54,14 +54,20 @@ function get_rutas_by_vehiculo($params)
                                 SELECT
                                 id,
                                 vehiculo_id,
-                                fecha_inicio,
+                                CASE 
+                                    WHEN fecha_inicio LIKE '%T%' THEN fecha_inicio
+                                    ELSE fecha_inicio || 'T00:00:00.000Z'
+                                END as fecha_inicio,
                                 fecha_fin,
                                 tiempo_total,
                                 tiempo_movimiento,
                                 ROUND(kms, 1) as kms,
                                 ROUND(SUM(kms) OVER (
                                         PARTITION BY vehiculo_id
-                                        ORDER BY fecha_inicio ASC, id ASC
+                                        ORDER BY CASE 
+                                            WHEN fecha_inicio LIKE '%T%' THEN fecha_inicio
+                                            ELSE fecha_inicio || 'T00:00:00.000Z'
+                                        END ASC, id ASC
                                         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
                                     ), 1) as acumulado_kms,
                                 metros_ascenso,
@@ -363,6 +369,31 @@ INNER JOIN vehiculos v1 ON r1.vehiculo_id = v1.id
 WHERE v1.usuario_id = ?
 GROUP BY anio, strftime('%m', r1.fecha_inicio)
 ORDER BY anio DESC, strftime('%m', r1.fecha_inicio) DESC;
+                                ");
+    $stmt->execute([$params['usuario_id']]);
+    $entity = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    return $entity;
+}
+
+function get_velocidades_by_month($params)
+{
+    $db = conectar();
+    $stmt = $db->prepare("
+SELECT
+    strftime('%Y-%m', r.fecha_inicio) AS mes_anio,
+    v.id AS vehiculo_id,
+    v.nombre AS vehiculo_nombre,
+    v.anagrama AS vehiculo_anagrama,
+    ROUND(AVG(r.velocidad_media), 1) AS velocidad_media_promedio,
+    ROUND(MAX(r.velocidad_maxima), 1) AS velocidad_maxima_maxima
+FROM rutas r
+INNER JOIN vehiculos v ON r.vehiculo_id = v.id
+WHERE r.activo = 1
+  AND v.usuario_id = ?
+  AND r.velocidad_media IS NOT NULL
+  AND r.velocidad_maxima IS NOT NULL
+GROUP BY strftime('%Y-%m', r.fecha_inicio), r.vehiculo_id
+ORDER BY mes_anio ASC, v.nombre ASC;
                                 ");
     $stmt->execute([$params['usuario_id']]);
     $entity = $stmt->fetchAll(PDO::FETCH_ASSOC);

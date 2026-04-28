@@ -22,6 +22,7 @@ switch ($action) {
     case 'actualizarRutaManual':
     case 'eliminaRutaManual':
     case 'getResumenBiker':
+    case 'getVelocidadesMensuales':
         $controllerFile = ROOT_PATH . '/controllers/ruta.php';
         if (!file_exists($controllerFile)) {
             http_response_code(500);

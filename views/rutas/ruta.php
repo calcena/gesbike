@@ -35,6 +35,7 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
     <script src="../../services/logs/logs.js?<?php random_file_enumerator() ?>"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <title><?php echo APP_NAME . '_' . APP_VERSION ?></title>
 </head>
 
@@ -71,10 +72,17 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
                 </button>
             </li>
             <li class="nav-item" role="presentation">
+                <button class="nav-link px-2 px-md-3" id="tab5-tab" data-bs-toggle="tab" data-bs-target="#tab5" type="button"
+                    role="tab" aria-controls="tab5" aria-selected="false" onclick="cargarGraficaVelocidades()">
+                    <span style="font-size: 22px" class="d-md-none">📈</span>
+                    <span style="font-size: 25px" class="d-none d-md-inline">📈</span>
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
                 <button class="nav-link px-2 px-md-3" id="tab4-tab" data-bs-toggle="tab" data-bs-target="#tab4" type="button"
                     role="tab" aria-controls="tab4" aria-selected="false" onclick="getResumenBiker()">
-                    <span style="font-size: 22px" class="d-md-none">📊</span>
-                    <span style="font-size: 25px" class="d-none d-md-inline">📊</span>
+                    <span style="font-size: 22px" class="d-md-none">🗂️</span>
+                    <span style="font-size: 25px" class="d-none d-md-inline">🗂️</span>
                 </button>
             </li>
             <li class="nav-item ms-auto d-flex align-items-end" role="presentation" style="padding-left: 5px;">
@@ -128,7 +136,8 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
 
                 </div>
                 <div class="row mt-2 justify-content-around">
-                    <img class="action-icon" src="../../assets/images/icons/papelera.png" alt="">
+                    <img class="action-icon" src="../../assets/images/icons/papelera.png" alt=""
+                        onclick="eliminarRutaFormulario()" id="papelera_btn">
                     <img class="action-icon" src="../../assets/images/icons/cancelar_icon.png" alt=""
                         onclick="cancelarEdicionRuta()" id="cancelar_btn" style="display: none;">
                     <img class="action-icon" src="../../assets/images/icons/validate_icon.png" alt=""
@@ -168,6 +177,18 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
                 <div class="accordion mt-0" id="accordionSummary">
                 </div>
 
+            </div>
+            <div class="tab-pane fade" id="tab5" role="tabpanel" aria-labelledby="tab5-tab">
+                <div class="container-fluid p-0">
+                    <div class="chart-container" style="position: relative; height: 400px;">
+                        <canvas id="velocidadesChart"></canvas>
+                    </div>
+                    <div class="mt-2 text-center">
+                        <label for="anio-filtro" class="form-label small">Año:</label>
+                        <select id="anio-filtro" class="form-select form-select-sm d-inline-block" style="width: auto;" onchange="actualizarGraficaPorAnio()">
+                        </select>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

@@ -190,6 +190,31 @@ function handle_get_resumem_usuario()
     }
 }
 
+function handle_get_velocidades_mensuales()
+{
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['success' => false, 'error' => 'Método no permitido']);
+        return;
+    }
+    $input = json_decode(file_get_contents('php://input'), true);
+    $params = $input['data'];
+
+    try {
+        $entity = get_velocidades_mensuales($params);
+        echo json_encode([
+            'success' => true,
+            'content' => $entity
+        ]);
+    } catch (Exception $e) {
+        http_response_code(404);
+        echo json_encode([
+            'success' => false,
+            'error' => $e
+        ]);
+    }
+}
+
 
 // === Enrutar según acción ===
 switch ($action) {
@@ -213,6 +238,9 @@ switch ($action) {
         break;
     case 'getResumenBiker':
         handle_get_resumem_usuario();
+        break;
+    case 'getVelocidadesMensuales':
+        handle_get_velocidades_mensuales();
         break;
     default:
         http_response_code(400);

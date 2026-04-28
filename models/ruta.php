@@ -42,6 +42,12 @@ function get_resumem_usuario($params) {
     return $entity;
 }
 
+function get_velocidades_mensuales($params) {
+    global $db;
+    $entity = get_velocidades_by_month($params);
+    return $entity;
+}
+
 
 
 
