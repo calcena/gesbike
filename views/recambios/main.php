@@ -23,6 +23,7 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
     <link href="../../assets/css/bootstrap/bootstrap.min.css" rel="stylesheet" type="text/css">
     <link href="../../assets/css/main/main.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
     <link href="../../assets/css/style.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
+    <link href="../../assets/css/theme.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
     <link href="../../assets/css/recambios/recambio.css?<?php random_file_enumerator() ?>" rel="stylesheet"
         type="text/css">
     <script src="../../assets/js/axios/axios.min.js?<?php random_file_enumerator() ?>"></script>
@@ -32,12 +33,13 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
     <script src="../../services/recambios/recambio.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../services/translate/translate.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../services/logs/logs.js?<?php random_file_enumerator() ?>"></script>
+    <script src="../../services/theme/theme.js?<?php random_file_enumerator() ?>"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
     <title><?php echo APP_NAME . '_' . APP_VERSION ?></title>
 </head>
 
-<body onload="initRecambios()">
+<body onload="initRecambios(); initTheme()">
     <div class="container mt-2 d-flex justify-content-between">
         <img class="icon-menu" src="../../assets/images/icons/left.png" alt="" onclick="gotoBackMantenimientos()">
         <div class="w-100 ps-2 pe-2">

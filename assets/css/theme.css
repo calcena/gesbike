@@ -1,0 +1,243 @@
+/* ============================================
+   GESBIKE THEME SYSTEM - Light & Dark Modes
+   ============================================ */
+
+:root {
+    /* === Base === */
+    --bg-primary: #ffffff;
+    --bg-secondary: #f5f5f5;
+    --bg-tertiary: #f8f9fa;
+    --text-primary: #212529;
+    --text-secondary: #6c757d;
+    --text-muted: #999;
+    --border-color: #dee2e6;
+    --border-light: #e0e0e0;
+    --shadow-sm: rgba(0, 0, 0, 0.05);
+    --shadow-md: rgba(0, 0, 0, 0.1);
+    --shadow-lg: rgba(0, 0, 0, 0.15);
+
+    /* === Cards === */
+    --card-bg: #ffffff;
+    --card-border: #e0e0e0;
+    --card-body-bg: #ffffff;
+    --card-shadow: 0 0.15rem 0.5rem rgba(0, 0, 0, 0.05);
+
+    /* === Sidebar === */
+    --sidebar-bg: #ffffff;
+    --sidebar-overlay: rgba(0, 0, 0, 0.4);
+    --sidebar-hover: #f8f9fa;
+
+    /* === Inputs === */
+    --input-bg: #ffffff;
+    --input-border: #dee2e6;
+    --input-focus-border: #28a745;
+    --input-focus-shadow: rgba(40, 167, 69, 0.25);
+    --input-disabled-bg: #e9ecef;
+    --select-bg: #ffffff;
+
+    /* === Buttons === */
+    --btn-primary-bg: #0d6efd;
+    --btn-primary-text: #ffffff;
+    --btn-success-bg: #28a745;
+    --btn-danger-bg: #dc3545;
+
+    /* === Navbar/Header === */
+    --header-bg: lightgreen;
+    --header-border: green;
+    --header-text: #ffffff;
+
+    /* === Tables === */
+    --table-stripe: #f8f9fa;
+    --table-border: #dee2e6;
+
+    /* === Specific elements === */
+    --page-title: #3d3d3d;
+    --repeat-card-bg: #e2e2e270;
+    --text-card-info: #6c757d;
+    --price-text: #2e4dff;
+    --und-text: #048000;
+    --date-card: #525252;
+    --date-text: #505050;
+    --supplier-text: #505050;
+
+    /* === Sidecar (KMS panel) === */
+    --kms-bg: #f8f9fa;
+    --kms-border: #e0e0e0;
+
+    /* === Related rows === */
+    --related-bg: #f8f9fa;
+    --related-hover: #e3f2fd;
+    --related-border: #e0e0e0;
+
+    /* === Progress bar === */
+    --progress-bg: linear-gradient(90deg, #87CEEB, #ADD8E6);
+
+    /* === Long-press === */
+    --long-press-transform: scale(0.98);
+
+    /* === Footer === */
+    --footer-text: #6c757d;
+
+    /* === FAB === */
+    --fab-bg: #0d6efd;
+    --fab-shadow: rgba(13, 110, 253, 0.4);
+
+    /* === Body === */
+    --body-bg: #ffffff;
+    --body-text: #212529;
+
+    /* === Offcanvas === */
+    --offcanvas-bg: #ffffff;
+
+    /* === Badges === */
+    --badge-active-bg: #28a745;
+    --badge-inactive-bg: #6c757d;
+
+    /* === Login === */
+    --login-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --login-card-bg: #ffffff;
+    --login-card-shadow: rgba(0, 0, 0, 0.15);
+    --login-title-color: #1a1a2e;
+    --login-subtitle-color: #888;
+    --login-icon-color: #aaa;
+    --login-input-border: #e0e0e0;
+    --login-input-bg: #f8f9fa;
+    --login-input-focus-border: #667eea;
+    --login-input-focus-bg: #ffffff;
+    --login-input-focus-shadow: rgba(102, 126, 234, 0.15);
+    --login-btn-bg: linear-gradient(135deg, #667eea, #764ba2);
+    --login-btn-text: #ffffff;
+    --login-btn-shadow: rgba(102, 126, 234, 0.4);
+    --login-message: #28a745;
+    --login-error-color: #dc3545;
+    --login-version-color: #bbb;
+    --login-link: #667eea;
+
+    /* === Mantenimientos === */
+    --asignado-border: #c7ffb9;
+    --asignado-header: #478a4a;
+    --asignado-body: #fafafa;
+    --pendiente-border: #eac7c7;
+    --pendiente-header: #eac7c7;
+    --pendiente-text: #125a15;
+    --pendiente-body: #ffecec;
+
+    /* === Vehiculos === */
+    --vehiculo-card-img-border: #f0f0f0;
+    --vehiculo-placeholder-border: #cccccc;
+    --vehiculo-placeholder-text: #aaaaaa;
+
+    /* === Mantenimiento card === */
+    --mant-card-bg: #ffffff;
+    --mant-card-hover-shadow: rgba(0, 0, 0, 0.15);
+}
+
+/* ============================================
+   DARK MODE
+   ============================================ */
+[data-theme="dark"] {
+    --bg-primary: #1a1a2e;
+    --bg-secondary: #16213e;
+    --bg-tertiary: #0f3460;
+    --text-primary: #e0e0e0;
+    --text-secondary: #a0a0b0;
+    --text-muted: #707080;
+    --border-color: #2a2a4a;
+    --border-light: #2a2a4a;
+    --shadow-sm: rgba(0, 0, 0, 0.3);
+    --shadow-md: rgba(0, 0, 0, 0.4);
+    --shadow-lg: rgba(0, 0, 0, 0.5);
+
+    --card-bg: #1e1e3a;
+    --card-border: #2a2a4a;
+    --card-body-bg: #1e1e3a;
+    --card-shadow: 0 0.15rem 0.5rem rgba(0, 0, 0, 0.3);
+
+    --sidebar-bg: #16213e;
+    --sidebar-overlay: rgba(0, 0, 0, 0.7);
+    --sidebar-hover: #0f3460;
+
+    --input-bg: #1e1e3a;
+    --input-border: #2a2a4a;
+    --input-focus-border: #4ade80;
+    --input-focus-shadow: rgba(74, 222, 128, 0.25);
+    --input-disabled-bg: #16213e;
+    --select-bg: #1e1e3a;
+
+    --btn-primary-bg: #3b82f6;
+    --btn-primary-text: #ffffff;
+    --btn-success-bg: #22c55e;
+    --btn-danger-bg: #ef4444;
+
+    --header-bg: #0f3460;
+    --header-border: #1e3a8a;
+    --header-text: #e0e0e0;
+
+    --table-stripe: #16213e;
+    --table-border: #2a2a4a;
+
+    --page-title: #e0e0e0;
+    --repeat-card-bg: #1a1a2e;
+    --text-card-info: #a0a0b0;
+    --price-text: #60a5fa;
+    --und-text: #4ade80;
+    --date-card: #a0a0b0;
+    --date-text: #a0a0b0;
+    --supplier-text: #a0a0b0;
+
+    --kms-bg: #16213e;
+    --kms-border: #2a2a4a;
+
+    --related-bg: #16213e;
+    --related-hover: #0f3460;
+    --related-border: #2a2a4a;
+
+    --progress-bg: linear-gradient(90deg, #3b82f6, #60a5fa);
+
+    --footer-text: #a0a0b0;
+
+    --fab-bg: #3b82f6;
+    --fab-shadow: rgba(59, 130, 246, 0.4);
+
+    --body-bg: #1a1a2e;
+    --body-text: #e0e0e0;
+
+    --offcanvas-bg: #16213e;
+
+    --badge-active-bg: #22c55e;
+    --badge-inactive-bg: #6b7280;
+
+    --login-bg: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+    --login-card-bg: #1e1e3a;
+    --login-card-shadow: rgba(0, 0, 0, 0.5);
+    --login-title-color: #e0e0e0;
+    --login-subtitle-color: #8888aa;
+    --login-icon-color: #6666aa;
+    --login-input-border: #2a2a4a;
+    --login-input-bg: #16213e;
+    --login-input-focus-border: #818cf8;
+    --login-input-focus-bg: #1a1a3e;
+    --login-input-focus-shadow: rgba(129, 140, 248, 0.15);
+    --login-btn-bg: linear-gradient(135deg, #6366f1, #8b5cf6);
+    --login-btn-text: #ffffff;
+    --login-btn-shadow: rgba(99, 102, 241, 0.4);
+    --login-message: #4ade80;
+    --login-error-color: #f87171;
+    --login-version-color: #555577;
+    --login-link: #818cf8;
+
+    --asignado-border: #0f3460;
+    --asignado-header: #1e3a8a;
+    --asignado-body: #16213e;
+    --pendiente-border: #4a1a1a;
+    --pendiente-header: #4a1a1a;
+    --pendiente-text: #fca5a5;
+    --pendiente-body: #2a1a1a;
+
+    --vehiculo-card-img-border: #2a2a4a;
+    --vehiculo-placeholder-border: #2a2a4a;
+    --vehiculo-placeholder-text: #707080;
+
+    --mant-card-bg: #1e1e3a;
+    --mant-card-hover-shadow: rgba(0, 0, 0, 0.5);
+}

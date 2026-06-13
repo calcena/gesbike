@@ -23,6 +23,7 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link href="../assets/css/bootstrap/bootstrap.min.css" rel="stylesheet" type="text/css">
   <link href="../assets/css/style.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
+  <link href="../assets/css/theme.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
   <link href="../assets/css/main/main.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
   <script src="../assets/js/axios/axios.min.js?<?php random_file_enumerator() ?>"></script>
   <script src="../assets/js/bootstrap/bootstrap.min.js?<?php random_file_enumerator() ?>"></script>
@@ -30,12 +31,13 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
   <script src="../services/main/main.js?<?php random_file_enumerator() ?>"></script>
   <script src="../services/components/sitebar.js?<?php random_file_enumerator() ?>"></script>
   <script src="../services/translate/translate.js?<?php random_file_enumerator() ?>"></script>
+  <script src="../services/theme/theme.js?<?php random_file_enumerator() ?>"></script>
   <script src="../services/logs/logs.js?<?php random_file_enumerator() ?>"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <title><?php echo APP_NAME . '_' . APP_VERSION ?></title>
 </head>
 
-<body onload="initMain()">
+<body onload="initMain(); initTheme()">
   <div class="container mt-2">
     <div class="container mt-2 d-flex justify-content-end align-items-center ps-0 !important" style="gap: 1rem;">
       <select class="form-select w-100" id="vehiculo-select" onchange="cambiarVehiculo(this.value)">

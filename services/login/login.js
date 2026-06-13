@@ -1,5 +1,9 @@
 const initLogin = () => {
+  const savedTheme = sessionStorage.getItem("theme");
   sessionStorage.clear();
+  if (savedTheme) {
+    sessionStorage.setItem("theme", savedTheme);
+  }
 };
 
 const auth = async (nombre, pass) => {
@@ -20,6 +24,8 @@ const auth = async (nombre, pass) => {
     if (response.data.success) {
       sessionStorage.setItem("usuario_id", response.data.content.id);
       sessionStorage.setItem("login_parent", true);
+      const theme = response.data.content.theme || "light";
+      sessionStorage.setItem("theme", theme);
       mensaje.innerHTML = `
                 <p class="success">
                     ¡Bienvenido ${response.data.content.nombre}!
@@ -52,7 +58,6 @@ window.addEventListener('load', () => {
         return false;
     };
 
-    // 1. Intervalo estándar (para Firefox y escritorio)
     const interval = setInterval(() => {
         if (intentarLogin()) clearInterval(interval);
     }, 500);

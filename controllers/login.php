@@ -51,10 +51,45 @@ function handle_login()
     }
 }
 
-// === Enrutar según acción ===
+function handle_set_theme()
+{
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['success' => false, 'error' => 'Método no permitido']);
+        return;
+    }
+    $input = json_decode(file_get_contents('php://input'), true);
+    $params = $input['data'];
+
+    if (empty($params['usuario_id']) || empty($params['theme'])) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'usuario_id y theme son requeridos']);
+        return;
+    }
+
+    try {
+        $db = conectar();
+        $stmt = $db->prepare("UPDATE usuarios SET theme = ? WHERE id = ?");
+        $stmt->execute([$params['theme'], $params['usuario_id']]);
+        echo json_encode([
+            'success' => true,
+            'message' => 'Tema guardado'
+        ]);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+    }
+}
+
 switch ($action) {
     case 'auth':
         handle_login();
+        break;
+    case 'setTheme':
+        handle_set_theme();
         break;
     default:
         http_response_code(400);

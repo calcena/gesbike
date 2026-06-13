@@ -322,15 +322,25 @@ function historico_mantenimientos_by_grupo($params)
     $stmt = $db->prepare("
                                 WITH Numeracion AS (
                                     SELECT
+                                        m.id,
                                         m.fecha,
-                                        (SELECT nombre FROM operaciones WHERE id = m.operacion_id) AS operacion_nombre,
-                                        (SELECT nombre FROM recambios WHERE id = m.recambio_id) AS recambio,
-                                        m.kms,
-                                        COALESCE(UPPER((SELECT nombre FROM localizaciones WHERE id = m.localizacion_id)), 'N/A') AS localizacion,
-                                        m.vehiculo_id,
+                                        m.operacion_id,
                                         m.localizacion_id,
-                                        -- Traemos los KMS del siguiente registro
+                                        (SELECT imagen FROM operaciones WHERE id = m.operacion_id) AS operacion_imagen,
+                                        (SELECT nombre FROM operaciones WHERE id = m.operacion_id) AS operacion_nombre,
+                                        m.recambio_id,
+                                        (SELECT nombre FROM recambios WHERE id = m.recambio_id) AS recambio,
+                                        (SELECT referencia FROM recambios WHERE id = m.recambio_id) AS recambio_referencia,
+                                        (SELECT imagen FROM recambios WHERE id = m.recambio_id) AS recambio_imagen,
+                                        m.kms,
+                                        m.precio,
+                                        m.unidades,
+                                        COALESCE(m.observaciones, '') AS observaciones,
+                                        COALESCE(UPPER((SELECT nombre FROM localizaciones WHERE id = m.localizacion_id)), 'N/A') AS localizacion,
+                                        (SELECT imagen FROM localizaciones WHERE id = m.localizacion_id) AS localizacion_imagen,
+                                        m.vehiculo_id,
                                         LEAD(m.kms) OVER(PARTITION BY m.vehiculo_id, m.localizacion_id ORDER BY m.fecha ASC) AS kms_proximo,
+                                        LEAD(m.fecha) OVER(PARTITION BY m.vehiculo_id, m.localizacion_id ORDER BY m.fecha ASC) AS fecha_proximo,
                                         ROW_NUMBER() OVER(PARTITION BY m.vehiculo_id, m.localizacion_id ORDER BY m.fecha ASC) AS fila_num,
                                         COUNT(*) OVER(PARTITION BY m.vehiculo_id, m.localizacion_id) AS total_filas
                                     FROM
@@ -338,43 +348,61 @@ function historico_mantenimientos_by_grupo($params)
                                     WHERE
                                         m.vehiculo_id = ?
                                         AND m.grupo_id = ?
+                                        AND m.is_active = 1
                                 )
                                 SELECT
+                                    n.id,
                                     n.fecha,
-                                    n.operacion_nombre,
-                                    COALESCE(n.recambio, 'N/A') AS recambio,
-                                    n.kms,
-                                    COALESCE(n.localizacion, '') AS localizacion,
-                                    n.vehiculo_id,
+                                    n.operacion_id,
                                     n.localizacion_id,
+                                    n.operacion_imagen,
+                                    n.operacion_nombre,
+                                    n.recambio_id,
+                                    COALESCE(n.recambio, 'N/A') AS recambio,
+                                    n.recambio_referencia,
+                                    n.recambio_imagen,
+                                    n.kms,
+                                    n.precio,
+                                    n.unidades,
+                                    n.observaciones,
+                                    COALESCE(n.localizacion, '') AS localizacion,
+                                    COALESCE(n.localizacion_imagen, '') AS localizacion_imagen,
+                                    n.vehiculo_id,
                                     n.fila_num,
-                                    -- CÁLCULO DE DURACIÓN DEL RECAMBIO (SIEMPRE MIRA HACIA ADELANTE)
-                                    CASE
-                                        -- Si hay un registro siguiente, restamos Siguiente - Actual
-                                        WHEN n.kms_proximo IS NOT NULL THEN (n.kms_proximo - n.kms)
+                                    n.total_filas,
 
-                                        -- Si es el último (no hay siguiente), usamos los kms actuales del vehículo (?)
+                                    -- Duración en KM del componente
+                                    CASE
+                                        WHEN n.kms_proximo IS NOT NULL THEN (n.kms_proximo - n.kms)
                                         ELSE
                                             CASE
                                                 WHEN (? - n.kms) < 0 THEN 0
                                                 ELSE (? - n.kms)
                                             END
-                                    END AS diferencia_kms,
+                                    END AS duracion_kms,
 
-                                    -- Diferencia en tiempo (Edad del vehículo)
+                                    -- Tiempo entre mantenimientos (no edad del vehículo)
+                                    CASE
+                                        WHEN n.fecha_proximo IS NOT NULL THEN
+                                            CAST((JULIANDAY(n.fecha_proximo) - JULIANDAY(n.fecha)) AS INTEGER) || ' días'
+                                        ELSE
+                                            CAST((JULIANDAY(date('now')) - JULIANDAY(n.fecha)) AS INTEGER) || ' días'
+                                    END AS duracion_tiempo,
+
+                                    -- Edad del vehículo en el momento del mantenimiento
                                     CASE
                                         WHEN CAST((JULIANDAY(n.fecha) - JULIANDAY((SELECT fecha_compra FROM vehiculos WHERE id = n.vehiculo_id))) / 365 AS INTEGER) = 0 THEN
                                             CAST(((JULIANDAY(n.fecha) - JULIANDAY((SELECT fecha_compra FROM vehiculos WHERE id = n.vehiculo_id))) % 365) / 30.44 AS INTEGER) || ' meses'
                                         ELSE
                                             CAST((JULIANDAY(n.fecha) - JULIANDAY((SELECT fecha_compra FROM vehiculos WHERE id = n.vehiculo_id))) / 365 AS INTEGER) || ' años y ' ||
                                             CAST(((JULIANDAY(n.fecha) - JULIANDAY((SELECT fecha_compra FROM vehiculos WHERE id = n.vehiculo_id))) % 365) / 30.44 AS INTEGER) || ' meses'
-                                    END AS diferencia_tiempo
+                                    END AS edad_vehiculo
                                 FROM
                                     Numeracion AS n
                                 ORDER BY
                                     n.localizacion_id, n.fecha ASC;
                                 ");
-    $stmt->execute([$params['vehiculo_id'], $params["grupo_id"],$params['kms'],$params['kms']]);
+    $stmt->execute([$params['vehiculo_id'], $params["grupo_id"], $params['kms'], $params['kms']]);
     $entity = $stmt->fetchAll(PDO::FETCH_ASSOC);
     return $entity;
 }

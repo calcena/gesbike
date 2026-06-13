@@ -1,0 +1,19 @@
+.historico-item {
+  transition: background-color 0.2s ease;
+}
+.historico-item:hover {
+  background-color: var(--bs-tertiary-bg, rgba(0,0,0,0.02));
+}
+[data-theme="dark"] .historico-item:hover {
+  background-color: var(--bs-tertiary-bg, rgba(255,255,255,0.04));
+}
+[data-theme="dark"] .historico-item .text-muted {
+  color: var(--bs-secondary-color, #adb5bd) !important;
+}
+[data-theme="dark"] .bg-light {
+  background-color: var(--bs-dark, #212529) !important;
+}
+[data-theme="dark"] .card-footer.bg-light {
+  background-color: var(--bs-dark, #212529) !important;
+  color: var(--bs-body-color, #dee2e6);
+}

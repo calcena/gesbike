@@ -13,6 +13,7 @@ $action = !empty($_GET) ? array_keys($_GET)[0] : '';
 
 switch ($action) {
     case 'auth':
+    case 'setTheme':
         $controllerFile = ROOT_PATH . '/controllers/login.php';
         if (!file_exists($controllerFile)) {
             http_response_code(500);
@@ -31,7 +32,7 @@ switch ($action) {
         header('Content-Type: application/json');
         echo json_encode([
             'success' => false,
-            'error' => $e
+            'error' => 'Acción no soportada'
         ]);
         exit;
 }

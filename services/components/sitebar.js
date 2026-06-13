@@ -30,6 +30,7 @@ function menuAction(action, deep) {
       window.location.href = `${basePath}/mantenimientos/mantenimiento.php`;
       break;
     case "vehiculo":
+    case "vehiculos":
       window.location.href = `${basePath}/vehiculos/vehiculo.php`;
       break;
     case "stock":

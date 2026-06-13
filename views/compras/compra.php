@@ -22,6 +22,7 @@ $modo = $_GET["modo"];
     <link href="../../assets/css/bootstrap/bootstrap.min.css" rel="stylesheet" type="text/css">
     <link href="../../assets/css/main/main.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
     <link href="../../assets/css/style.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
+    <link href="../../assets/css/theme.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
     <script src="../../assets/js/axios/axios.min.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../assets/js/bootstrap/bootstrap.min.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../services/helpers/helper.js?<?php random_file_enumerator() ?>"></script>
@@ -29,12 +30,13 @@ $modo = $_GET["modo"];
     <script src="../../services/compras/compra.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../services/translate/translate.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../services/logs/logs.js?<?php random_file_enumerator() ?>"></script>
+    <script src="../../services/theme/theme.js?<?php random_file_enumerator() ?>"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
     <title><?php echo APP_NAME . '_' . APP_VERSION ?></title>
 </head>
 
-<body id="mainBody" data-modo="<?php echo $modo; ?>" onload="initCompraNuevoEdit()">
+<body id="mainBody" data-modo="<?php echo $modo; ?>" onload="initCompraNuevoEdit(); initTheme()">
     <div class="container mt-2">
         <div class="w-100 d-flex">
             <img class="icon-menu" src="../../assets/images/icons/left.png" alt="" onclick="gotoBackCompras()">

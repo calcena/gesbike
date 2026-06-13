@@ -20,11 +20,12 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
     <meta http-equiv='pragma' content='no-cache'>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link href="../../assets/css/bootstrap/bootstrap.min.css" rel="stylesheet" type="text/css">
-    <link href="../.././assets/css/main/main.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
+    <link href="../../assets/css/main/main.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
     <link href="../../assets/css/style.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
+    <link href="../../assets/css/theme.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
     <link href="../../assets/css/vehiculos/vehiculo.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
     <script src="../../assets/js/axios/axios.min.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../assets/js/bootstrap/bootstrap.min.js?<?php random_file_enumerator() ?>"></script>
@@ -33,25 +34,29 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
     <script src="../../services/vehiculos/vehiculo.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../services/translate/translate.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../services/logs/logs.js?<?php random_file_enumerator() ?>"></script>
+    <script src="../../services/theme/theme.js?<?php random_file_enumerator() ?>"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <title><?php echo APP_NAME . '_' . APP_VERSION ?></title>
 </head>
 
-<body onload="initStock()">
+<body onload="initVehiculos(); initTheme()">
     <div class="container mt-2">
-        <div class="container mt-2 d-flex justify-content-end align-items-center ps-0 !important" style="gap: 1rem;">
-            <select class="form-select w-100 menu-text-option" id="vehiculo-select" onchange="cambiarVehiculo(this.value)">
-            </select>
-            <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" role="switch" id="flexSwitchCheckDisabled" onmouseover="showDescription()">
-            </div>
+        <div class="d-flex justify-content-between align-items-center">
+            <img class="icon-menu" src="../../assets/images/icons/left.png" alt="" onclick="gotoBack()">
+            <h5 class="mb-0">Vehículos</h5>
             <img class="icon-menu" src="../../assets/images/icons/menu.png" alt="" onclick="showLateralMenu()">
         </div>
     </div>
+
     <div class="container mt-2">
-        <div class="row row-cols-1 g-3" id="main-cards">
+        <div class="row" id="vehiculos-container">
         </div>
     </div>
+
+    <div class="fab-button" onclick="nuevoVehiculo()">
+        <img src="../../assets/images/icons/add.png" alt="Añadir" class="fab-icon">
+    </div>
+
     <div class="container footer-location text-center">
         <?php
         $source = 'main';
@@ -59,6 +64,18 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
     </div>
     <?php include __DIR__ . '/../components/sidebar.php'; ?>
 
+    <div class="offcanvas offcanvas-start" tabindex="-1" id="menuVehiculo" aria-labelledby="menuVehiculoLabel" style="width: 250px;">
+        <div class="offcanvas-body p-0 mt-4">
+            <div class="list-group list-group-flush">
+                <button type="button" class="list-group-item list-group-item-action py-3" onclick="accionMenu('editar')">
+                    <img class="icon-submenu-izquierda" src="../../assets/images/icons/pencil.png" alt=""> Editar
+                </button>
+                <button type="button" class="list-group-item list-group-item-action py-3" onclick="accionMenu('eliminar')">
+                    <img class="icon-submenu-izquierda" src="../../assets/images/icons/papelera.png" alt=""> Eliminar
+                </button>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>

@@ -8,7 +8,6 @@
     </div>
     <hr />
     <div class="menu-items">
-        <!-- 7 íconos de menú -->
         <div class="menu-item text-center" onclick="menuAction('inicio',<?php echo $GLOBALS['navigation_deep'] ?>)">
             <img src="<?php echo $GLOBALS['pathUrl'] ?>assets/images/icons/inicio_ico.png" alt="Inicio"
                 class="menu-icon">
@@ -16,7 +15,7 @@
         </div>
         <div class="menu-item text-center"
             onclick="menuAction('mantenimiento',<?php echo $GLOBALS['navigation_deep'] ?>)">
-            <img src="<?php echo $GLOBALS['pathUrl'] ?>assets/images/icons/mantenimiento_ico.png" alt="Matenimientos"
+            <img src="<?php echo $GLOBALS['pathUrl'] ?>assets/images/icons/mantenimiento_ico.png" alt="Mantenimientos"
                 class="menu-icon">
             <div class="menu-text-option">Mantenimientos</div>
         </div>
@@ -44,11 +43,15 @@
             <div class="menu-text-option">Stock</div>
         </div>
         <hr>
+        <div class="menu-item text-center" id="theme-toggle-btn">
+            <i class="fas fa-moon menu-icon"></i>
+            <div class="menu-text-option">Modo oscuro</div>
+        </div>
+        <hr>
         <div class="menu-item text-center" onclick="menuAction('salir',<?php echo $GLOBALS['navigation_deep'] ?>)">
             <img src="<?php echo $GLOBALS['pathUrl'] ?>assets/images/icons/exit.png" alt="Salir" class="menu-icon">
             <div class="menu-text-option">Salir</div>
         </div>
     </div>
 </div>
-<!-- Overlay oscuro (opcional, mejora UX) -->
 <div id="menu-overlay" class="menu-overlay" onclick="hideLateralMenu()"></div>

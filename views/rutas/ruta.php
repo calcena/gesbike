@@ -25,6 +25,7 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
     <link href="../../assets/css/bootstrap/bootstrap.min.css" rel="stylesheet" type="text/css">
     <link href="../../assets/css/main/main.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
     <link href="../../assets/css/style.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
+    <link href="../../assets/css/theme.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
     <link href="../../assets/css/rutas/ruta.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
     <script src="../../assets/js/axios/axios.min.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../assets/js/bootstrap/bootstrap.min.js?<?php random_file_enumerator() ?>"></script>
@@ -33,13 +34,14 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
     <script src="../../services/rutas/ruta.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../services/translate/translate.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../services/logs/logs.js?<?php random_file_enumerator() ?>"></script>
+    <script src="../../services/theme/theme.js?<?php random_file_enumerator() ?>"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <title><?php echo APP_NAME . '_' . APP_VERSION ?></title>
 </head>
 
-<body onload="initRutas()">
+<body onload="initRutas(); initTheme()">
     <div class="container mt-2 d-flex justify-content-between align-items-center ps-0 !important" style="gap: 1rem;">
         <img class="icon-menu ms-2" src="../../assets/images/icons/left.png" alt="" onclick="gotoBackMantenimientos()">
         <select id="vehiculo-select" name="" class="form-select mb-1" onchange="cambiarVehiculo(this.value)">

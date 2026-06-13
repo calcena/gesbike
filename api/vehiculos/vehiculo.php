@@ -15,9 +15,27 @@ $db = conectar();
 $action = !empty($_GET) ? array_keys($_GET)[0] : '';
 
 switch ($action) {
-    case 'getVehiculosById':
+    case 'getVehiculos':
+    case 'getVehiculoById':
+    case 'nuevoVehiculo':
+    case 'editarVehiculo':
+    case 'eliminarVehiculo':
     case 'getMotorVehiculo':
         $controllerFile = ROOT_PATH . '/controllers/vehiculo.php';
+        if (!file_exists($controllerFile)) {
+            http_response_code(500);
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => false,
+                'error' => 'Controlador no encontrado: ' . $controllerFile
+            ]);
+            exit;
+        }
+        define('ACTION', $action);
+        require_once $controllerFile;
+        break;
+    case 'uploadVehiculoImage':
+        $controllerFile = ROOT_PATH . '/controllers/attach.php';
         if (!file_exists($controllerFile)) {
             http_response_code(500);
             header('Content-Type: application/json');
@@ -35,7 +53,7 @@ switch ($action) {
         header('Content-Type: application/json');
         echo json_encode([
             'success' => false,
-            'error' =>  $error
+            'error' => 'Acción no soportada'
         ]);
         exit;
 }

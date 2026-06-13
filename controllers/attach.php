@@ -233,6 +233,10 @@ switch ($source) {
         $uploadDir = __DIR__ . '/../assets/images/Recambios/';
         $basePath = '../assets/images/Recambios/';
         break;
+    case 'vehiculo':
+        $uploadDir = __DIR__ . '/../assets/images/Vehiculos/';
+        $basePath = '../assets/images/Vehiculos/';
+        break;
     default:
         $uploadDir = __DIR__ . '/../attachments/';
         $basePath = '../attachments/';
@@ -245,7 +249,7 @@ if (!is_dir($uploadDir)) {
     }
 }
 
-if (!$vehiculo_id) {
+if (!$vehiculo_id && $source !== 'vehiculo') {
     echo json_encode(['success' => false, 'message' => 'vehiculo_id es requerido']);
     exit;
 }

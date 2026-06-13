@@ -25,6 +25,7 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
     <link href="../../assets/css/bootstrap/bootstrap.min.css" rel="stylesheet" type="text/css">
     <link href="../../assets/css/main/main.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
     <link href="../../assets/css/style.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
+    <link href="../../assets/css/theme.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
     <link href="../../assets/css/detalles/detalle.css?<?php random_file_enumerator() ?>" rel="stylesheet"
         type="text/css">
     <script src="../../assets/js/axios/axios.min.js?<?php random_file_enumerator() ?>"></script>
@@ -34,18 +35,17 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
     <script src="../../services/detalles/detalle.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../services/translate/translate.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../services/logs/logs.js?<?php random_file_enumerator() ?>"></script>
+    <script src="../../services/theme/theme.js?<?php random_file_enumerator() ?>"></script>
     <title><?php echo APP_NAME . '_' . APP_VERSION ?></title>
 </head>
 
-<body onload="initDetalles()">
+<body onload="initDetalles(); initTheme()">
     <div class="container mt-2 d-flex justify-content-between align-items-center ps-0 !important" style="gap: 1rem;">
         <img class="icon-menu ms-2" src="../../assets/images/icons/left.png" alt="" onclick="gotoBackMantenimientos()">
         <select id="grupo_select" name="" class="form-control mb-1" onchange="changeGrupos()"></select>
         <img class="icon-menu me-2" src="../../assets/images/icons/menu.png" alt="" onclick="showLateralMenu()">
     </div>
     <div class="container mt-1">
-
-        </select>
         <!-- Pestañas (Nav Tabs) -->
         <ul class="nav nav-tabs" id="myTab" role="tablist">
             <li class="nav-item" role="presentation">
@@ -56,9 +56,7 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="tab2-tab" data-bs-toggle="tab" data-bs-target="#tab2" type="button"
-                    role="tab" aria-controls="tab2" aria-selected="false"><span style="font-size: 30px"
-                        onclick="getHistorico()">📋</span>
-
+                    role="tab" aria-controls="tab2" aria-selected="false"><span style="font-size: 30px">📋</span>
                 </button>
             </li>
         </ul>
@@ -84,6 +82,16 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
         include_once("../components/footer.php"); ?>
     </div>
     <?php include __DIR__ . '/../components/sidebar.php'; ?>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const tab2 = document.getElementById('tab2-tab');
+            if (tab2) {
+                tab2.addEventListener('shown.bs.tab', function() {
+                    getHistorico();
+                });
+            }
+        });
+    </script>
 </body>
 
 </html>

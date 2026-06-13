@@ -1,8 +1,14 @@
 .form-select:focus,
 .form-control:focus {
-  border-color: #28a745 !important;
-  box-shadow: 0 0 0 0.25rem rgba(40, 167, 69, 0.25) !important;
+  border-color: var(--input-focus-border) !important;
+  box-shadow: 0 0 0 0.25rem var(--input-focus-shadow) !important;
   outline: 0 !important;
+}
+
+body {
+  background-color: var(--body-bg);
+  color: var(--body-text);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .action-icon {
@@ -21,11 +27,11 @@
 }
 
 .page-title {
-  color: #3d3d3d;
+  color: var(--page-title);
   font-weight: 600;
 }
 .repeat-card {
-  background-color: #e2e2e270 !important;
+  background-color: var(--repeat-card-bg) !important;
 }
 
 .menu-text-option {
@@ -35,7 +41,7 @@
 
 .text-card-info {
   font-weight: 700;
-  color: gray;
+  color: var(--text-card-info);
   font-size: small;
 }
 
@@ -125,21 +131,18 @@
   color: white;
 }
 
-/* Altura fija para la tabla en tablet */
 .table-container {
-  max-height: 500px; /* Ajusta según necesites */
+  max-height: 500px;
   overflow-y: auto;
   margin-top: 1rem;
 }
 
-/* Evitar que los inputs se vean muy grandes */
 .form-control.time-input {
   width: 90px;
   padding: 0.2rem 0.5rem;
   font-size: 0.875rem;
 }
 
-/* Ajuste para tablet */
 @media (max-width: 768px) {
   .table th,
   .table td {
@@ -151,12 +154,10 @@
   }
 }
 
-/* Fondo de fila alternada */
 .table tbody tr:nth-child(even) {
-  background-color: #f8f9fa;
+  background-color: var(--table-stripe);
 }
 
-/* Tarjetas con capacidad de swipe */
 .swipeable-card {
   position: relative;
   overflow: hidden;
@@ -168,7 +169,6 @@
   cursor: grabbing;
 }
 
-/* Feedback visual durante el deslizamiento */
 .swipeable-card.swiping::after {
   content: "🗑️";
   position: absolute;
@@ -180,9 +180,8 @@
   pointer-events: none;
 }
 
-/* Opcional: sombra ligera al deslizar */
 .swipeable-card.swiping {
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 10px var(--shadow-md);
 }
 
 .swipeable-card {
@@ -208,43 +207,115 @@
 
 .body-table-mini {
   font-size: 0.875rem;
-  color: dimgray;
+  color: var(--text-secondary);
 }
 
 .date-card-style {
   font-size: 0.9rem;
-  color: #525252;
+  color: var(--date-card);
   font-weight: 700;
 }
 
 .date-text {
   font-size: 0.785rem;
-  color: #505050;
+  color: var(--date-text);
   font-weight: 600;
 }
 
 .supplier-text {
   font-size: 0.785rem;
-  color: #505050;
+  color: var(--supplier-text);
   font-weight: 700;
 }
 
 .price-text {
   font-size: 0.8rem;
-  color: #2e4dff;
+  color: var(--price-text);
   font-weight: 700;
 }
 
 .und-text {
   font-size: 0.9rem;
-  color: #048000;
+  color: var(--und-text);
   font-weight: 700;
 }
 
 select {
-  -webkit-appearance: none; /* Quita el estilo nativo en Safari/Chrome */
-  -moz-appearance: none; /* Quita el estilo en Firefox */
+  -webkit-appearance: none;
+  -moz-appearance: none;
   appearance: none;
-  background-color: white;
-  color: blue
+  background-color: var(--select-bg);
+  color: var(--text-primary);
+}
+
+.form-control,
+.form-select {
+  background-color: var(--input-bg);
+  border-color: var(--input-border);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+.form-control:disabled,
+.form-select:disabled {
+  background-color: var(--input-disabled-bg);
+}
+
+.form-control::placeholder {
+  color: var(--text-muted);
+}
+
+.card {
+  background-color: var(--card-bg);
+  border-color: var(--card-border);
+  box-shadow: var(--card-shadow);
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
+}
+
+.card-body {
+  background-color: var(--card-body-bg);
+  transition: background-color 0.3s ease;
+}
+
+.table {
+  color: var(--text-primary);
+  transition: color 0.3s ease;
+}
+
+.table th,
+.table td {
+  border-color: var(--table-border);
+}
+
+.text-muted {
+  color: var(--text-secondary) !important;
+}
+
+.badge {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.offcanvas {
+  background-color: var(--offcanvas-bg);
+  transition: background-color 0.3s ease;
+}
+
+.list-group-item {
+  background-color: var(--card-bg);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+.list-group-item:hover {
+  background-color: var(--sidebar-hover);
+}
+
+hr {
+  border-color: var(--border-color);
+  transition: border-color 0.3s ease;
+}
+
+a, .link-click {
+  color: var(--login-link);
 }

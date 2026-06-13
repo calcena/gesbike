@@ -23,42 +23,52 @@ $_SESSION['base_project'] = dirname(__FILE__);
     <link rel="icon" sizes="192x192" href="assets/images/logo_192.png">
     <link rel="icon" sizes="512x512" href="assets/images/logo_512.png">
     <link rel="apple-touch-icon" href="assets/images/logo_192.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link href="assets/css/bootstrap/bootstrap.min.css" rel="stylesheet" type="text/css">
     <link href="assets/css/login/login.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
     <link href="assets/css/style.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
+    <link href="assets/css/theme.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
     <script src="assets/js/axios/axios.min.js?<?php random_file_enumerator() ?>"></script>
     <script src="assets/js/bootstrap/bootstrap.min.js?<?php random_file_enumerator() ?>"></script>
     <script src="services/logs/logs.js?<?php random_file_enumerator() ?>"></script>
     <script src="services/translate/translate.js?<?php random_file_enumerator() ?>"></script>
+    <script src="services/theme/theme.js?<?php random_file_enumerator() ?>"></script>
     <script src="services/login/login.js?<?php random_file_enumerator() ?>"></script>
     <title><?php echo APP_NAME . '_' . APP_VERSION ?></title>
 </head>
 
-<body onload="initLogin()">
-    <div class="container">
-        <div class="login-container">
-            <div id="output"></div>
-            <div><img class="avatar p-3" src="./assets/images/logo.png?<?php random_file_enumerator() ?>" /></div>
-            <div class="form-box">
-                <input id="username" name="username" type="text" placeholder="Usuario" autocomplete="username">
-                <input id="pass" name="password" type="password" placeholder="Contraseña"
-                    autocomplete="current-password">
-                <button id="btn_acceder" class="btn login-button btn-block login"
-                    onclick="auth(document.getElementById('username').value, document.getElementById('pass').value)">
-                    Acceder
-                </button>
+<body onload="initLogin(); initTheme()">
+    <div class="login-page">
+        <div class="login-card">
+            <div class="login-header">
+                <img class="login-logo" src="./assets/images/logo.png?<?php random_file_enumerator() ?>" alt="GesBike">
+                <h1 class="login-title"><?php echo APP_NAME ?></h1>
+                <p class="login-subtitle">Accede a tu panel de control</p>
             </div>
-            <span id="warn_credentials" class="mt-3 d-none text-danger fw-bolder"></span>
+            <div class="login-body">
+                <div id="output"></div>
+                <div class="form-group">
+                    <div class="input-icon-wrapper">
+                        <i class="fas fa-user input-icon"></i>
+                        <input id="username" class="form-control login-input" type="text" placeholder="Usuario" autocomplete="username">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="input-icon-wrapper">
+                        <i class="fas fa-lock input-icon"></i>
+                        <input id="pass" class="form-control login-input" type="password" placeholder="Contraseña" autocomplete="current-password">
+                    </div>
+                </div>
+                <button id="btn_acceder" class="btn login-btn" onclick="auth(document.getElementById('username').value, document.getElementById('pass').value)">
+                    <i class="fas fa-sign-in-alt me-2"></i>Acceder
+                </button>
+                <div id="mensaje" class="login-message"></div>
+                <span id="warn_credentials" class="mt-3 d-none text-danger fw-bolder"></span>
+            </div>
+            <div class="login-footer">
+                <span class="login-version">v<?php echo APP_VERSION ?></span>
+            </div>
         </div>
-    </div>
-    <div class="container text-center">
-        <div class="mensaje-login" id="mensaje"></div>
-    </div>
-    <div class="container footer-location text-center">
-        <?php
-        $source = '';
-        include_once("./views/components/footer.php");
-        ?>
     </div>
 </body>
 

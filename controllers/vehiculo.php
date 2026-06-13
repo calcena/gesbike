@@ -10,6 +10,31 @@ global $db;
 
 $action = defined('ACTION') ? ACTION : ($_GET ? array_keys($_GET)[0] : '');
 
+function handle_get_vehiculos()
+{
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['success' => false, 'error' => 'Método no permitido']);
+        return;
+    }
+    $input = json_decode(file_get_contents('php://input'), true);
+    $params = $input['data'];
+
+    try {
+        $entity = getVehiculos($params);
+        echo json_encode([
+            'success' => true,
+            'content' => $entity
+        ]);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+    }
+}
+
 function handle_get_vehiculo_by_id()
 {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -21,16 +46,91 @@ function handle_get_vehiculo_by_id()
     $params = $input['data'];
 
     try {
-        $entity = getVehiculosByUser($params);
+        $entity = getVehiculoById($params);
         echo json_encode([
             'success' => true,
             'content' => $entity
         ]);
     } catch (Exception $e) {
-        http_response_code(401);
+        http_response_code(500);
         echo json_encode([
             'success' => false,
-            'error' => 'Credenciales inválidas'
+            'error' => $e->getMessage()
+        ]);
+    }
+}
+
+function handle_nuevo_vehiculo()
+{
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['success' => false, 'error' => 'Método no permitido']);
+        return;
+    }
+    $input = json_decode(file_get_contents('php://input'), true);
+    $params = $input['data'];
+
+    try {
+        $result = crearVehiculo($params);
+        echo json_encode([
+            'success' => true,
+            'content' => $result
+        ]);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+    }
+}
+
+function handle_editar_vehiculo()
+{
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['success' => false, 'error' => 'Método no permitido']);
+        return;
+    }
+    $input = json_decode(file_get_contents('php://input'), true);
+    $params = $input['data'];
+
+    try {
+        $result = editarVehiculo($params);
+        echo json_encode([
+            'success' => true,
+            'content' => $result
+        ]);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+    }
+}
+
+function handle_eliminar_vehiculo()
+{
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['success' => false, 'error' => 'Método no permitido']);
+        return;
+    }
+    $input = json_decode(file_get_contents('php://input'), true);
+    $params = $input['data'];
+
+    try {
+        $result = eliminarVehiculo($params);
+        echo json_encode([
+            'success' => true,
+            'content' => $result
+        ]);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
         ]);
     }
 }
@@ -55,15 +155,26 @@ function handle_get_motor_vehiculo()
         http_response_code(400);
         echo json_encode([
             'success' => false,
-            'error' => $e
+            'error' => $e->getMessage()
         ]);
     }
 }
 
-// === Enrutar según acción ===
 switch ($action) {
-    case 'getVehiculosById':
+    case 'getVehiculos':
+        handle_get_vehiculos();
+        break;
+    case 'getVehiculoById':
         handle_get_vehiculo_by_id();
+        break;
+    case 'nuevoVehiculo':
+        handle_nuevo_vehiculo();
+        break;
+    case 'editarVehiculo':
+        handle_editar_vehiculo();
+        break;
+    case 'eliminarVehiculo':
+        handle_eliminar_vehiculo();
         break;
     case 'getMotorVehiculo':
         handle_get_motor_vehiculo();
@@ -72,14 +183,3 @@ switch ($action) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Acción no soportada en este controlador']);
 }
-
-
-
-
-
-
-
-
-
-
-
