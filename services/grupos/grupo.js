@@ -51,7 +51,7 @@ const parseHtmlGrupos = async (data) => {
   }
   return data
     .map((item) => {
-      const iconPath = `../../assets/images/icons/Grupos/${item.imagen}`;
+      const iconPath = cacheBustUrl(`../../assets/images/icons/Grupos/${item.imagen}`);
       return `
         <div class="col-6 col-md-4 col-lg-3 mb-3">
           <div class="card grupo-card h-100" onclick="onGrupoClick(${item.id})">
@@ -135,7 +135,7 @@ const cargarIconos = async () => {
     .map(
       (icono) => `
     <div class="icon-option" data-icono="${icono}" onclick="seleccionarIcono(this)">
-      <img src="../../assets/images/icons/Grupos/${icono}" alt="${icono}">
+      <img src="${cacheBustUrl(`../../assets/images/icons/Grupos/${icono}`)}" alt="${icono}">
     </div>
   `
     )

@@ -16,7 +16,7 @@ const parseHtmlCardMantenimientos = (grupos) => {
     .map((grupo, index) => {
       const item = grupo.principal;
       const tieneRelacionados = grupo.relacionados.length > 0;
-      const iconSrc = `../assets/images/icons/Vehiculos/${item.puntero}`;
+      const iconSrc = cacheBustUrl(`../assets/images/icons/Vehiculos/${item.puntero}`);
 
       // Generar filas para registros relacionados (cada uno es clicable)
       const filasRelacionados = grupo.relacionados
@@ -24,10 +24,10 @@ const parseHtmlCardMantenimientos = (grupos) => {
           <div class="related-row" style="justify-content: space-around; cursor: pointer;"
                data-rel-id="${rel.id}"
                onclick="editMantenimiento('${rel.id}')">
-            <img src="../assets/images/icons/Operaciones/${rel.img_operacion}" alt="Operación" class="icon-table">
-            <img src="../assets/images/icons/Grupos/${rel.img_grupo}" alt="Grupo" class="icon-table">
+            <img src="${cacheBustUrl(`../assets/images/icons/Operaciones/${rel.img_operacion}`)}" alt="Operación" class="icon-table">
+            <img src="${cacheBustUrl(`../assets/images/icons/Grupos/${rel.img_grupo}`)}" alt="Grupo" class="icon-table">
             ${rel.img_localizacion
-              ? `<img src="../assets/images/icons/Localizaciones/${rel.img_localizacion}" alt="Situación" class="icon-table">`
+              ? `<img src="${cacheBustUrl(`../assets/images/icons/Localizaciones/${rel.img_localizacion}`)}" alt="Situación" class="icon-table">`
               : ""
             }
           </div>
@@ -54,10 +54,10 @@ const parseHtmlCardMantenimientos = (grupos) => {
                 <span name="kms" class="badge bg-primary">${item.kms}</span>
               </div>
               <div class="mt-2 d-flex justify-content-around align-items-center flex-wrap">
-                <img src="../assets/images/icons/Operaciones/${item.img_operacion}" alt="Operación" class="icon-table">
-                <img src="../assets/images/icons/Grupos/${item.img_grupo}" alt="Grupo" class="icon-table">
+                <img src="${cacheBustUrl(`../assets/images/icons/Operaciones/${item.img_operacion}`)}" alt="Operación" class="icon-table">
+                <img src="${cacheBustUrl(`../assets/images/icons/Grupos/${item.img_grupo}`)}" alt="Grupo" class="icon-table">
                 ${item.img_localizacion
-                  ? `<img src="../assets/images/icons/Localizaciones/${item.img_localizacion}" alt="Situación" class="icon-table">`
+                  ? `<img src="${cacheBustUrl(`../assets/images/icons/Localizaciones/${item.img_localizacion}`)}" alt="Situación" class="icon-table">`
                   : ""
                 }
               </div>

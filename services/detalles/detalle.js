@@ -53,7 +53,7 @@ const parseHtmlCardKms = async (data) => {
           <div class="card-body p-2">
             <div class="d-flex justify-content-between align-items-center mb-1">
               <span class="fw-bold small">${formatFechaISO(item.ultima_fecha)}</span>
-              <img class="icon-table" src="../../assets/images/icons/Localizaciones/${item.img_localizacion}" alt="">
+              <img class="icon-table" src="${cacheBustUrl(`../../assets/images/icons/Localizaciones/${item.img_localizacion}`)}" alt="">
             </div>
             <table class="table table-sm mb-0">
               <thead class="header-table-mini text-muted">
@@ -136,7 +136,7 @@ const parseHtmlCardHistorico = async (data) => {
       <div class="card mt-3 shadow-sm border-${grupo.color}">
         <div class="card-header p-2 bg-${grupo.color} text-light d-flex justify-content-between align-items-center">
           <span>
-            <img class="icon-table me-1" src="../../assets/images/icons/Localizaciones/${grupo.localizacion_imagen}" alt="">
+            <img class="icon-table me-1" src="${cacheBustUrl(`../../assets/images/icons/Localizaciones/${grupo.localizacion_imagen}`)}" alt="">
             <strong>${grupo.localizacion}</strong>
             <span class="badge bg-light text-dark ms-2">${totalItems} registro${totalItems !== 1 ? "s" : ""}</span>
           </span>
@@ -166,14 +166,14 @@ const parseHtmlCardHistorico = async (data) => {
             <div class="col-6">
               <span class="text-muted">Operación:</span>
               <div class="d-flex align-items-center gap-1">
-                <img class="icon-table" src="../../assets/images/icons/${item.operacion_imagen}" alt="">
+                <img class="icon-table" src="${cacheBustUrl(`../../assets/images/icons/Operaciones/${item.operacion_imagen}`)}" alt="">
                 <span>${item.operacion_nombre}</span>
               </div>
             </div>
             <div class="col-6">
               <span class="text-muted">Recambio:</span>
               <div class="d-flex align-items-center gap-1">
-                ${item.recambio_imagen ? `<img class="rounded" src="../../assets/images/Recambios/${item.recambio_imagen}" alt="" style="width:24px;height:24px;object-fit:cover;">` : ""}
+                ${item.recambio_imagen ? `<img class="rounded" src="${cacheBustUrl(`../../assets/images/Recambios/${item.recambio_imagen}`)}" alt="" style="width:24px;height:24px;object-fit:cover;">` : ""}
                 <span class="fw-bold">${item.recambio}</span>
               </div>
               ${item.recambio_referencia ? `<small class="text-muted ms-3">Ref: ${item.recambio_referencia}</small>` : ""}

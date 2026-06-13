@@ -163,18 +163,25 @@ const getOperaciones = async (deep = 1) => {
       }
     );
     if (response.data.success) {
-      const select = document.getElementById("operacion_select");
-      select.innerHTML = null;
-      const option = document.createElement("option");
-      option.value = 0;
-      option.textContent = "Selecciona...";
-      select.appendChild(option);
-      await response.data.content.forEach((element) => {
+      window.operacionesData = response.data.content;
+      const btn = document.getElementById("operacion_select");
+      if (btn && btn.tagName === "BUTTON") {
+        if (!btn.dataset.selected) {
+          btn.textContent = "Selecciona...";
+        }
+      } else if (btn) {
+        btn.innerHTML = null;
         const option = document.createElement("option");
-        option.value = element.id;
-        option.textContent = element.nombre;
-        select.appendChild(option);
-      });
+        option.value = 0;
+        option.textContent = "Selecciona...";
+        btn.appendChild(option);
+        response.data.content.forEach((element) => {
+          const option = document.createElement("option");
+          option.value = element.id;
+          option.textContent = element.nombre;
+          btn.appendChild(option);
+        });
+      }
     }
   } catch (err) {
     console.log("getVehiculosByUser", err.response.data.error);
@@ -198,22 +205,29 @@ const getGrupos = async (deep = 1) => {
       }
     );
     if (response.data.success) {
-      const select = document.getElementById("grupo_select");
-      select.innerHTML = null;
-      const option = document.createElement("option");
-      option.value = 0;
-      option.textContent = "Selecciona...";
-      select.appendChild(option);
-      await response.data.content.forEach((element) => {
+      window.gruposData = response.data.content;
+      const btn = document.getElementById("grupo_select");
+      if (btn && btn.tagName === "BUTTON") {
+        if (!btn.dataset.selected) {
+          btn.textContent = "Selecciona...";
+        }
+      } else if (btn) {
+        btn.innerHTML = null;
         const option = document.createElement("option");
-        option.value = `${element.id}-${element.agrupador_id}`;
-        option.textContent = element.nombre;
-        select.appendChild(option);
-      });
-      sessionStorage.setItem(
-        "agrupador_id",
-        document.getElementById("grupo_select").value
-      );
+        option.value = 0;
+        option.textContent = "Selecciona...";
+        btn.appendChild(option);
+        response.data.content.forEach((element) => {
+          const option = document.createElement("option");
+          option.value = `${element.id}-${element.agrupador_id}`;
+          option.textContent = element.nombre;
+          btn.appendChild(option);
+        });
+        sessionStorage.setItem(
+          "agrupador_id",
+          document.getElementById("grupo_select").value
+        );
+      }
     }
   } catch (err) {
     console.log("getVehiculosByUser", err.response.data.error);
@@ -239,19 +253,26 @@ const getLocalizaciones = async (deep = 1) => {
       }
     );
     if (response.data.success) {
-      const select = document.getElementById("localizacion_select");
-      select.innerHTML = null;
-      const option = document.createElement("option");
-      option.value = 0;
-      option.textContent = "Selecciona...";
-      select.appendChild(option);
-      if (response.data.content.length > 0) {
-        response.data.content.forEach((element) => {
-          const option = document.createElement("option");
-          option.value = element.id;
-          option.textContent = element.nombre;
-          select.appendChild(option);
-        });
+      window.localizacionesData = response.data.content;
+      const btn = document.getElementById("localizacion_select");
+      if (btn && btn.tagName === "BUTTON") {
+        if (!btn.dataset.selected) {
+          btn.textContent = "Selecciona...";
+        }
+      } else if (btn) {
+        btn.innerHTML = null;
+        const option = document.createElement("option");
+        option.value = 0;
+        option.textContent = "Selecciona...";
+        btn.appendChild(option);
+        if (response.data.content.length > 0) {
+          response.data.content.forEach((element) => {
+            const option = document.createElement("option");
+            option.value = element.id;
+            option.textContent = element.nombre;
+            btn.appendChild(option);
+          });
+        }
       }
     }
   } catch (err) {
@@ -280,24 +301,37 @@ const getRecambios = async (deep = 1) => {
     );
     if (response.data.success) {
       console.log("getRecambios=>", response.data.content);
-      const select = document.getElementById("recambio_select");
-      select.innerHTML = null;
-      const option = document.createElement("option");
-      option.value = 0;
-      option.textContent = "Selecciona...";
-      select.appendChild(option);
-      if (response.data.content.length > 0) {
-        response.data.content.forEach((element) => {
-          const option = document.createElement("option");
-          option.value = element.id;
-          option.textContent = `${element.nombre}(${element.stock})`;
-          select.appendChild(option);
-        });
+      window.recambiosData = response.data.content;
+      const btn = document.getElementById("recambio_select");
+      if (btn && btn.tagName === "BUTTON") {
+        if (!btn.dataset.selected) {
+          btn.textContent = "Selecciona...";
+        }
+      } else if (btn) {
+        btn.innerHTML = null;
+        const option = document.createElement("option");
+        option.value = 0;
+        option.textContent = "Selecciona...";
+        btn.appendChild(option);
+        if (response.data.content.length > 0) {
+          response.data.content.forEach((element) => {
+            const option = document.createElement("option");
+            option.value = element.id;
+            option.textContent = `${element.nombre}(${element.stock})`;
+            btn.appendChild(option);
+          });
+        }
       }
     }
   } catch (err) {
     console.log("getRecambios", err);
   }
+};
+
+window.versionKey = Date.now();
+window.cacheBustUrl = (url) => {
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}v=${window.versionKey}`;
 };
 
 const formatKilometersBadges = async () => {

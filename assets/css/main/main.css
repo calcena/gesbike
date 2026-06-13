@@ -191,6 +191,8 @@ font-size: 1.2rem;
 .mantenimiento-card {
   cursor: pointer;
   transition: all 0.3s ease;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .mantenimiento-card:hover {

@@ -26,6 +26,12 @@ function random_file_enumerator()
     echo time();
 }
 
+function cacheBustUrl($url)
+{
+    $separator = (strpos($url, '?') !== false) ? '&' : '?';
+    return $url . $separator . 'v=' . time();
+}
+
 function exit_session()
 {
     if (session_status() === PHP_SESSION_ACTIVE) {

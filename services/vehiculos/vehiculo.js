@@ -56,8 +56,8 @@ const parseHtmlVehiculos = (data) => {
   return data
     .map((item) => {
       const imgSrc = item.imagen
-        ? `../../assets/images/Vehiculos/${item.imagen}`
-        : `../../assets/images/icons/vehiculos_ico.png`;
+        ? cacheBustUrl(`../../assets/images/Vehiculos/${item.imagen}`)
+        : cacheBustUrl(`../../assets/images/icons/vehiculos_ico.png`);
       const isInactive = item.is_active == 0;
       const cardClass = isInactive ? "card vehiculo-card inactive" : "card vehiculo-card";
 

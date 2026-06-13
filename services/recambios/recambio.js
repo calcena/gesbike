@@ -66,7 +66,7 @@ const initRecambiosNuevoEdit = async () => {
             "recambio_imagen_name",
             response.data.content.imagen
           );
-          imgPreview.src = `../../assets/images/Recambios/${response.data.content.imagen}`;
+          imgPreview.src = cacheBustUrl(`../../assets/images/Recambios/${response.data.content.imagen}`);
           imgPreview.classList.remove("invisible");
         }
         document.getElementById("recambio_grupo").value =
@@ -126,7 +126,7 @@ const parseHtmlCardRecambios = async (data) => {
   return data
     .map((item) => {
       const recambioImg = item.imagen
-        ? `<img height="40px" src="../../assets/images/Recambios/${item.imagen}">`
+        ? `<img height="40px" src="${cacheBustUrl(`../../assets/images/Recambios/${item.imagen}`)}">`
         : "";
 
       return `
@@ -136,7 +136,7 @@ const parseHtmlCardRecambios = async (data) => {
                     <div class="card-body p-2">
                         <div class="d-flex align-items-center justify-content-between">
                             <div class="d-flex align-items-center gap-3 flex-grow-1">
-                                <img height="40px" src="../../assets/images/icons/Grupos/${item.img_grupo}">
+                                <img height="40px" src="${cacheBustUrl(`../../assets/images/icons/Grupos/${item.img_grupo}`)}">
                                 ${recambioImg}
                                 <span class="ref-text text-truncate">${item.referencia}</span>
                             </div>

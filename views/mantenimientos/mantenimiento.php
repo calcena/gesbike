@@ -83,29 +83,32 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
                         </div>
                         <div class="w-50">
                             <label class="form-label">Operación</label>
-                            <select id="operacion_select" name="" class="form-select"
-                                onchange="changeOperaciones(this.value)">
-                            </select>
+                            <button id="operacion_select" class="form-select text-start" onclick="openOperacionPicker()">
+                                Selecciona...
+                            </button>
                         </div>
                     </div>
                 </div>
                 <div class="row mt-1">
                     <div class="w-50">
                         <label class="form-label">Grupo</label>
-                        <select id="grupo_select" name="" class="form-select" onchange="changeGrupos()">
-                        </select>
+                        <button id="grupo_select" class="form-select text-start" onclick="openGrupoPicker()">
+                            Selecciona...
+                        </button>
                     </div>
                     <div class="w-50">
                         <label class="form-label">Localización</label>
-                        <select id="localizacion_select" name="" class="form-select">
-                        </select>
+                        <button id="localizacion_select" class="form-select text-start" onclick="openLocalizacionPicker()">
+                            Selecciona...
+                        </button>
                     </div>
                 </div>
                 <div class="row mt-1">
                     <div class="w-100">
                         <label class="form-label">Recambio</label>
-                        <select id="recambio_select" name="" class="form-select"
-                            onchange="changeRecambio(this.value)"></select>
+                        <button id="recambio_select" class="form-select text-start" onclick="openRecambioPicker()">
+                            Selecciona...
+                        </button>
                     </div>
                 </div>
                 <div class="row mt-1">

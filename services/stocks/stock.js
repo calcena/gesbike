@@ -31,14 +31,14 @@ const parseHtmlCardStock = async (data) => {
 
   pathGrupo = "../../assets/images/icons/Grupos/";
   const cards = data.map((item) => {
-      vehiculoIcon = `../../assets/images/icons/Vehiculos/${item.bullet_vehiculo}`;
+      vehiculoIcon = cacheBustUrl(`../../assets/images/icons/Vehiculos/${item.bullet_vehiculo}`);
     return `
       <div class="col">
         <div class="card shadow-sm">
           <div class="card-body d-flex justify-content-between align-items-center" onclick="mostrarFotoRecambio('${item.recambio_imagen}')">
             <div class="flex-grow-1">
               <div class="d-flex justify-content-between align-items-start">
-                <img src="${pathGrupo}${item.grupo_imagen}" alt="Grupo" class="icon-table">
+                <img src="${cacheBustUrl(pathGrupo + item.grupo_imagen)}" alt="Grupo" class="icon-table">
                 <span id="texto-referencia">${item.referencia}</span>
                 <span class="badge bg-success">${item.unidades}</span>
               </div>
@@ -61,9 +61,9 @@ const cambiarVehiculo = async (id) => {
 
 const mostrarFotoRecambio = async (nombreArchivo) => {
   if (nombreArchivo == "camara.png") {
-    nombreArchivo = `../../assets/images/icons/${nombreArchivo}`;
+    nombreArchivo = cacheBustUrl(`../../assets/images/icons/${nombreArchivo}`);
   } else {
-    nombreArchivo = `../../assets/images/Recambios/${nombreArchivo}`;
+    nombreArchivo = cacheBustUrl(`../../assets/images/Recambios/${nombreArchivo}`);
   }
   Swal.fire({
     imageUrl: nombreArchivo,

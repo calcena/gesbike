@@ -12,6 +12,7 @@ const initMantenimientos = async () => {
   if ("mantenimiento_id" in sessionStorage) {
     await editMantenimiento();
   } else {
+    ["operacion_id", "localizacion_id", "recambio_id"].forEach(k => sessionStorage.removeItem(k));
     await getKmsDetail();
     const kmsInput = document.getElementById("kms_realizados");
     document.getElementById("kms_mantenimiento").value =
@@ -19,25 +20,190 @@ const initMantenimientos = async () => {
   }
 };
 
+const openGrupoPicker = () => {
+  const grupos = window.gruposData || [];
+  const selectedId = sessionStorage.getItem("grupo_id");
+  if (!grupos.length) {
+    Swal.fire("Sin datos", "No hay grupos disponibles", "info");
+    return;
+  }
+
+  const sorted = [...grupos].sort((a, b) => a.nombre.localeCompare(b.nombre));
+  const html = sorted.map((g) => {
+    const isSelected = selectedId && g.id == selectedId;
+    return `
+    <div class="swal-grupo-item d-flex align-items-center p-2 border-bottom ${isSelected ? 'swal-grupo-selected' : ''}"
+         style="cursor:pointer;gap:10px;"
+         onclick="selectGrupo(${g.id}, ${g.agrupador_id || 0}, '${g.nombre}')">
+      ${g.imagen ? `<img src="${cacheBustUrl(`../../assets/images/icons/Grupos/${g.imagen}`)}" style="width:32px;height:32px;object-fit:contain;">` : '<div style="width:32px;"></div>'}
+      <span>${g.nombre}</span>
+    </div>`;
+  }).join("");
+
+  Swal.fire({
+    title: "Grupo",
+    html: `<div style="max-height:60vh;overflow-y:auto;">${html}</div>`,
+    showConfirmButton: false,
+    showCloseButton: true,
+    customClass: { title: "swal-title-small" },
+  });
+};
+
+window.selectGrupo = (id, agrupadorId, nombre) => {
+  sessionStorage.setItem("grupo_id", id);
+  sessionStorage.setItem("agrupador_id", agrupadorId);
+  const btn = document.getElementById("grupo_select");
+  if (btn) {
+    btn.textContent = nombre;
+    btn.dataset.selected = id;
+  }
+  Swal.close();
+  changeGrupos();
+};
+
+const openOperacionPicker = () => {
+  const items = window.operacionesData || [];
+  const selectedId = sessionStorage.getItem("operacion_id");
+  if (!items.length) {
+    Swal.fire("Sin datos", "No hay operaciones disponibles", "info");
+    return;
+  }
+
+  const sorted = [...items].sort((a, b) => a.nombre.localeCompare(b.nombre));
+  const html = sorted.map((item) => {
+    const isSelected = selectedId && item.id == selectedId;
+    return `
+    <div class="swal-grupo-item d-flex align-items-center p-2 border-bottom ${isSelected ? 'swal-grupo-selected' : ''}"
+         style="cursor:pointer;gap:10px;"
+         onclick="selectOperacion(${item.id}, '${item.nombre}')">
+      ${item.imagen ? `<img src="${cacheBustUrl(`../../assets/images/icons/Operaciones/${item.imagen}`)}" style="width:32px;height:32px;object-fit:contain;">` : '<div style="width:32px;"></div>'}
+      <span>${item.nombre}</span>
+    </div>`;
+  }).join("");
+
+  Swal.fire({
+    title: "Operación",
+    html: `<div style="max-height:60vh;overflow-y:auto;">${html}</div>`,
+    showConfirmButton: false,
+    showCloseButton: true,
+    customClass: { title: "swal-title-small" },
+  });
+};
+
+window.selectOperacion = (id, nombre) => {
+  sessionStorage.setItem("operacion_id", id);
+  const btn = document.getElementById("operacion_select");
+  if (btn) {
+    btn.textContent = nombre;
+    btn.dataset.selected = id;
+  }
+  Swal.close();
+  changeOperaciones(id);
+};
+
+const openLocalizacionPicker = () => {
+  const items = window.localizacionesData || [];
+  const selectedId = sessionStorage.getItem("localizacion_id");
+  if (!items.length) {
+    Swal.fire("Sin datos", "No hay localizaciones disponibles", "info");
+    return;
+  }
+
+  const sorted = [...items].sort((a, b) => a.nombre.localeCompare(b.nombre));
+  const html = sorted.map((item) => {
+    const isSelected = selectedId && item.id == selectedId;
+    return `
+    <div class="swal-grupo-item d-flex align-items-center p-2 border-bottom ${isSelected ? 'swal-grupo-selected' : ''}"
+         style="cursor:pointer;gap:10px;"
+         onclick="selectLocalizacion(${item.id}, '${item.nombre}')">
+      ${item.imagen ? `<img src="${cacheBustUrl(`../../assets/images/icons/Localizaciones/${item.imagen}`)}" style="width:32px;height:32px;object-fit:contain;">` : '<div style="width:32px;"></div>'}
+      <span>${item.nombre}</span>
+    </div>`;
+  }).join("");
+
+  Swal.fire({
+    title: "Localización",
+    html: `<div style="max-height:60vh;overflow-y:auto;">${html}</div>`,
+    showConfirmButton: false,
+    showCloseButton: true,
+    customClass: { title: "swal-title-small" },
+  });
+};
+
+window.selectLocalizacion = (id, nombre) => {
+  sessionStorage.setItem("localizacion_id", id);
+  const btn = document.getElementById("localizacion_select");
+  if (btn) {
+    btn.textContent = nombre;
+    btn.dataset.selected = id;
+  }
+  Swal.close();
+};
+
+const openRecambioPicker = () => {
+  const items = window.recambiosData || [];
+  const selectedId = sessionStorage.getItem("recambio_id");
+  if (!items.length) {
+    Swal.fire("Sin datos", "No hay recambios disponibles para este grupo", "info");
+    return;
+  }
+
+  const sorted = [...items].sort((a, b) => a.nombre.localeCompare(b.nombre));
+  const html = sorted.map((item) => {
+    const isSelected = selectedId && item.id == selectedId;
+    return `
+    <div class="swal-grupo-item d-flex align-items-center p-2 border-bottom ${isSelected ? 'swal-grupo-selected' : ''}"
+         style="cursor:pointer;gap:10px;"
+         onclick="selectRecambio(${item.id}, '${item.nombre}')">
+      ${item.imagen ? `<img src="${cacheBustUrl(`../../assets/images/Recambios/${item.imagen}`)}" style="width:32px;height:32px;object-fit:cover;border-radius:4px;">` : '<div style="width:32px;"></div>'}
+      <div>
+        <span>${item.nombre}</span>
+        <small class="text-muted ms-1">(stock: ${item.stock})</small>
+        ${item.referencia ? `<br><small class="text-muted">Ref: ${item.referencia}</small>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+
+  Swal.fire({
+    title: "Recambio",
+    html: `<div style="max-height:60vh;overflow-y:auto;">${html}</div>`,
+    showConfirmButton: false,
+    showCloseButton: true,
+    customClass: { title: "swal-title-small" },
+  });
+};
+
+window.selectRecambio = (id, nombre) => {
+  sessionStorage.setItem("recambio_id", id);
+  const btn = document.getElementById("recambio_select");
+  if (btn) {
+    btn.textContent = nombre;
+    btn.dataset.selected = id;
+  }
+  Swal.close();
+};
+
 const gotoMain = () => {
   window.location.href = "../main.php";
 };
 
 const changeOperaciones = async (value) => {
-  if (value === "5") {
-    // Modo: Introducir precio manualmente
-    document.getElementById("recambio_select").innerHTML = ""; // limpia
+  sessionStorage.removeItem("recambio_id");
+  const btn = document.getElementById("recambio_select");
+  if (btn) {
+    btn.textContent = "Selecciona...";
+    delete btn.dataset.selected;
+  }
+  if (value == 5) {
     document.getElementById("precio_mantenimiento").value = "";
     document.getElementById("precio_mantenimiento").removeAttribute("disabled");
-  } else if (value === "3") {
-    // Modo: Seleccionar recambio → el precio se rellenará automáticamente al elegir uno
+  } else if (value == 3) {
     document.getElementById("precio_mantenimiento").value = "";
     document
       .getElementById("precio_mantenimiento")
       .setAttribute("disabled", "");
     await getRecambios(2);
   } else {
-    document.getElementById("recambio_select").innerHTML = "";
     document.getElementById("precio_mantenimiento").value = "";
     document
       .getElementById("precio_mantenimiento")
@@ -46,17 +212,15 @@ const changeOperaciones = async (value) => {
 };
 
 const changeGrupos = async () => {
-  const [primero, segundo] = document
-    .getElementById("grupo_select")
-    .value.split("-")
-    .map(Number);
-  sessionStorage.setItem("grupo_id", primero);
-  sessionStorage.setItem("agrupador_id", segundo);
+  const grupoId = sessionStorage.getItem("grupo_id");
+  const agrupadorId = sessionStorage.getItem("agrupador_id");
+  if (!grupoId) return;
+  sessionStorage.removeItem("localizacion_id");
+  sessionStorage.removeItem("recambio_id");
   await getLocalizaciones(2);
-  if (document.getElementById("operacion_select").value == 3) {
+  if (sessionStorage.getItem("operacion_id") == 3) {
     await getRecambios(2);
   }
-  sessionStorage.removeItem("recambio_id");
 };
 
 const changeRecambio = async (valueId) => {
@@ -74,10 +238,10 @@ const validateMantenimiento = async () => {
       vehiculo_id: sessionStorage.getItem("vehiculo_id"),
       motor_id: sessionStorage.getItem("motor_id"),
       fecha: document.getElementById("fecha_mantenimiento").value,
-      operacion_id: document.getElementById("operacion_select").value,
+      operacion_id: sessionStorage.getItem("operacion_id") || 0,
       grupo_id: sessionStorage.getItem("grupo_id"),
-      localizacion_id: document.getElementById("localizacion_select").value,
-      recambio_id: document.getElementById("recambio_select").value,
+      localizacion_id: sessionStorage.getItem("localizacion_id") || 0,
+      recambio_id: sessionStorage.getItem("recambio_id") || 0,
       kms: document.getElementById("kms_mantenimiento").value,
       und: document.getElementById("unds_mantenimiento").value ?? 0,
       precio:
@@ -374,26 +538,42 @@ const editMantenimiento = async () => {
       console.log(response.data.content);
       document.getElementById("fecha_mantenimiento").value =
         response.data.content.fecha;
-      document.getElementById("operacion_select").value =
-        response.data.content.operacion_id;
-      document.getElementById(
-        "grupo_select"
-      ).value = `${response.data.content.grupo_id}-${response.data.content.agrupador_id}`;
+      sessionStorage.setItem("operacion_id", response.data.content.operacion_id);
+      const opBtn = document.getElementById("operacion_select");
+      if (opBtn) {
+        const op = (window.operacionesData || []).find(o => o.id == response.data.content.operacion_id);
+        opBtn.textContent = op ? op.nombre : response.data.content.operacion_id;
+        opBtn.dataset.selected = response.data.content.operacion_id;
+      }
       sessionStorage.setItem(
         "agrupador_id",
         response.data.content.agrupador_id
       );
       sessionStorage.setItem("grupo_id", response.data.content.grupo_id);
+      const grupoBtn = document.getElementById("grupo_select");
+      if (grupoBtn) {
+        const g = (window.gruposData || []).find(g => g.id == response.data.content.grupo_id);
+        grupoBtn.textContent = g ? g.nombre : response.data.content.grupo_id;
+        grupoBtn.dataset.selected = response.data.content.grupo_id;
+      }
       await getLocalizaciones(2);
-      document.getElementById("localizacion_select").value =
-        response.data.content.localizacion_id;
+      sessionStorage.setItem("localizacion_id", response.data.content.localizacion_id);
+      const locBtn = document.getElementById("localizacion_select");
+      if (locBtn) {
+        const loc = (window.localizacionesData || []).find(l => l.id == response.data.content.localizacion_id);
+        locBtn.textContent = loc ? loc.nombre : response.data.content.localizacion_id;
+        locBtn.dataset.selected = response.data.content.localizacion_id;
+      }
       document.getElementById("kms_mantenimiento").value =
         response.data.content.kms;
-      document.getElementById("recambio_select").disabled = true;
-      if (response.data.content.nombre_recambio != null) {
-        document.getElementById(
-          "recambio_select"
-        ).innerHTML = `<option>${response.data.content.nombre_recambio}</option>`;
+      if (response.data.content.recambio_id) {
+        sessionStorage.setItem("recambio_id", response.data.content.recambio_id);
+        const recBtn = document.getElementById("recambio_select");
+        if (recBtn) {
+          recBtn.textContent = response.data.content.nombre_recambio || `ID ${response.data.content.recambio_id}`;
+          recBtn.dataset.selected = response.data.content.recambio_id;
+          recBtn.disabled = true;
+        }
       }
       document.getElementById("unds_mantenimiento").value =
         response.data.content.Unidades;

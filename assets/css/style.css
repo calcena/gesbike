@@ -7,6 +7,9 @@
 
 body {
   background: var(--body-bg);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  min-height: 100vh;
   color: var(--body-text);
   transition: background 0.3s ease, color 0.3s ease;
 }
@@ -356,4 +359,37 @@ a, .link-click {
 .upload-placeholder {
   color: var(--upload-placeholder-text);
   text-align: center;
+}
+
+.swal-grupo-item:hover {
+  background-color: var(--sidebar-hover);
+}
+
+.swal-grupo-item:active {
+  background-color: var(--border-color);
+}
+
+.swal-grupo-selected {
+  background-color: rgba(102, 126, 234, 0.12);
+}
+
+.swal-title-small {
+  font-size: 1rem !important;
+}
+
+.swal2-popup {
+  background: var(--card-bg) !important;
+  color: var(--text-primary) !important;
+}
+
+.swal2-title {
+  color: var(--text-primary) !important;
+}
+
+.swal2-close {
+  color: var(--text-secondary) !important;
+}
+
+.swal2-html-container {
+  color: var(--text-primary) !important;
 }

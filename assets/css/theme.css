@@ -70,7 +70,7 @@
     --related-border: #e0e0e0;
 
     /* === Progress bar === */
-    --progress-bg: linear-gradient(90deg, #87CEEB, #ADD8E6);
+    --progress-bg: linear-gradient(90deg, #7c3aed, #a78bfa);
 
     /* === Long-press === */
     --long-press-transform: scale(0.98);
@@ -83,7 +83,7 @@
     --fab-shadow: rgba(118, 75, 162, 0.4);
 
     /* === Body === */
-    --body-bg: linear-gradient(135deg, #b59fd3, #eee6f7);
+    --body-bg: linear-gradient(180deg, #b59fd3 0%, #f0ecf9 100%);
     --body-text: #212529;
 
     /* === Offcanvas === */
@@ -197,14 +197,14 @@
     --related-hover: #0f3460;
     --related-border: #2a2a4a;
 
-    --progress-bg: linear-gradient(90deg, #3b82f6, #60a5fa);
+    --progress-bg: linear-gradient(90deg, #c4b5fd, #e2d9fd);
 
     --footer-text: #a0a0b0;
 
     --fab-bg: linear-gradient(135deg, #302b63, #24243e);
     --fab-shadow: rgba(36, 36, 62, 0.6);
 
-    --body-bg: #2b2b2b;
+    --body-bg: linear-gradient(180deg, #1a1a3e 0%, #2b2b2b 100%);
     --body-text: #e0e0e0;
 
     --offcanvas-bg: #16213e;
