@@ -11,6 +11,7 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
+<script>(function(){var t=sessionStorage.getItem('theme');if(t==='dark'){document.documentElement.setAttribute('data-theme','dark')}})()</script>
 
 <head>
     <meta http-equiv='cache-control' content='no-cache'>
@@ -52,12 +53,13 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
         </div>
         <img class="icon-menu" src="../../assets/images/icons/menu.png" alt="" onclick="showLateralMenu()">
     </div>
-    <div class="container w-100 d-flex justify-content-center mt-2 mb-2">
-        <img class="recambio-icon" src="../../assets/images/icons/add.png" alt="" onclick="accionMenu('nuevo')">
-    </div>
     <div class="container mt-1">
         <div class="" id="main_cards">
         </div>
+    </div>
+
+    <div class="fab-button" onclick="accionMenu('nuevo')">
+        <img src="../../assets/images/icons/add.png" alt="Añadir" class="fab-icon">
     </div>
 
     <!-- Footer y Sidebar -->

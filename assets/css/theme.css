@@ -79,11 +79,11 @@
     --footer-text: #6c757d;
 
     /* === FAB === */
-    --fab-bg: #0d6efd;
-    --fab-shadow: rgba(13, 110, 253, 0.4);
+    --fab-bg: linear-gradient(135deg, #667eea, #764ba2);
+    --fab-shadow: rgba(118, 75, 162, 0.4);
 
     /* === Body === */
-    --body-bg: #ffffff;
+    --body-bg: linear-gradient(135deg, #b59fd3, #eee6f7);
     --body-text: #212529;
 
     /* === Offcanvas === */
@@ -98,7 +98,7 @@
     --login-card-bg: #ffffff;
     --login-card-shadow: rgba(0, 0, 0, 0.15);
     --login-title-color: #1a1a2e;
-    --login-subtitle-color: #888;
+    --login-subtitle-color: #7c5cbf;
     --login-icon-color: #aaa;
     --login-input-border: #e0e0e0;
     --login-input-bg: #f8f9fa;
@@ -108,7 +108,7 @@
     --login-btn-bg: linear-gradient(135deg, #667eea, #764ba2);
     --login-btn-text: #ffffff;
     --login-btn-shadow: rgba(102, 126, 234, 0.4);
-    --login-message: #28a745;
+    --login-message: #7c5cbf;
     --login-error-color: #dc3545;
     --login-version-color: #bbb;
     --login-link: #667eea;
@@ -126,6 +126,11 @@
     --vehiculo-card-img-border: #f0f0f0;
     --vehiculo-placeholder-border: #cccccc;
     --vehiculo-placeholder-text: #aaaaaa;
+
+    /* === Upload imagen compartido === */
+    --upload-border: #cccccc;
+    --upload-placeholder-text: #aaaaaa;
+    --upload-bg: #fafafa;
 
     /* === Mantenimiento card === */
     --mant-card-bg: #ffffff;
@@ -148,9 +153,9 @@
     --shadow-md: rgba(0, 0, 0, 0.4);
     --shadow-lg: rgba(0, 0, 0, 0.5);
 
-    --card-bg: #1e1e3a;
-    --card-border: #2a2a4a;
-    --card-body-bg: #1e1e3a;
+    --card-bg: #3a3a5c;
+    --card-border: #4a4a7a;
+    --card-body-bg: #3a3a5c;
     --card-shadow: 0 0.15rem 0.5rem rgba(0, 0, 0, 0.3);
 
     --sidebar-bg: #16213e;
@@ -196,10 +201,10 @@
 
     --footer-text: #a0a0b0;
 
-    --fab-bg: #3b82f6;
-    --fab-shadow: rgba(59, 130, 246, 0.4);
+    --fab-bg: linear-gradient(135deg, #302b63, #24243e);
+    --fab-shadow: rgba(36, 36, 62, 0.6);
 
-    --body-bg: #1a1a2e;
+    --body-bg: #2b2b2b;
     --body-text: #e0e0e0;
 
     --offcanvas-bg: #16213e;
@@ -211,7 +216,7 @@
     --login-card-bg: #1e1e3a;
     --login-card-shadow: rgba(0, 0, 0, 0.5);
     --login-title-color: #e0e0e0;
-    --login-subtitle-color: #8888aa;
+    --login-subtitle-color: #a08cd9;
     --login-icon-color: #6666aa;
     --login-input-border: #2a2a4a;
     --login-input-bg: #16213e;
@@ -221,7 +226,7 @@
     --login-btn-bg: linear-gradient(135deg, #6366f1, #8b5cf6);
     --login-btn-text: #ffffff;
     --login-btn-shadow: rgba(99, 102, 241, 0.4);
-    --login-message: #4ade80;
+    --login-message: #a08cd9;
     --login-error-color: #f87171;
     --login-version-color: #555577;
     --login-link: #818cf8;
@@ -237,6 +242,10 @@
     --vehiculo-card-img-border: #2a2a4a;
     --vehiculo-placeholder-border: #2a2a4a;
     --vehiculo-placeholder-text: #707080;
+
+    --upload-border: #3a3a5a;
+    --upload-placeholder-text: #808090;
+    --upload-bg: #1a1a2e;
 
     --mant-card-bg: #1e1e3a;
     --mant-card-hover-shadow: rgba(0, 0, 0, 0.5);

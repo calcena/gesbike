@@ -1,0 +1,87 @@
+.grupo-card {
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  border: 1px solid var(--card-border);
+}
+
+.grupo-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--card-shadow);
+}
+
+.grupo-card:active {
+  transform: scale(0.97);
+}
+
+.grupo-card-img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.icon-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  padding: 12px;
+  border: 1px solid var(--input-border);
+  border-radius: 12px;
+  background: var(--input-bg);
+}
+
+.icon-option {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.icon-option:hover {
+  border-color: var(--fab-bg);
+  background-color: var(--sidebar-hover);
+}
+
+.icon-option.selected {
+  border-color: var(--fab-bg);
+  background-color: var(--sidebar-hover);
+}
+
+.icon-option img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.fab-button {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--fab-bg);
+  box-shadow: 0 4px 12px var(--fab-shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1000;
+  transition: transform 0.2s, box-shadow 0.2s, background-color 0.3s ease;
+}
+
+.fab-button:active {
+  transform: scale(0.92);
+  box-shadow: 0 2px 6px var(--fab-shadow);
+}
+
+.fab-icon {
+  width: 28px;
+  height: 28px;
+  filter: brightness(0) invert(1);
+}

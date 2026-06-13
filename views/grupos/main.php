@@ -25,40 +25,56 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
     <link href="../../assets/css/main/main.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
     <link href="../../assets/css/style.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
     <link href="../../assets/css/theme.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
-    <link href="../../assets/css/compras/compra.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
+    <link href="../../assets/css/grupos/grupo.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
     <script src="../../assets/js/axios/axios.min.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../assets/js/bootstrap/bootstrap.min.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../services/helpers/helper.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../services/components/sitebar.js?<?php random_file_enumerator() ?>"></script>
-    <script src="../../services/compras/compra.js?<?php random_file_enumerator() ?>"></script>
+    <script src="../../services/grupos/grupo.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../services/translate/translate.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../services/logs/logs.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../services/theme/theme.js?<?php random_file_enumerator() ?>"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
     <title><?php echo APP_NAME . '_' . APP_VERSION ?></title>
 </head>
 
-<body onload="initCompras(); initTheme()">
-    <div class="container mt-2 d-flex justify-content-end align-items-center ps-0" style="gap: 1rem;">
-        <div class="w-100 d-flex ms-3">
-            <img class="icon-menu" src="../../assets/images/icons/left.png" alt="" onclick="gotoBackRecambios()">
-        </div>
-        <img class="icon-menu" src="../../assets/images/icons/menu.png" alt="" onclick="showLateralMenu()">
-    </div>
-    <div class="container mt-1">
-        <div class="" id="main_cards">
+<body onload="initGrupos(); initTheme()">
+    <div class="container mt-2">
+        <div class="d-flex justify-content-between align-items-center">
+            <img class="icon-menu" src="../../assets/images/icons/left.png" alt="" onclick="gotoBack()">
+            <h5 class="mb-0">Grupos</h5>
+            <img class="icon-menu" src="../../assets/images/icons/menu.png" alt="" onclick="showLateralMenu()">
         </div>
     </div>
 
-    <!-- Footer y Sidebar -->
+    <div class="container mt-3">
+        <div class="row" id="grupos-container">
+        </div>
+    </div>
+
+    <div class="fab-button" onclick="nuevoGrupo()">
+        <img src="../../assets/images/icons/add.png" alt="Añadir" class="fab-icon">
+    </div>
+
     <div class="container footer-location text-center">
         <?php
         $source = 'main';
-        include_once("../components/footer.php");
-        ?>
+        include_once("../components/footer.php"); ?>
     </div>
     <?php include __DIR__ . '/../components/sidebar.php'; ?>
+
+    <div class="offcanvas offcanvas-start" tabindex="-1" id="menuGrupo" aria-labelledby="menuGrupoLabel" style="width: 250px;">
+        <div class="offcanvas-body p-0 mt-4">
+            <div class="list-group list-group-flush">
+                <button type="button" class="list-group-item list-group-item-action py-3" onclick="accionMenu('editar')">
+                    <img class="icon-submenu-izquierda" src="../../assets/images/icons/pencil.png" alt=""> Editar
+                </button>
+                <button type="button" class="list-group-item list-group-item-action py-3" onclick="accionMenu('eliminar')">
+                    <img class="icon-submenu-izquierda" src="../../assets/images/icons/papelera.png" alt=""> Eliminar
+                </button>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>

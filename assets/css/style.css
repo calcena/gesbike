@@ -6,9 +6,9 @@
 }
 
 body {
-  background-color: var(--body-bg);
+  background: var(--body-bg);
   color: var(--body-text);
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
 .action-icon {
@@ -26,6 +26,13 @@ body {
   width: auto;
 }
 
+[data-theme="dark"] .icon-submenu-izquierda,
+[data-theme="dark"] .icon-register-action,
+[data-theme="dark"] .action-icon,
+[data-theme="dark"] .icon-card {
+  filter: brightness(0) invert(1);
+}
+
 .page-title {
   color: var(--page-title);
   font-weight: 600;
@@ -35,7 +42,7 @@ body {
 }
 
 .menu-text-option {
-  font-size: 0.75rem;
+  font-size: min(0.75rem, 2vh);
   font-weight: 600;
 }
 
@@ -318,4 +325,35 @@ hr {
 
 a, .link-click {
   color: var(--login-link);
+}
+
+.upload-container {
+  width: 100%;
+  max-width: 260px;
+  height: 150px;
+  margin: 0 auto;
+  border: 2px dashed var(--upload-border);
+  border-radius: 12px;
+  background: var(--upload-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.2s, background-color 0.3s ease;
+}
+
+.upload-container:active {
+  border-color: var(--fab-bg);
+}
+
+.upload-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.upload-placeholder {
+  color: var(--upload-placeholder-text);
+  text-align: center;
 }

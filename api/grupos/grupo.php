@@ -16,6 +16,10 @@ $action = !empty($_GET) ? array_keys($_GET)[0] : '';
 
 switch ($action) {
     case 'getListGrupos':
+    case 'getGrupoById':
+    case 'nuevoGrupo':
+    case 'editarGrupo':
+    case 'eliminarGrupo':
         $controllerFile = ROOT_PATH . '/controllers/grupo.php';
         if (!file_exists($controllerFile)) {
             http_response_code(500);
@@ -34,10 +38,7 @@ switch ($action) {
         header('Content-Type: application/json');
         echo json_encode([
             'success' => false,
-            'error' => $e
+            'error' => 'Acción no soportada'
         ]);
         exit;
 }
-
-
-

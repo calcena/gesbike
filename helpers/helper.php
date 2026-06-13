@@ -23,8 +23,7 @@ if (!function_exists('getallheaders')) {
 
 function random_file_enumerator()
 {
-    $number = rand(1, 10000000000);
-    echo $number;
+    echo time();
 }
 
 function exit_session()

@@ -13,6 +13,7 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
+<script>(function(){var t=sessionStorage.getItem('theme');if(t==='dark'){document.documentElement.setAttribute('data-theme','dark')}})()</script>
 
 <head>
     <meta http-equiv='cache-control' content='no-cache'>
@@ -137,20 +138,16 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
                 </div>
             </div>
             <div class="tab-pane fade" id="tab3" role="tabpanel" aria-labelledby="tab3-tab">
-                <!-- Imagen central (con margen inferior) -->
-                <div class="row mb-3">
-                    <div class="col d-flex justify-content-evenly">
-                        <label class="action-icon cursor-pointer" title="Subir imagen">
-                            <img class="action-icon" src="../../assets/images/icons/upload_file.png" alt="Subir imagen">
-                            <input type="file" accept="image/*" style="display: none;"
-                                onchange="handleFileUpload(this.files)">
-                        </label>
-                        <label class="action-icon p-1 cursor-pointer" title="Capturar imagen">
-                            <img class="action-icon" src="../../assets/images/icons/camara.png" alt="Capturar imagen">
-                            <input type="file" accept="image/*" capture="environment" style="display: none;"
-                                onchange="handlePhotoUpload(this.files)">
-                        </label>
+                <div class="text-center mb-3">
+                    <div class="upload-container" onclick="document.getElementById('input_foto_mantenimiento').click()">
+                        <img id="img_preview_adjunto" src="" alt="Foto adjunto" class="upload-preview d-none">
+                        <div id="img_placeholder_adjunto" class="upload-placeholder">
+                            <i class="fas fa-camera fa-3x"></i>
+                            <p class="mt-2 mb-0">Tocar para añadir foto</p>
+                        </div>
                     </div>
+                    <input type="file" id="input_foto_mantenimiento" accept="image/*" style="display:none" onchange="handleFileUpload(this.files)">
+                    <small class="text-muted d-block mt-1">Puedes hacer una foto o seleccionar de la galería</small>
                 </div>
                 <!-- Cards para mostrar el nombre del archivo y acciones-->
                 <div class="row gap-2" id="main_cards">

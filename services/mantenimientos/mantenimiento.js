@@ -12,7 +12,10 @@ const initMantenimientos = async () => {
   if ("mantenimiento_id" in sessionStorage) {
     await editMantenimiento();
   } else {
-    console.log("Creamos");
+    await getKmsDetail();
+    const kmsInput = document.getElementById("kms_realizados");
+    document.getElementById("kms_mantenimiento").value =
+      kmsInput && kmsInput.value ? kmsInput.value : 0;
   }
 };
 
@@ -118,15 +121,9 @@ const validateMantenimiento = async () => {
   }
 };
 
-// Función unificada para manejar subida de archivos (tanto selección como captura)
 async function handleFileUpload(files) {
   if (!files || files.length === 0) return;
 
-  console.log(
-    "Mantenimiento creado:",
-    sessionStorage.getItem("mantenimiento_id")
-  );
-
   if (!sessionStorage.getItem("mantenimiento_id")) {
     Swal.fire(
       "Error",
@@ -138,7 +135,6 @@ async function handleFileUpload(files) {
 
   const file = files[0];
 
-  // ✅ Validación básica
   if (!file.type.startsWith("image/")) {
     Swal.fire("Error", "Solo se permiten imágenes.", "error");
     return;
@@ -147,55 +143,17 @@ async function handleFileUpload(files) {
   if (file.size > 8 * 1024 * 1024) {
     Swal.fire("Error", "La imagen no debe superar los 8 MB.", "error");
     return;
+  }
+
+  const preview = document.getElementById("img_preview_adjunto");
+  const placeholder = document.getElementById("img_placeholder_adjunto");
+  if (preview && placeholder) {
+    preview.src = URL.createObjectURL(file);
+    preview.classList.remove("d-none");
+    placeholder.classList.add("d-none");
   }
 
   await uploadFileToServer(file);
-}
-
-// Función específica para manejar fotos capturadas
-async function handlePhotoUpload(files) {
-  if (!files || files.length === 0) return;
-
-  console.log(
-    "Mantenimiento creado:",
-    sessionStorage.getItem("mantenimiento_id")
-  );
-
-  if (!sessionStorage.getItem("mantenimiento_id")) {
-    Swal.fire(
-      "Error",
-      "No se ha guardado correctamente el mantenimiento.",
-      "error"
-    );
-    return;
-  }
-
-  const file = files[0];
-
-  // ✅ Validación para fotos capturadas
-  if (!file.type.startsWith("image/")) {
-    Swal.fire("Error", "Solo se permiten imágenes.", "error");
-    return;
-  }
-
-  if (file.size > 8 * 1024 * 1024) {
-    Swal.fire("Error", "La imagen no debe superar los 8 MB.", "error");
-    return;
-  }
-
-  // Mostrar confirmación antes de subir la foto capturada
-  const result = await Swal.fire({
-    title: "¿Subir foto capturada?",
-    text: "¿Deseas subir esta foto al mantenimiento?",
-    icon: "question",
-    showCancelButton: true,
-    confirmButtonText: "Sí, subir",
-    cancelButtonText: "Cancelar",
-  });
-
-  if (result.isConfirmed) {
-    await uploadFileToServer(file);
-  }
 }
 
 // Función común para subir archivos al servidor

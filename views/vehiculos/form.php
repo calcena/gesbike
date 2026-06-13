@@ -9,6 +9,7 @@ $modo = $_GET["modo"] ?? 'nuevo';
 ?>
 <!DOCTYPE html>
 <html lang="en">
+<script>(function(){var t=sessionStorage.getItem('theme');if(t==='dark'){document.documentElement.setAttribute('data-theme','dark')}})()</script>
 
 <head>
     <meta http-equiv='cache-control' content='no-cache'>
@@ -44,9 +45,9 @@ $modo = $_GET["modo"] ?? 'nuevo';
         </div>
 
         <div class="text-center mb-3">
-            <div class="vehiculo-image-container" onclick="document.getElementById('input_foto_vehiculo').click()">
-                <img id="img_preview" src="" alt="Foto vehículo" class="vehiculo-preview d-none">
-                <div id="img_placeholder" class="vehiculo-placeholder">
+            <div class="upload-container" onclick="document.getElementById('input_foto_vehiculo').click()">
+                <img id="img_preview" src="" alt="Foto vehículo" class="upload-preview d-none">
+                <div id="img_placeholder" class="upload-placeholder">
                     <i class="fas fa-camera fa-3x"></i>
                     <p class="mt-2 mb-0">Tocar para añadir foto</p>
                 </div>

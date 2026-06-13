@@ -33,6 +33,9 @@ function menuAction(action, deep) {
     case "vehiculos":
       window.location.href = `${basePath}/vehiculos/vehiculo.php`;
       break;
+    case "grupos":
+      window.location.href = `${basePath}/grupos/main.php`;
+      break;
     case "stock":
       window.location.href = `${basePath}/stocks/stock.php`;
       break;

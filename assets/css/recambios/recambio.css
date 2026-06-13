@@ -3,3 +3,31 @@
     font-size: 0.8rem;
     margin: 0, 3px, 0, 3px
 }
+
+.fab-button {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--fab-bg);
+    box-shadow: 0 4px 12px var(--fab-shadow);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1000;
+    transition: transform 0.2s, box-shadow 0.2s, background-color 0.3s ease;
+}
+
+.fab-button:active {
+    transform: scale(0.92);
+    box-shadow: 0 2px 6px var(--fab-shadow);
+}
+
+.fab-icon {
+    width: 28px;
+    height: 28px;
+    filter: brightness(0) invert(1);
+}

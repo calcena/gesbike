@@ -10,6 +10,7 @@ $modo = $_GET["modo"];
 
 <!DOCTYPE html>
 <html lang="en">
+<script>(function(){var t=sessionStorage.getItem('theme');if(t==='dark'){document.documentElement.setAttribute('data-theme','dark')}})()</script>
 
 <head>
     <meta http-equiv='cache-control' content='no-cache'>

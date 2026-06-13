@@ -105,6 +105,10 @@ font-size: 1.2rem;
   height: 2.4rem;
 }
 
+[data-theme="dark"] .icon-menu {
+  filter: brightness(0) invert(1);
+}
+
 .lateral-menu {
   position: fixed;
   top: 0;
@@ -115,7 +119,31 @@ font-size: 1.2rem;
   box-shadow: -4px 0 12px var(--shadow-lg);
   z-index: 1050;
   transition: right 0.3s ease, background-color 0.3s ease;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.menu-items {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  overflow: hidden;
+}
+
+.lateral-menu hr {
+  margin: 2px 0;
+}
+
+.lateral-menu .menu-header {
+  flex-shrink: 0;
+}
+
+.lateral-menu #kms_realizados {
+  font-size: min(1.25rem, 3vh);
+  height: auto;
+  padding: 2px 6px;
 }
 
 .lateral-menu.open {
@@ -124,12 +152,16 @@ font-size: 1.2rem;
 
 .menu-icon {
   width: auto;
-  height: 32px;
+  height: min(32px, 5vh);
+}
+
+[data-theme="dark"] .menu-icon {
+  filter: brightness(0) invert(1);
 }
 
 .menu-item {
   cursor: pointer;
-  padding: 6px;
+  padding: 4px 6px;
   border-radius: 8px;
   transition: background 0.2s;
 }
@@ -209,6 +241,11 @@ font-size: 1.2rem;
   width: 30px;
   height: 30px;
   opacity: 0.8;
+}
+
+[data-theme="dark"] .mantenimiento-card .icon-table,
+[data-theme="dark"] .mantenimiento-card img[alt="Vehículo"] {
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.35));
 }
 
 .main-record {

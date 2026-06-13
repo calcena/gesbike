@@ -251,17 +251,20 @@ const selectRecambios = async (selectIds, stockZero = false) => {
   }
 };
 
+const mostrarPreviewImagen = (src) => {
+  const preview = document.getElementById("img_preview");
+  const placeholder = document.getElementById("img_placeholder");
+  if (preview && placeholder) {
+    preview.src = src;
+    preview.classList.remove("d-none");
+    placeholder.classList.add("d-none");
+  }
+};
+
 const uploadImage = async (input) => {
   if (input.files && input.files[0]) {
     const file = input.files[0];
-    const imgPreview = document.getElementById("img_preview");
-    if (imgPreview) {
-      imgPreview.classList.remove("invisible");
-      imgPreview.src = URL.createObjectURL(file);
-      imgPreview.onload = () => {
-        URL.revokeObjectURL(imgPreview.src);
-      };
-    }
+    mostrarPreviewImagen(URL.createObjectURL(file));
     const formData = new FormData();
     formData.append("archivo", file);
     formData.append("vehiculo_id", sessionStorage.getItem("vehiculo_id"));
