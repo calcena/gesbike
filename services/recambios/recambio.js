@@ -33,6 +33,17 @@ const initRecambios = async () => {
   await getAllRecambios();
 };
 
+window.selectVehiculoPicker = (id, nombre) => {
+  sessionStorage.setItem("vehiculo_id", id);
+  const btn = document.getElementById("vehiculo-select");
+  if (btn) {
+    btn.textContent = nombre;
+    btn.dataset.selected = id;
+  }
+  Swal.close();
+  selectRecambios();
+};
+
 const initRecambiosNuevoEdit = async () => {
   modo = document.getElementById("mainBody").dataset.modo;
   const data = {};

@@ -341,26 +341,27 @@ function formatTime(seconds) {
 async function initRutas() {
   await getVehiculosByUser(2);
   document.getElementById("fecha_ruta").value = await loadDefaultDate();
+  await selectVehiculo(2);
   await getRutasByVehiculo();
-  document.getElementById("vehiculo-select").value =
-    sessionStorage.getItem("vehiculo_id");
   setupGPXUpload();
   setupMultipleGPXUpload();
 }
 
-const cambiarVehiculo = async (id) => {
-  await setVehiculo(id);
-  // Limpiar campo de búsqueda al cambiar de vehículo
+window.selectVehiculoPicker = (id, nombre) => {
+  sessionStorage.setItem("vehiculo_id", id);
+  const btn = document.getElementById("vehiculo-select");
+  if (btn) {
+    btn.textContent = nombre;
+    btn.dataset.selected = id;
+  }
+  Swal.close();
   const searchInput = document.getElementById("searchRutas");
   if (searchInput) searchInput.value = "";
-  // Resetear paginación al cambiar de vehículo
   window.paginaActual = 1;
-  await getRutasByVehiculo();
-
-  // Si la pestaña de velocidades está activa, recargar la gráfica
+  getRutasByVehiculo();
   const tab5 = document.getElementById("tab5");
   if (tab5 && tab5.classList.contains("active")) {
-    await cargarGraficaVelocidades();
+    cargarGraficaVelocidades();
   }
 };
 
@@ -732,7 +733,7 @@ const eliminarRutaFormulario = async () => {
       html: `
         <div style="text-align: left;">
           <p>¿Está seguro que desea eliminar esta ruta?</p>
-          <p><strong>Fecha:</strong> ${fecha}</p>
+          <p><strong>Fecha:</strong> ${formatFechaISO(fecha)}</p>
           <p><strong>Kilómetros:</strong> ${kms} km</p>
           <p class="text-danger mt-3"><small>Esta acción no se puede deshacer.</small></p>
         </div>
@@ -828,26 +829,12 @@ const cancelarEdicionRuta = () => {
 };
 
 const confirmarEliminarRutaGPX = async (idRuta, fecha, kms) => {
-  const formatFechaTimeISO = (fechaStr) => {
-    if (!fechaStr) return "";
-    try {
-      const dateObj = new Date(fechaStr);
-      if (isNaN(dateObj.getTime())) return "";
-      const dia = String(dateObj.getDate()).padStart(2, "0");
-      const mes = String(dateObj.getMonth() + 1).padStart(2, "0");
-      const año = dateObj.getFullYear();
-      return `${dia}/${mes}/${año}`;
-    } catch (error) {
-      return "";
-    }
-  };
-
   const result = await Swal.fire({
     title: 'Eliminar ruta GPX',
     html: `
       <div style="text-align: left;">
         <p>¿Está seguro que desea eliminar esta ruta?</p>
-        <p><strong>Fecha:</strong> ${formatFechaTimeISO(fecha)}</p>
+        <p><strong>Fecha:</strong> ${formatFechaISO(fecha)}</p>
         <p><strong>Kilómetros:</strong> ${kms} km</p>
         <p class="text-danger mt-3"><small>Esta acción no se puede deshacer.</small></p>
       </div>
@@ -1009,23 +996,6 @@ function configurarLongPressCards() {
 
 // Función para generar el contenido HTML de la ruta
 function generarContenidoRuta(ruta, hasHR = false) {
-  const formatFechaTimeISO = (fecha) => {
-    if (!fecha) return "";
-    try {
-      const dateObj = new Date(fecha);
-      if (isNaN(dateObj.getTime())) return "";
-      const dia = String(dateObj.getDate()).padStart(2, "0");
-      const mes = String(dateObj.getMonth() + 1).padStart(2, "0");
-      const año = dateObj.getFullYear();
-      const horas = String(dateObj.getHours()).padStart(2, "0");
-      const minutos = String(dateObj.getMinutes()).padStart(2, "0");
-      return `${dia}/${mes}/${año} ${horas}:${minutos}`;
-    } catch (error) {
-      console.error("Error formateando fecha:", error);
-      return "";
-    }
-  };
-
   const fields = [
     { label: "📆 Inicio", value: formatFechaTimeISO(ruta.fecha_inicio) },
     { label: "📆 Fin", value: formatFechaTimeISO(ruta.fecha_fin) },
@@ -1188,22 +1158,6 @@ const getRutasByVehiculo = async () => {
     if (response.data.success) {
       // Almacenar datos originales con formato de búsqueda para filtrado
       const rutasConFormato = response.data.content.map(item => {
-        const formatFechaTimeISO = (fecha) => {
-          if (!fecha) return "";
-          try {
-            const dateObj = new Date(fecha);
-            if (isNaN(dateObj.getTime())) return "";
-            const dia = String(dateObj.getDate()).padStart(2, "0");
-            const mes = String(dateObj.getMonth() + 1).padStart(2, "0");
-            const año = dateObj.getFullYear();
-            const horas = String(dateObj.getHours()).padStart(2, "0");
-            const minutos = String(dateObj.getMinutes()).padStart(2, "0");
-            return `${dia}/${mes}/${año} ${horas}:${minutos}`;
-          } catch (error) {
-            return "";
-          }
-        };
-
         // Normalizar formato de kms para búsqueda (manejar punto y coma)
         const kmsValor = item.kms ? parseFloat(item.kms) : 0;
         const acumuladoKmsValor = item.acumulado_kms ? parseFloat(item.acumulado_kms) : 0;
@@ -1253,28 +1207,28 @@ function renderizarControlesPaginacion() {
     <div id="paginacion-container" class="col-12 mt-1 mb-1">
       <div class="d-flex justify-content-center align-items-center" style="gap: 15px;">
         <button
-          class="btn btn-sm btn-outline-secondary ${window.paginaActual === 1 ? 'disabled' : ''}"
+          class="btn btn-sm pag-btn ${window.paginaActual === 1 ? 'disabled' : ''}"
           onclick="cambiarPagina(1)"
           ${window.paginaActual === 1 ? 'disabled' : ''}>
           <i class="fas fa-angles-left"></i>
         </button>
         <button
-          class="btn btn-sm btn-outline-secondary ${window.paginaActual === 1 ? 'disabled' : ''}"
+          class="btn btn-sm pag-btn ${window.paginaActual === 1 ? 'disabled' : ''}"
           onclick="cambiarPagina(${window.paginaActual - 1})"
           ${window.paginaActual === 1 ? 'disabled' : ''}>
           <i class="fas fa-chevron-left"></i>
         </button>
-        <span class="text-muted">
-          Página ${window.paginaActual} de ${window.totalPaginas}
+        <span class="pag-text">
+          ${window.paginaActual}/${window.totalPaginas}
         </span>
         <button
-          class="btn btn-sm btn-outline-secondary ${window.paginaActual === window.totalPaginas ? 'disabled' : ''}"
+          class="btn btn-sm pag-btn ${window.paginaActual === window.totalPaginas ? 'disabled' : ''}"
           onclick="cambiarPagina(${window.paginaActual + 1})"
           ${window.paginaActual === window.totalPaginas ? 'disabled' : ''}>
           <i class="fas fa-chevron-right"></i>
         </button>
         <button
-          class="btn btn-sm btn-outline-secondary ${window.paginaActual === window.totalPaginas ? 'disabled' : ''}"
+          class="btn btn-sm pag-btn ${window.paginaActual === window.totalPaginas ? 'disabled' : ''}"
           onclick="cambiarPagina(${window.totalPaginas})"
           ${window.paginaActual === window.totalPaginas ? 'disabled' : ''}>
           <i class="fas fa-angles-right"></i>
@@ -1294,23 +1248,6 @@ function cambiarPagina(nuevaPagina) {
 }
 
 const parseHtmlCardsRutas = async (data) => {
-  const formatFechaTimeISO = (fecha) => {
-    if (!fecha) return "";
-    try {
-      const dateObj = new Date(fecha);
-      if (isNaN(dateObj.getTime())) return "";
-      const dia = String(dateObj.getDate()).padStart(2, "0");
-      const mes = String(dateObj.getMonth() + 1).padStart(2, "0");
-      const año = dateObj.getFullYear();
-      const horas = String(dateObj.getHours()).padStart(2, "0");
-      const minutos = String(dateObj.getMinutes()).padStart(2, "0");
-      return `${dia}/${mes}/${año} ${horas}:${minutos}`;
-    } catch (error) {
-      console.error("Error formateando fecha:", error);
-      return "";
-    }
-  };
-
   return data
     .map((item) => {
       const iconType =
@@ -1657,7 +1594,8 @@ let datosVelocidadesGlobal = null;
 
 async function cargarGraficaVelocidades() {
   const usuario_id = sessionStorage.getItem("usuario_id");
-  const vehiculo_id = document.getElementById("vehiculo-select")?.value;
+  const vehiculoBtn = document.getElementById("vehiculo-select");
+  const vehiculo_id = vehiculoBtn?.dataset?.selected || vehiculoBtn?.value;
   if (!usuario_id || !vehiculo_id) return;
 
   try {
@@ -1703,7 +1641,8 @@ function poblarSelectorAnio(datos) {
 function actualizarGraficaPorAnio() {
   if (!datosVelocidadesGlobal) return;
 
-  const vehiculo_id = document.getElementById("vehiculo-select")?.value;
+  const vehiculoBtn = document.getElementById("vehiculo-select");
+  const vehiculo_id = vehiculoBtn?.dataset?.selected || vehiculoBtn?.value;
   const anioSeleccionado = document.getElementById("anio-filtro")?.value;
 
   if (!vehiculo_id || !anioSeleccionado) return;

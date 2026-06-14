@@ -83,7 +83,7 @@
     --fab-shadow: rgba(118, 75, 162, 0.4);
 
     /* === Body === */
-    --body-bg: linear-gradient(180deg, #7c3aed 0%, #24e41e 100%);
+    --body-bg: linear-gradient(180deg, #a78bfa 0%, #6ee7b7 100%);
     --body-text: #212529;
 
     /* === Offcanvas === */
@@ -94,7 +94,7 @@
     --badge-inactive-bg: #6c757d;
 
     /* === Login === */
-    --login-bg: linear-gradient(180deg, #7c3aed 0%, #24e41e 100%);
+    --login-bg: linear-gradient(180deg, #a78bfa 0%, #6ee7b7 100%);
     --login-card-bg: #ffffff;
     --login-card-shadow: rgba(0, 0, 0, 0.15);
     --login-title-color: #1a1a2e;

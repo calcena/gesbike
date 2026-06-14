@@ -13,6 +13,8 @@ const initMantenimientos = async () => {
     await editMantenimiento();
   } else {
     ["operacion_id", "localizacion_id", "recambio_id"].forEach(k => sessionStorage.removeItem(k));
+    document.getElementById("proxima_fecha").value = "";
+    document.getElementById("proximos_kms").value = "";
     await getKmsDetail();
     const kmsInput = document.getElementById("kms_realizados");
     document.getElementById("kms_mantenimiento").value =
@@ -138,6 +140,7 @@ window.selectLocalizacion = (id, nombre) => {
     btn.dataset.selected = id;
   }
   Swal.close();
+  loadPrediccion();
 };
 
 const openRecambioPicker = () => {
@@ -187,6 +190,34 @@ const gotoMain = () => {
   window.location.href = "../main.php";
 };
 
+const loadPrediccion = async () => {
+  const vehiculo_id = sessionStorage.getItem("vehiculo_id");
+  const operacion_id = sessionStorage.getItem("operacion_id");
+  const grupo_id = sessionStorage.getItem("grupo_id");
+  const localizacion_id = sessionStorage.getItem("localizacion_id");
+  if (!vehiculo_id || !operacion_id || !grupo_id || !localizacion_id) return;
+  try {
+    const response = await axios.post(
+      "../../api/programaciones/programacion.php?getPrediccion",
+      { data: { vehiculo_id, operacion_id, grupo_id, localizacion_id } },
+      { headers: { "Content-Type": "application/json" } }
+    );
+    if (response.data.success && response.data.content) {
+      const c = response.data.content;
+      const fechaInput = document.getElementById("proxima_fecha");
+      const kmsInput = document.getElementById("proximos_kms");
+      if (fechaInput && c.proxima_fecha) {
+        fechaInput.value = c.proxima_fecha;
+      }
+      if (kmsInput && c.proximos_kms !== null) {
+        kmsInput.value = c.proximos_kms;
+      }
+    }
+  } catch (err) {
+    console.log("loadPrediccion", err);
+  }
+};
+
 const changeOperaciones = async (value) => {
   sessionStorage.removeItem("recambio_id");
   const btn = document.getElementById("recambio_select");
@@ -209,6 +240,7 @@ const changeOperaciones = async (value) => {
       .getElementById("precio_mantenimiento")
       .setAttribute("disabled", "");
   }
+  loadPrediccion();
 };
 
 const changeGrupos = async () => {
@@ -583,6 +615,7 @@ const editMantenimiento = async () => {
         response.data.content.observaciones;
       document.getElementById("tab3-tab").classList.remove("disabled");
       document.getElementById("papelera_icon").classList.remove("d-none");
+      loadPrediccion();
     }
   } catch (error) {
     Swal.fire("Error", "No se pudieron cargar los mantenimientos.", "error");

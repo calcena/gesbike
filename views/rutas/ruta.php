@@ -45,8 +45,9 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
 <body onload="initRutas(); initTheme()">
     <div class="container mt-2 d-flex justify-content-between align-items-center ps-0 !important" style="gap: 1rem;">
         <img class="icon-menu ms-2" src="../../assets/images/icons/left.png" alt="" onclick="gotoBackMantenimientos()">
-        <select id="vehiculo-select" name="" class="form-select mb-1" onchange="cambiarVehiculo(this.value)">
-        </select>
+        <button id="vehiculo-select" class="form-select mb-1 text-start" onclick="openVehiculoPicker(2)">
+            Selecciona...
+        </button>
         <img class="icon-menu" src="../../assets/images/icons/menu.png" alt="" onclick="showLateralMenu()">
     </div>
     <div class="container p-2">

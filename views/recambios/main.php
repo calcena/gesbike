@@ -44,8 +44,10 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
     <div class="container mt-2 d-flex justify-content-between">
         <img class="icon-menu" src="../../assets/images/icons/left.png" alt="" onclick="gotoBackMantenimientos()">
         <div class="w-100 ps-2 pe-2">
-            <select id="vehiculo-select" name="" class="form-select mb-1"
-                onchange="setVehiculo(this.value); selectRecambios()"></select>
+            <button id="vehiculo-select" class="form-select mb-1 text-start"
+                onclick="openVehiculoPicker(2)">
+                Selecciona...
+            </button>
         </div>
         <div class="form-check form-switch align-content-center">
             <input class="form-check-input" type="checkbox" id="check-recambios-cero"

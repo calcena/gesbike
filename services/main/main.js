@@ -344,16 +344,16 @@ function renderizarControlesPaginacionMain() {
     <div id="paginacion-container-main" class="col-12 mt-1 mb-1">
       <div class="d-flex justify-content-center align-items-center" style="gap: 15px;">
         <button
-          class="btn btn-sm btn-outline-secondary ${window.paginaActual === 1 ? 'disabled' : ''}"
+          class="btn btn-sm pag-btn ${window.paginaActual === 1 ? 'disabled' : ''}"
           onclick="cambiarPaginaMain(${window.paginaActual - 1})"
           ${window.paginaActual === 1 ? 'disabled' : ''}>
           <i class="fas fa-chevron-left"></i>
         </button>
-        <span class="text-muted">
-          Página ${window.paginaActual} de ${window.totalPaginas}
+        <span class="pag-text">
+          ${window.paginaActual}/${window.totalPaginas}
         </span>
         <button
-          class="btn btn-sm btn-outline-secondary ${window.paginaActual === window.totalPaginas ? 'disabled' : ''}"
+          class="btn btn-sm pag-btn ${window.paginaActual === window.totalPaginas ? 'disabled' : ''}"
           onclick="cambiarPaginaMain(${window.paginaActual + 1})"
           ${window.paginaActual === window.totalPaginas ? 'disabled' : ''}>
           <i class="fas fa-chevron-right"></i>
@@ -444,7 +444,7 @@ const initMain = async () => {
   if (sessionStorage.getItem("login_parent") === "true") {
     sessionStorage.setItem("login_parent", "false");
     setTimeout(async () => {
-      await setVehiculo();
+      await selectVehiculo();
       await getListMantenimientosByVehiculo();
       await getMotorVehiculo();
     }, 50);
@@ -454,12 +454,17 @@ const initMain = async () => {
   }
 };
 
-const cambiarVehiculo = async (id) => {
-  await setVehiculo(id);
-  // Resetear paginación al cambiar de vehículo
+window.selectVehiculoPicker = (id, nombre) => {
+  sessionStorage.setItem("vehiculo_id", id);
+  const btn = document.getElementById("vehiculo-select");
+  if (btn) {
+    btn.textContent = nombre;
+    btn.dataset.selected = id;
+  }
+  Swal.close();
   window.paginaActual = 1;
-  await getListMantenimientosByVehiculo();
-  await getMotorVehiculo();
+  getListMantenimientosByVehiculo();
+  getMotorVehiculo();
 };
 
 window.addEventListener("beforeunload", () => {

@@ -1,0 +1,188 @@
+.agenda-card {
+    border-radius: 12px;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.agenda-card:hover {
+    transform: scale(1.01);
+}
+.agenda-card .card-body {
+    padding: 10px 14px;
+}
+[data-theme="light"] .agenda-card .text-muted,
+[data-theme="light"] .agenda-card .agenda-proxima-fecha,
+[data-theme="light"] .agenda-card .agenda-proxima-kms,
+[data-theme="light"] .agenda-card .agenda-label {
+    color: #1a1a1a !important;
+}
+
+[data-theme="light"] .agenda-card .agenda-proxima-fecha.agenda-text-red,
+[data-theme="light"] .agenda-card .agenda-proxima-kms.agenda-text-red {
+    color: #dc3545 !important;
+}
+[data-theme="dark"] .agenda-card .agenda-proxima-fecha.agenda-text-red,
+[data-theme="dark"] .agenda-card .agenda-proxima-kms.agenda-text-red {
+    color: #f87171 !important;
+}
+.agenda-icon {
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
+}
+.agenda-proxima-fecha {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+.agenda-proxima-kms {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+.agenda-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+}
+.agenda-header-icon {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+}
+
+.agenda-group-header {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.agenda-group-danger {
+    background: rgba(0, 0, 0, 0.06);
+    color: var(--text-primary, #000);
+}
+.agenda-group-success {
+    background: rgba(0, 0, 0, 0.06);
+    color: var(--text-primary, #000);
+}
+.agenda-group-header i.fa-chevron-down {
+    transition: transform 0.25s;
+}
+.agenda-group-header[aria-expanded="false"] i.fa-chevron-down {
+    transform: rotate(-90deg);
+}
+.agenda-group-collapse {
+    display: none;
+}
+.agenda-group-collapse.show {
+    display: block;
+}
+
+.fab-config-btn {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: none;
+    background: var(--fab-bg, linear-gradient(135deg, #667eea, #764ba2));
+    color: #fff;
+    font-size: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 999;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+.fab-config-btn:active {
+    transform: scale(0.92);
+}
+
+.config-popup {
+    width: 95% !important;
+    max-width: 500px !important;
+    font-size: 0.8rem;
+}
+.config-popup .swal2-title {
+    font-size: 1rem !important;
+}
+.config-popup .swal2-html-container {
+    font-size: 0.8rem !important;
+}
+.config-scroll {
+    max-height: 55vh;
+    overflow-y: auto;
+}
+
+.config-card {
+    background: var(--card-bg, #f8f9fa);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+}
+.config-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 2px;
+}
+.config-icons {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+.config-icon {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+}
+.config-title {
+    flex: 1;
+    font-weight: 600;
+    font-size: 0.85rem;
+    line-height: 1.2;
+}
+.config-subtitle {
+    font-size: 0.75rem;
+    color: var(--text-secondary, #666);
+    margin-bottom: 4px;
+    padding-left: 2px;
+}
+.config-sistema {
+    font-size: 0.78rem;
+    color: var(--text-secondary, #555);
+    background: var(--sistema-bg, #e8f0fe);
+    border-radius: 6px;
+    padding: 4px 8px;
+    margin-bottom: 6px;
+}
+.config-user {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.config-user-label {
+    font-size: 0.72rem;
+    color: var(--text-secondary, #666);
+    white-space: nowrap;
+}
+.config-input {
+    width: 60px;
+    padding: 4px 4px;
+    font-size: 0.82rem;
+    border: 1px solid var(--border-color, #ccc);
+    border-radius: 6px;
+    text-align: center;
+    background: var(--input-bg, #fff);
+    color: var(--text-color, #000);
+}
+.config-badge {
+    font-size: 0.6rem;
+    padding: 1px 5px;
+}
+
+

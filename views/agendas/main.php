@@ -24,45 +24,47 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link href="../../assets/css/bootstrap/bootstrap.min.css" rel="stylesheet" type="text/css">
-    <link href="../.././assets/css/main/main.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
+    <link href="../../assets/css/main/main.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
     <link href="../../assets/css/style.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
     <link href="../../assets/css/theme.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
-    <link href="../../assets/css/stocks/stock.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
+    <link href="../../assets/css/agendas/agenda.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
     <script src="../../assets/js/axios/axios.min.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../assets/js/bootstrap/bootstrap.min.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../services/helpers/helper.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../services/components/sitebar.js?<?php random_file_enumerator() ?>"></script>
-    <script src="../../services/stocks/stock.js?<?php random_file_enumerator() ?>"></script>
+    <script src="../../services/agendas/agenda.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../services/translate/translate.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../services/logs/logs.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../services/theme/theme.js?<?php random_file_enumerator() ?>"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <title><?php echo APP_NAME . '_' . APP_VERSION ?></title>
+    <title><?php echo APP_NAME . '_' . APP_VERSION ?> - Agendas</title>
 </head>
 
-<body onload="initStock(); initTheme()">
-    <div class="container mt-2">
-        <div class="container mt-2 d-flex justify-content-end align-items-center ps-0 !important" style="gap: 1rem;">
-            <img class="icon-menu ms-2" src="../../assets/images/icons/left.png" alt=""
-                onclick="gotoBackMantenimientos()">
-            <button class="form-select w-100 text-start" id="vehiculo-select"
-                onclick="openVehiculoPicker(2)">
+<body onload="initAgendas(); initTheme()">
+    <div class="container mt-2 d-flex justify-content-end align-items-center ps-0 !important" style="gap: 1rem;">
+        <img class="icon-menu ms-2" src="../../assets/images/icons/left.png" alt="" onclick="gotoBack()">
+        <div class="container p-2">
+            <button id="vehiculo-select" class="form-select text-start" onclick="openVehiculoPicker(2)">
                 Selecciona...
             </button>
-            <img class="icon-menu" src="../../assets/images/icons/menu.png" alt="" onclick="showLateralMenu()">
         </div>
+        <img class="icon-menu" src="../../assets/images/icons/menu.png" alt="" onclick="showLateralMenu()">
     </div>
+
     <div class="container mt-2">
-        <div class="row row-cols-1 g-3" id="main-cards">
-        </div>
+        <div class="row g-2" id="main-cards"></div>
     </div>
+
+    <button id="fab-config" class="fab-config-btn" onclick="openConfiguracion()" title="Configurar preferencias">
+        <i class="fas fa-cog"></i>
+    </button>
+
     <div class="container footer-location text-center">
         <?php
         $source = 'main';
         include_once("../components/footer.php"); ?>
     </div>
     <?php include __DIR__ . '/../components/sidebar.php'; ?>
-
 </body>
 
 </html>

@@ -40,17 +40,34 @@ const setVehiculo = async (id) => {
   if (id !== undefined) {
     await sessionStorage.setItem("vehiculo_id", id);
   } else {
-    document.getElementById("vehiculo-select").selectedIndex = 0;
-    await sessionStorage.setItem(
-      "vehiculo_id",
-      document.getElementById("vehiculo-select").value
-    );
+    const el = document.getElementById("vehiculo-select");
+    if (el && el.tagName === "BUTTON") return;
+    if (el) {
+      el.selectedIndex = 0;
+      await sessionStorage.setItem("vehiculo_id", el.value);
+    }
   }
 };
 
 const selectVehiculo = async (deep) => {
-  document.getElementById("vehiculo-select").value =
-    await sessionStorage.getItem("vehiculo_id");
+  const el = document.getElementById("vehiculo-select");
+  let vehiculoId = sessionStorage.getItem("vehiculo_id");
+  if (el) {
+    if (el.tagName === "BUTTON") {
+      if (!vehiculoId) {
+        const first = (window.vehiculosData || []).find(v => v.is_active == 1);
+        if (first) {
+          vehiculoId = first.id;
+          sessionStorage.setItem("vehiculo_id", vehiculoId);
+        }
+      }
+      const v = (window.vehiculosData || []).find(v => v.id == vehiculoId);
+      el.textContent = v ? v.nombre : "Selecciona...";
+      if (v) el.dataset.selected = vehiculoId;
+    } else {
+      el.value = vehiculoId;
+    }
+  }
   await getMotorVehiculo(deep);
 };
 
@@ -114,31 +131,31 @@ const getVehiculosByUser = async (deep = 1) => {
       }
     );
     if (response.data.success) {
-      const select = document.getElementById("vehiculo-select");
-      select.innerHTML =
-        '';
-
-      // Creamos el grupo solo para los inactivos
-      const grupoInactivos = document.createElement("optgroup");
-      grupoInactivos.label = "Vehículos Inactivos";
-
-      response.data.content.forEach((element) => {
-        const option = document.createElement("option");
-        option.value = element.id;
-        option.textContent = element.nombre;
-
-        if (element.is_active == 0) {
-          option.textContent = `🚫 ${element.nombre}`;
-          grupoInactivos.appendChild(option);
-        } else {
-          // Si es activo, lo añadimos directamente al select (sin label/grupo)
-          select.appendChild(option);
+      window.vehiculosData = response.data.content;
+      const btn = document.getElementById("vehiculo-select");
+      if (!btn) return;
+      if (btn.tagName === "BUTTON") {
+        if (!btn.dataset.selected) {
+          btn.textContent = "Selecciona...";
         }
-      });
-
-      // Al final, si el grupo de inactivos tiene elementos, lo añadimos al select
-      if (grupoInactivos.children.length > 0) {
-        select.appendChild(grupoInactivos);
+      } else {
+        btn.innerHTML = '';
+        const grupoInactivos = document.createElement("optgroup");
+        grupoInactivos.label = "Vehículos Inactivos";
+        response.data.content.forEach((element) => {
+          const option = document.createElement("option");
+          option.value = element.id;
+          option.textContent = element.nombre;
+          if (element.is_active == 0) {
+            option.textContent = `🚫 ${element.nombre}`;
+            grupoInactivos.appendChild(option);
+          } else {
+            btn.appendChild(option);
+          }
+        });
+        if (grupoInactivos.children.length > 0) {
+          btn.appendChild(grupoInactivos);
+        }
       }
     }
   } catch (err) {
@@ -332,6 +349,60 @@ window.versionKey = Date.now();
 window.cacheBustUrl = (url) => {
   const separator = url.includes('?') ? '&' : '?';
   return `${url}${separator}v=${window.versionKey}`;
+};
+
+const openVehiculoPicker = (deep = 1) => {
+  var baseUrl = "..";
+  if (deep == 2) baseUrl = "../..";
+
+  const items = window.vehiculosData || [];
+  const selectedId = sessionStorage.getItem("vehiculo_id");
+  if (!items.length) {
+    Swal.fire("Sin datos", "No hay vehículos disponibles", "info");
+    return;
+  }
+
+  const sorted = [...items].sort((a, b) => {
+    const aInactive = a.is_active == 0 ? 1 : 0;
+    const bInactive = b.is_active == 0 ? 1 : 0;
+    if (aInactive !== bInactive) return aInactive - bInactive;
+    return a.nombre.localeCompare(b.nombre);
+  });
+  const html = sorted.map((item) => {
+    const isSelected = selectedId && item.id == selectedId;
+    const isInactive = item.is_active == 0;
+    return `
+    <div class="swal-grupo-item d-flex align-items-center p-2 border-bottom ${isSelected ? 'swal-grupo-selected' : ''}"
+         style="cursor:pointer;gap:10px;"
+         onclick="selectVehiculoPicker(${item.id}, '${item.nombre.replace(/'/g, "\\'")}')">
+      ${item.imagen
+        ? `<img src="${cacheBustUrl(`${baseUrl}/assets/images/Vehiculos/${item.imagen}`)}" style="width:50px;height:32px;object-fit:cover;border-radius:4px;">`
+        : `<img src="${cacheBustUrl(`${baseUrl}/assets/images/icons/vehiculos_ico.png`)}" style="width:32px;height:32px;object-fit:contain;">`}
+      <div>
+        <span>${item.nombre}</span>
+        ${item.anagrama ? `<small class="text-muted ms-1">(${item.anagrama})</small>` : ""}
+        ${isInactive ? `<span class="badge bg-danger ms-1">Inactivo</span>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+
+  Swal.fire({
+    title: "Vehículo",
+    html: `<div style="max-height:60vh;overflow-y:auto;">${html}</div>`,
+    showConfirmButton: false,
+    showCloseButton: true,
+    customClass: { title: "swal-title-small" },
+  });
+};
+
+window.selectVehiculoPicker = (id, nombre) => {
+  sessionStorage.setItem("vehiculo_id", id);
+  const btn = document.getElementById("vehiculo-select");
+  if (btn) {
+    btn.textContent = nombre;
+    btn.dataset.selected = id;
+  }
+  Swal.close();
 };
 
 const formatKilometersBadges = async () => {

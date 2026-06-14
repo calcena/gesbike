@@ -41,8 +41,9 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
 <body onload="initMain(); initTheme()">
   <div class="container mt-2">
     <div class="container mt-2 d-flex justify-content-end align-items-center ps-0 !important" style="gap: 1rem;">
-      <select class="form-select w-100" id="vehiculo-select" onchange="cambiarVehiculo(this.value)">
-      </select>
+      <button class="form-select w-100 text-start" id="vehiculo-select" onclick="openVehiculoPicker(1)">
+        Selecciona...
+      </button>
       <img class="icon-menu" src="../assets/images/icons/menu.png" alt="" onclick="showLateralMenu()">
     </div>
   </div>

@@ -69,6 +69,33 @@ html, body {
     }
 }
 
+.pag-btn {
+    background: var(--login-btn-bg, linear-gradient(135deg, #667eea, #764ba2));
+    color: var(--login-btn-text, #fff);
+    border: none;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 0.85rem;
+    box-shadow: 0 2px 6px var(--login-btn-shadow, rgba(102,126,234,0.4));
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+.pag-btn:hover:not(.disabled) {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px var(--login-btn-shadow, rgba(102,126,234,0.4));
+}
+.pag-btn.disabled,
+.pag-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+    transform: none;
+}
+.pag-text {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary, #333);
+    white-space: nowrap;
+}
+
 * {
     box-sizing: border-box;
 }

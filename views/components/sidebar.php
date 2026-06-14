@@ -42,9 +42,15 @@
             <img src="<?php echo $GLOBALS['pathUrl'] ?>assets/images/icons/stock_ico.png" alt="Stock" class="menu-icon">
             <div class="menu-text-option">Stock</div>
         </div>
+        <div class="menu-item text-center position-relative" onclick="menuAction('agendas',<?php echo $GLOBALS['navigation_deep'] ?>)">
+            <i class="fas fa-calendar-check menu-icon" style="font-size: 32px;"></i>
+            <div class="menu-text-option">Agendas</div>
+            <span id="agenda-badge-vencidos" class="badge agenda-menu-badge agenda-badge-red d-none">0</span>
+            <span id="agenda-badge-pendientes" class="badge agenda-menu-badge agenda-badge-green d-none">0</span>
+        </div>
         <hr>
         <div class="menu-item text-center" id="theme-toggle-btn">
-            <i class="fas fa-moon menu-icon"></i>
+            <i class="fas fa-moon menu-icon" style="font-size: 34px;"></i>
             <div class="menu-text-option">Modo oscuro</div>
         </div>
         <hr>

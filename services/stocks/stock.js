@@ -54,9 +54,15 @@ const parseHtmlCardStock = async (data) => {
   return cards.join("");
 };
 
-const cambiarVehiculo = async (id) => {
-  await setVehiculo(id);
-  await getListStocks();
+window.selectVehiculoPicker = (id, nombre) => {
+  sessionStorage.setItem("vehiculo_id", id);
+  const btn = document.getElementById("vehiculo-select");
+  if (btn) {
+    btn.textContent = nombre;
+    btn.dataset.selected = id;
+  }
+  Swal.close();
+  getListStocks();
 };
 
 const mostrarFotoRecambio = async (nombreArchivo) => {

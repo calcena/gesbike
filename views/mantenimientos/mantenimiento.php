@@ -44,8 +44,9 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
     <div class="container mt-2 d-flex justify-content-end align-items-center ps-0 !important" style="gap: 1rem;">
         <img class="icon-menu ms-2" src="../../assets/images/icons/left.png" alt="" onclick="gotoBackMantenimientos()">
         <div class="container p-2">
-            <select id="vehiculo-select" name="" class="form-select"
-                onchange="setVehiculo(this.value)"></select>
+            <button id="vehiculo-select" class="form-select text-start" onclick="openVehiculoPicker(2)">
+                Selecciona...
+            </button>
         </div>
         <img class="icon-menu" src="../../assets/images/icons/menu.png" alt="" onclick="showLateralMenu()">
     </div>
@@ -123,6 +124,16 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
                     <div class="w-25">
                         <label for="und" class="form-label">Precio</label>
                         <input id="precio_mantenimiento" name="precio" type="number" class="form-control" disabled>
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="w-50">
+                        <label class="form-label text-muted small">Próxima fecha</label>
+                        <input id="proxima_fecha" type="date" class="form-control" readonly disabled>
+                    </div>
+                    <div class="w-50">
+                        <label class="form-label text-muted small">Próximos kms</label>
+                        <input id="proximos_kms" type="number" class="form-control" readonly disabled>
                     </div>
                 </div>
                 <div class="w-100 d-flex justify-content-around mt-2">

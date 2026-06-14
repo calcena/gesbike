@@ -39,6 +39,9 @@ function menuAction(action, deep) {
     case "stock":
       window.location.href = `${basePath}/stocks/stock.php`;
       break;
+    case "agendas":
+      window.location.href = `${basePath}/agendas/main.php`;
+      break;
     case "rutas":
       window.location.href = `${basePath}/rutas/ruta.php`;
       break;
@@ -131,5 +134,26 @@ async function getKmsDetail() {
     }
   } catch (err) {
     console.log("getKmsDetail", err.response.data.error);
+  }
+};
+
+window.updateAgendaBadge = (vencidos, pendientes) => {
+  const badgeV = document.getElementById("agenda-badge-vencidos");
+  const badgeP = document.getElementById("agenda-badge-pendientes");
+  if (badgeV) {
+    if (vencidos > 0) {
+      badgeV.textContent = vencidos;
+      badgeV.classList.remove("d-none");
+    } else {
+      badgeV.classList.add("d-none");
+    }
+  }
+  if (badgeP) {
+    if (pendientes > 0) {
+      badgeP.textContent = pendientes;
+      badgeP.classList.remove("d-none");
+    } else {
+      badgeP.classList.add("d-none");
+    }
   }
 };
