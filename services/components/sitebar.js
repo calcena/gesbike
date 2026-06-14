@@ -2,7 +2,7 @@ async function showLateralMenu() {
   document.getElementById("lateral-menu").classList.add("open");
   document.getElementById("menu-overlay").classList.add("active");
   document.body.style.overflow = "hidden";
-  await getKmsDetail();
+  await Promise.all([getKmsDetail(), updateAgendaBadges()]);
 }
 
 function hideLateralMenu() {
@@ -157,3 +157,36 @@ window.updateAgendaBadge = (vencidos, pendientes) => {
     }
   }
 };
+
+async function updateAgendaBadges() {
+  const vehiculoId = sessionStorage.getItem("vehiculo_id");
+  if (!vehiculoId) {
+    updateAgendaBadge(0, 0);
+    return;
+  }
+  const basePath = window.location.href.includes("views/main.php") ? ".." : "../..";
+  try {
+    const resp = await axios.post(
+      `${basePath}/api/programaciones/programacion.php?getTodasPredicciones`,
+      { data: { vehiculo_id: vehiculoId } },
+      { headers: { "Content-Type": "application/json" } }
+    );
+    if (resp.data.success) {
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+      let v = 0, p = 0;
+      (resp.data.content || []).forEach(item => {
+        if (!item.proxima_fecha) return;
+        const f = new Date(item.proxima_fecha + "T00:00:00");
+        if (f < hoy) v++; else p++;
+      });
+      updateAgendaBadge(v, p);
+    } else {
+      updateAgendaBadge(0, 0);
+    }
+  } catch (e) {
+    updateAgendaBadge(0, 0);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", updateAgendaBadges);

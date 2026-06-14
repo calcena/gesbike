@@ -33,7 +33,7 @@
 
 .fab-button {
     position: fixed;
-    bottom: 80px;
+    bottom: 30px;
     right: 20px;
     width: 56px;
     height: 56px;
@@ -114,4 +114,50 @@
     font-size: 1.3rem;
     font-weight: 800;
     letter-spacing: 0.5px;
+}
+
+.fab-motor-btn {
+    position: fixed;
+    bottom: 30px;
+    right: 20px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: none;
+    background: var(--fab-bg, linear-gradient(135deg, #667eea, #764ba2));
+    color: #fff;
+    font-size: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 999;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+.fab-motor-btn:active {
+    transform: scale(0.92);
+}
+
+.swal-half-btn {
+    flex: 1 !important;
+    margin: 0 3px !important;
+    padding: 10px 4px !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+    border-radius: 10px !important;
+    letter-spacing: 0.3px !important;
+    white-space: nowrap !important;
+}
+.swal-actions-row {
+    display: flex !important;
+    gap: 4px !important;
+    width: 100% !important;
+    padding: 0 4px !important;
+}
+.swal-footer-btn {
+    width: 100% !important;
+    border-radius: 10px !important;
+    padding: 10px !important;
+    font-weight: 600 !important;
 }

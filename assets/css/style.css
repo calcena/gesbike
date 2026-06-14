@@ -5,13 +5,21 @@
   outline: 0 !important;
 }
 
+html {
+  height: 100%;
+  overflow: hidden;
+}
 body {
+  height: 100%;
+  overflow-y: auto;
   background: var(--body-bg);
   background-repeat: no-repeat;
   background-attachment: fixed;
-  min-height: 100vh;
+  background-size: cover;
   color: var(--body-text);
   transition: background 0.3s ease, color 0.3s ease;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 .action-icon {
@@ -333,8 +341,6 @@ select {
 }
 
 .agenda-menu-badge {
-    position: absolute;
-    right: 4px;
     font-size: 0.55rem;
     color: #fff;
     border-radius: 50%;
@@ -345,15 +351,12 @@ select {
     justify-content: center;
     padding: 0 3px;
     line-height: 1;
-    z-index: 10;
 }
 .agenda-badge-red {
     background: #dc3545;
-    top: 0px;
 }
 .agenda-badge-green {
     background: #28a745;
-    bottom: 0px;
 }
 
 .offcanvas {
@@ -443,4 +446,16 @@ a, .link-click {
 
 .swal2-html-container {
   color: var(--text-primary) !important;
+}
+
+.badge-num {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 0.7rem;
+  line-height: 1;
 }

@@ -108,14 +108,57 @@ function motor_vehiculo($params)
     $db = conectar();
     $vehiculo_id = $params['vehiculo_id'];
     $stmt = $db->prepare("
-        SELECT
-            coalesce(id, 0) as motor_id,
-            count(id)
+        SELECT id, vehiculo_id, Kms, observaciones, fecha, created_at
         FROM motores
-        WHERE vehiculo_id = ?
-            AND is_active = 1
+        WHERE vehiculo_id = ? AND is_active = 1
         LIMIT 1
     ");
     $stmt->execute([$vehiculo_id]);
     return $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
+function baja_motor_vehiculo($params)
+{
+    global $db;
+    $db = conectar();
+    $motor_id = $params['motor_id'];
+    $stmt = $db->prepare("
+        UPDATE motores SET
+            is_active = 0,
+            deleted_at = datetime('now')
+        WHERE id = ?
+    ");
+    $stmt->execute([$motor_id]);
+    return $stmt->rowCount();
+}
+
+function get_all_motores_by_vehiculo($params)
+{
+    global $db;
+    $db = conectar();
+    $stmt = $db->prepare("
+        SELECT id, vehiculo_id, Kms, observaciones, fecha, created_at, deleted_at, is_active
+        FROM motores
+        WHERE vehiculo_id = ?
+        ORDER BY created_at DESC
+    ");
+    $stmt->execute([$params['vehiculo_id']]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+function nuevo_motor_vehiculo($params)
+{
+    global $db;
+    $db = conectar();
+    $stmt = $db->prepare("
+        INSERT INTO motores (vehiculo_id, Kms, observaciones, fecha, is_active, created_at)
+        VALUES (?, ?, ?, ?, 1, datetime('now'))
+    ");
+    $stmt->execute([
+        $params['vehiculo_id'],
+        $params['kms'] ?? 0,
+        $params['observaciones'] ?? '',
+        $params['fecha'] ?? date('Y-m-d')
+    ]);
+    return $db->lastInsertId();
 }

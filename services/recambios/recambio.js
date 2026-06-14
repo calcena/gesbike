@@ -152,7 +152,7 @@ const parseHtmlCardRecambios = async (data) => {
                                 <span class="ref-text text-truncate">${item.referencia}</span>
                             </div>
                             <div class="d-flex align-items-center gap-2">
-                                <span class="badge bg-primary">${item.stock}</span>
+                                <span class="badge bg-primary badge-num">${item.stock}</span>
                             </div>
                         </div>
                     </div>

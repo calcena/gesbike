@@ -33,3 +33,18 @@ function getMotorVehiculo($params) {
     global $db;
     return motor_vehiculo($params);
 }
+
+function getAllMotores($params) {
+    global $db;
+    return get_all_motores_by_vehiculo($params);
+}
+
+function bajaMotor($params) {
+    global $db;
+    return baja_motor_vehiculo($params);
+}
+
+function nuevoMotor($params) {
+    global $db;
+    return nuevo_motor_vehiculo($params);
+}

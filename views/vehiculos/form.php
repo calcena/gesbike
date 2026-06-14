@@ -35,7 +35,6 @@ $modo = $_GET["modo"] ?? 'nuevo';
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <title><?php echo APP_NAME . '_' . APP_VERSION ?></title>
 </head>
-
 <body id="mainBody" data-modo="<?php echo $modo; ?>" onload="initVehiculoForm(); initTheme()">
     <div class="container mt-2">
         <div class="d-flex justify-content-between align-items-center mb-3">
@@ -95,6 +94,12 @@ $modo = $_GET["modo"] ?? 'nuevo';
             <img class="icon-register-action" src="../../assets/images/icons/save.png" alt="Guardar" onclick="guardarVehiculo()">
         </div>
     </div>
+
+    <button id="fab-motor" class="fab-motor-btn d-none" onclick="openMotorPopup()" title="Gestionar motor">
+        <i class="fas fa-bolt"></i>
+    </button>
+
+    <?php include __DIR__ . '/../components/sidebar.php'; ?>
 </body>
 
 </html>

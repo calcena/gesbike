@@ -21,6 +21,9 @@ switch ($action) {
     case 'editarVehiculo':
     case 'eliminarVehiculo':
     case 'getMotorVehiculo':
+    case 'bajaMotor':
+    case 'nuevoMotor':
+    case 'getAllMotores':
         $controllerFile = ROOT_PATH . '/controllers/vehiculo.php';
         if (!file_exists($controllerFile)) {
             http_response_code(500);

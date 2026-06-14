@@ -40,7 +40,7 @@ const parseHtmlCardStock = async (data) => {
               <div class="d-flex justify-content-between align-items-start">
                 <img src="${cacheBustUrl(pathGrupo + item.grupo_imagen)}" alt="Grupo" class="icon-table">
                 <span id="texto-referencia">${item.referencia}</span>
-                <span class="badge bg-success">${item.unidades}</span>
+                <span class="badge bg-success badge-num">${item.unidades}</span>
               </div>
               <div class="mt-2 d-flex justify-content-around align-items-center flex-wrap">
                 <span class="text-obs">${item.observaciones}</span>

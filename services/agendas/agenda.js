@@ -21,7 +21,7 @@ const countVencidosPendientes = (data) => {
   (data || []).forEach(item => {
     if (!item.proxima_fecha) return;
     const f = new Date(item.proxima_fecha + "T00:00:00");
-    if (f <= hoy) v++; else p++;
+    if (f < hoy) v++; else p++;
   });
   return { vencidos: v, pendientes: p };
 };
@@ -183,7 +183,7 @@ const parseHtmlAgenda = (data, currentKms = 0) => {
   if (vencidos.length > 0) {
     html += `<div class="col-12 mb-2">
       <div class="agenda-group-header agenda-group-danger" onclick="toggleAgendaGroup('collapseVencidos', this)">
-        <i class="fas fa-exclamation-triangle me-1"></i> Vencidos <span class="badge bg-light text-danger ms-1">${vencidos.length}</span>
+        <i class="fas fa-exclamation-triangle me-1"></i> Vencidos <span class="badge bg-light text-danger badge-num ms-1">${vencidos.length}</span>
         <i class="fas fa-chevron-down ms-auto"></i>
       </div>
       <div class="agenda-group-collapse" id="collapseVencidos"><div class="row g-2">${vencidos.map(i => renderAgendaCard(i, currentKms)).join("")}</div></div>
@@ -193,7 +193,7 @@ const parseHtmlAgenda = (data, currentKms = 0) => {
   if (pendientes.length > 0) {
     html += `<div class="col-12">
       <div class="agenda-group-header agenda-group-success" onclick="toggleAgendaGroup('collapsePendientes', this)">
-        <i class="fas fa-clock me-1"></i> Futuros <span class="badge bg-light text-success ms-1">${pendientes.length}</span>
+        <i class="fas fa-clock me-1"></i> Futuros <span class="badge bg-light text-success badge-num ms-1">${pendientes.length}</span>
         <i class="fas fa-chevron-down ms-auto"></i>
       </div>
       <div class="agenda-group-collapse" id="collapsePendientes"><div class="row g-2">${pendientes.map(i => renderAgendaCard(i, currentKms)).join("")}</div></div>

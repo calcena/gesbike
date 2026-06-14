@@ -26,8 +26,8 @@ $_SESSION['base_project'] = dirname(__FILE__);
     <link rel="apple-touch-icon" href="assets/images/logo_192.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link href="assets/css/bootstrap/bootstrap.min.css" rel="stylesheet" type="text/css">
-    <link href="assets/css/login/login.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
     <link href="assets/css/style.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
+    <link href="assets/css/login/login.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
     <link href="assets/css/theme.css?<?php random_file_enumerator() ?>" rel="stylesheet" type="text/css">
     <script src="assets/js/axios/axios.min.js?<?php random_file_enumerator() ?>"></script>
     <script src="assets/js/bootstrap/bootstrap.min.js?<?php random_file_enumerator() ?>"></script>
