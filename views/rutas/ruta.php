@@ -85,8 +85,22 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
             <li class="nav-item" role="presentation">
                 <button class="nav-link px-2 px-md-3" id="tab4-tab" data-bs-toggle="tab" data-bs-target="#tab4" type="button"
                     role="tab" aria-controls="tab4" aria-selected="false" onclick="getResumenBiker()">
-                    <span style="font-size: 22px" class="d-md-none">🗂️</span>
-                    <span style="font-size: 25px" class="d-none d-md-inline">🗂️</span>
+                    <span style="font-size: 22px" class="d-md-none">🏆</span>
+                    <span style="font-size: 25px" class="d-none d-md-inline">🏆</span>
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link px-2 px-md-3" id="tab6-tab" data-bs-toggle="tab" data-bs-target="#tab6" type="button"
+                    role="tab" aria-controls="tab6" aria-selected="false" onclick="cargarGraficasAnalisis()">
+                    <span style="font-size: 22px" class="d-md-none">📊</span>
+                    <span style="font-size: 25px" class="d-none d-md-inline">📊</span>
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link px-2 px-md-3" id="tab7-tab" data-bs-toggle="tab" data-bs-target="#tab7" type="button"
+                    role="tab" aria-controls="tab7" aria-selected="false" onclick="cargarGraficasAnalisis()">
+                    <span style="font-size: 22px" class="d-md-none">🔬</span>
+                    <span style="font-size: 25px" class="d-none d-md-inline">🔬</span>
                 </button>
             </li>
             <li class="nav-item ms-auto d-flex align-items-end" role="presentation" style="padding-left: 5px;">
@@ -191,6 +205,33 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
                         <label for="anio-filtro" class="form-label small">Año:</label>
                         <select id="anio-filtro" class="form-select form-select-sm d-inline-block" style="width: auto;" onchange="actualizarGraficaPorAnio()">
                         </select>
+                    </div>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="tab6" role="tabpanel" aria-labelledby="tab6-tab">
+                <div class="container-fluid p-0">
+                    <div class="text-center mb-2">
+                        <label for="anio-filtro-distancia" class="form-label small">Año:</label>
+                        <select id="anio-filtro-distancia" class="form-select form-select-sm d-inline-block" style="width: auto;" onchange="actualizarGraficaDistanciaPorAnio()">
+                        </select>
+                    </div>
+                    <div class="chart-container" style="position: relative; height: 350px;">
+                        <canvas id="chart-distancia"></canvas>
+                    </div>
+                    <hr class="my-3">
+                    <div class="chart-container" style="position: relative; height: 350px;">
+                        <canvas id="chart-cumulativa"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="tab7" role="tabpanel" aria-labelledby="tab7-tab">
+                <div class="container-fluid p-0">
+                    <div class="chart-container" style="position: relative; height: 350px;">
+                        <canvas id="chart-corr-desnivel"></canvas>
+                    </div>
+                    <hr class="my-3">
+                    <div class="chart-container" style="position: relative; height: 350px;">
+                        <canvas id="chart-corr-velocidad"></canvas>
                     </div>
                 </div>
             </div>

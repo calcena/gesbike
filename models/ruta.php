@@ -48,6 +48,11 @@ function get_velocidades_mensuales($params) {
     return $entity;
 }
 
+function get_rutas_chart($params) {
+    global $db;
+    return get_rutas_chart_data($params);
+}
+
 
 
 

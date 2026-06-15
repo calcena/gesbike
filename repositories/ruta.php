@@ -375,6 +375,29 @@ ORDER BY anio DESC, strftime('%m', r1.fecha_inicio) DESC;
     return $entity;
 }
 
+function get_rutas_chart_data($params)
+{
+    $db = conectar();
+    $stmt = $db->prepare("
+        SELECT
+            fecha_inicio,
+            ROUND(kms, 1) as kms,
+            ROUND(SUM(kms) OVER (PARTITION BY vehiculo_id ORDER BY fecha_inicio ASC, id ASC), 1) as acumulado_kms,
+            metros_ascenso,
+            metros_descenso,
+            velocidad_media,
+            velocidad_maxima,
+            potencia_promedio_w,
+            tiempo_total,
+            calorias
+        FROM rutas
+        WHERE activo = 1 AND vehiculo_id = ?
+        ORDER BY fecha_inicio ASC, id ASC
+    ");
+    $stmt->execute([$params['vehiculo_id']]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
 function get_velocidades_by_month($params)
 {
     $db = conectar();

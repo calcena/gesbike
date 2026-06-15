@@ -34,9 +34,14 @@ const loadAgenda = async () => {
   }
 
   try {
-    const [agendaResp] = await Promise.all([
+    const [agendaResp, kmsResp] = await Promise.all([
       axios.post(
         "../../api/programaciones/programacion.php?getTodasPredicciones",
+        { data: { vehiculo_id: vehiculoId } },
+        { headers: { "Content-Type": "application/json" } }
+      ),
+      axios.post(
+        "../../api/helpers/helper.php?getKilometrosByVehiculo",
         { data: { vehiculo_id: vehiculoId } },
         { headers: { "Content-Type": "application/json" } }
       )
@@ -44,8 +49,9 @@ const loadAgenda = async () => {
 
     if (agendaResp.data.success) {
       const content = agendaResp.data.content;
-      const vehiculo = (window.vehiculosData || []).find(v => v.id == vehiculoId);
-      const currentKms = vehiculo ? parseFloat(vehiculo.kms_actuales) || 0 : 0;
+      const currentKms = kmsResp.data.success && kmsResp.data.content.kms != null
+        ? parseFloat(kmsResp.data.content.kms) || 0
+        : 0;
       document.getElementById("main-cards").innerHTML =
         parseHtmlAgenda(content, currentKms);
       const counts = countVencidosPendientes(content);
@@ -75,7 +81,7 @@ const formatDaysToText = (fechaStr) => {
   hoy.setHours(0, 0, 0, 0);
   const fecha = new Date(fechaStr + "T00:00:00");
   const diff = Math.round((fecha - hoy) / 86400000);
-  if (diff < 0) return "Vencido";
+  if (diff < 0) return `${Math.abs(diff)} días`;
   if (diff === 0) return "Hoy";
   if (diff === 1) return "Mañana";
   return `En ${diff} días`;
@@ -104,13 +110,27 @@ const renderAgendaCard = (item, currentKms) => {
   const fechaClass = fechaVencida ? "agenda-text-red" : "";
   const kmsClass = kmsVencido ? "agenda-text-red" : "";
 
-  const diasTexto = formatDaysToText(item.proxima_fecha);
-  const badgeClass =
-    diasTexto === "Vencido"
-      ? "bg-danger"
-      : diasTexto === "Hoy" || diasTexto === "Mañana"
-      ? "bg-warning text-dark"
+  let badgeText, badgeClass;
+  if (item.dias_usuario) {
+    badgeText = formatDaysToText(item.proxima_fecha);
+    badgeClass = fechaVencida ? "bg-danger"
+      : badgeText === "Hoy" || badgeText === "Mañana" ? "bg-warning text-dark"
       : "bg-success";
+  } else if (item.km_usuario && item.proximos_kms != null) {
+    const kmRestantes = item.proximos_kms - currentKms;
+    if (kmRestantes <= 0) {
+      badgeText = `${Math.abs(kmRestantes)} km`;
+      badgeClass = "bg-danger";
+    } else {
+      badgeText = `${kmRestantes} km`;
+      badgeClass = "bg-success";
+    }
+  } else {
+    badgeText = formatDaysToText(item.proxima_fecha);
+    badgeClass = fechaVencida ? "bg-danger"
+      : badgeText === "Hoy" || badgeText === "Mañana" ? "bg-warning text-dark"
+      : "bg-success";
+  }
 
   const kmsDiff = item.proximos_kms
     ? `${item.proximos_kms} km`
@@ -125,7 +145,7 @@ const renderAgendaCard = (item, currentKms) => {
             <div class="flex-grow-1">
               <div class="d-flex justify-content-between align-items-center">
                 <strong>${item.operacion_nombre}</strong>
-                <span class="badge ${badgeClass}">${diasTexto}</span>
+                <span class="badge ${badgeClass}">${badgeText}</span>
               </div>
               <div class="d-flex align-items-center gap-3 mt-1">
                 <small class="text-muted"><i class="fas fa-tag me-1"></i>${item.grupo_nombre}</small>
@@ -149,8 +169,8 @@ const renderAgendaCard = (item, currentKms) => {
           </div>
           ${item.dias_usuario || item.km_usuario ? `
           <div class="mt-1">
-            <small class="text-info">
-              <i class="fas fa-user-cog me-1"></i>Pref.: ${item.dias_usuario ? item.dias_usuario + " días" : ""}${item.dias_usuario && item.km_usuario ? " / " : ""}${item.km_usuario ? item.km_usuario + " km" : ""}
+            <small class="agenda-pref-text">
+              <i class="fas fa-user-cog me-1"></i>Pref.: ${item.dias_usuario ? `${item.dias_usuario} días${item.proxima_fecha ? ` → ${formatFechaISO(item.proxima_fecha)}` : ""}` : ""}${item.dias_usuario && item.km_usuario ? " / " : ""}${item.km_usuario ? `${item.km_usuario} km${item.proximos_kms ? ` → ${item.proximos_kms} km` : ""}` : ""}
             </small>
           </div>` : ""}
         </div>

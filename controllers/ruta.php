@@ -216,6 +216,24 @@ function handle_get_velocidades_mensuales()
 }
 
 
+function handle_get_rutas_chart()
+{
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['success' => false, 'error' => 'Método no permitido']);
+        return;
+    }
+    $input = json_decode(file_get_contents('php://input'), true);
+    $params = $input['data'];
+    try {
+        $entity = get_rutas_chart($params);
+        echo json_encode(['success' => true, 'content' => $entity]);
+    } catch (Exception $e) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+}
+
 // === Enrutar según acción ===
 switch ($action) {
     case 'guardarRutaGPX':
@@ -241,6 +259,9 @@ switch ($action) {
         break;
     case 'getVelocidadesMensuales':
         handle_get_velocidades_mensuales();
+        break;
+    case 'getRutasChartData':
+        handle_get_rutas_chart();
         break;
     default:
         http_response_code(400);

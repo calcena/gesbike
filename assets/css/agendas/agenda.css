@@ -17,12 +17,19 @@
 
 [data-theme="light"] .agenda-card .agenda-proxima-fecha.agenda-text-red,
 [data-theme="light"] .agenda-card .agenda-proxima-kms.agenda-text-red {
-    color: #dc3545 !important;
+    color: #b91c1c !important;
 }
 [data-theme="dark"] .agenda-card .agenda-proxima-fecha.agenda-text-red,
 [data-theme="dark"] .agenda-card .agenda-proxima-kms.agenda-text-red {
-    color: #f87171 !important;
+    color: var(--bs-danger, #dc3545) !important;
 }
+[data-theme="light"] .agenda-pref-text {
+    color: var(--bs-primary, #0d6efd) !important;
+}
+[data-theme="dark"] .agenda-pref-text {
+    color: var(--bs-info, #0dcaf0) !important;
+}
+
 .agenda-icon {
     width: 36px;
     height: 36px;

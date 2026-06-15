@@ -403,6 +403,7 @@ window.selectVehiculoPicker = (id, nombre) => {
     btn.dataset.selected = id;
   }
   Swal.close();
+  document.dispatchEvent(new CustomEvent('vehiculoChanged', { detail: { vehiculo_id: id, vehiculo_nombre: nombre } }));
 };
 
 const formatKilometersBadges = async () => {

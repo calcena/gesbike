@@ -359,9 +359,11 @@ window.selectVehiculoPicker = (id, nombre) => {
   if (searchInput) searchInput.value = "";
   window.paginaActual = 1;
   getRutasByVehiculo();
-  const tab5 = document.getElementById("tab5");
-  if (tab5 && tab5.classList.contains("active")) {
-    cargarGraficaVelocidades();
+  const activePane = document.querySelector('.tab-pane.show.active');
+  if (activePane) {
+    const id = activePane.id;
+    if (id === 'tab5') cargarGraficaVelocidades();
+    else if (id === 'tab6' || id === 'tab7') cargarGraficasAnalisis();
   }
 };
 
@@ -800,6 +802,300 @@ const eliminarRutaFormulario = async () => {
     document.getElementById("fecha_ruta").value = "";
   }
 };
+
+// ========== GRÁFICAS DE ANÁLISIS (Tabs 6 y 7) ==========
+let chartDistanciaInstance = null;
+let chartCumulativaInstance = null;
+let chartCorrDesnivelInstance = null;
+let chartCorrVelocidadInstance = null;
+let datosDistanciaGlobal = null;
+
+async function cargarGraficasAnalisis() {
+  const vehiculoBtn = document.getElementById("vehiculo-select");
+  const vehiculo_id = vehiculoBtn?.dataset?.selected || vehiculoBtn?.value;
+  if (!vehiculo_id) return;
+
+  try {
+    const response = await axios.post(
+      getApiUrl('ruta.php?getRutasChartData'),
+      { data: { vehiculo_id } },
+      { headers: { "Content-Type": "application/json" } }
+    );
+
+    if (response.data.success) {
+      const datos = response.data.content;
+      if (!datos || datos.length === 0) {
+        mostrarSinDatos('Gráfica no disponible - Sin rutas para este vehículo');
+        return;
+      }
+      datosDistanciaGlobal = datos;
+      poblarSelectorAnioDistancia(datos);
+      actualizarGraficaDistanciaPorAnio();
+      renderChartCumulativa(datos, vehiculo_id);
+      renderChartCorrDesnivel(datos);
+      renderChartCorrVelocidad(datos);
+    }
+  } catch (err) {
+    console.error("Error al obtener datos de análisis:", err);
+  }
+}
+
+function poblarSelectorAnioDistancia(datos) {
+  const select = document.getElementById("anio-filtro-distancia");
+  if (!select) return;
+  const anios = [...new Set(datos.map(d => {
+    const f = d.fecha_inicio ? d.fecha_inicio.substring(0, 10) : '';
+    return f ? f.substring(0, 4) : null;
+  }).filter(Boolean))].sort().reverse();
+  select.innerHTML = '';
+  anios.forEach(anio => {
+    const opt = document.createElement("option");
+    opt.value = anio;
+    opt.textContent = anio;
+    select.appendChild(opt);
+  });
+  const anioActual = new Date().getFullYear().toString();
+  if (anios.includes(anioActual)) select.value = anioActual;
+}
+
+function actualizarGraficaDistanciaPorAnio() {
+  if (!datosDistanciaGlobal) return;
+  const select = document.getElementById("anio-filtro-distancia");
+  const anio = select ? select.value : null;
+  if (!anio) return;
+  const filtrados = datosDistanciaGlobal.filter(d => {
+    const f = d.fecha_inicio ? d.fecha_inicio.substring(0, 10) : '';
+    return f && f.substring(0, 4) === anio;
+  });
+  renderChartDistanciaDesnivel(filtrados);
+}
+
+function mostrarSinDatos(mensaje) {
+  ['chart-distancia', 'chart-cumulativa', 'chart-corr-desnivel', 'chart-corr-velocidad'].forEach(id => {
+    const canvas = document.getElementById(id);
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.font = "16px Arial";
+    ctx.fillStyle = "#666";
+    ctx.textAlign = "center";
+    ctx.fillText(mensaje || "Sin datos", canvas.width / 2, canvas.height / 2);
+  });
+}
+
+function renderChartDistanciaDesnivel(datos) {
+  if (chartDistanciaInstance) chartDistanciaInstance.destroy();
+  const canvas = document.getElementById("chart-distancia");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+
+  const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const agg = {};
+  datos.forEach(d => {
+    const f = d.fecha_inicio ? d.fecha_inicio.substring(0, 10) : '';
+    if (!f) return;
+    const key = f.substring(0, 7);
+    if (!agg[key]) agg[key] = { kms: 0, ascenso: 0 };
+    agg[key].kms += parseFloat(d.kms) || 0;
+    agg[key].ascenso += parseFloat(d.metros_ascenso) || 0;
+  });
+  const keys = Object.keys(agg).sort();
+  const etiquetas = keys.map(k => {
+    const [y, m] = k.split('-');
+    return meses[parseInt(m) - 1] + ' ' + y;
+  });
+  const kms = keys.map(k => agg[k].kms);
+  const ascenso = keys.map(k => agg[k].ascenso);
+
+  chartDistanciaInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: etiquetas,
+      datasets: [
+        {
+          label: 'Distancia (km)',
+          data: kms,
+          backgroundColor: 'rgba(13,71,161,0.65)',
+          borderColor: '#0D47A1',
+          borderWidth: 2,
+          yAxisID: 'y'
+        },
+        {
+          label: 'Desnivel (m)',
+          data: ascenso,
+          backgroundColor: 'rgba(230,81,0,0.65)',
+          borderColor: '#E65100',
+          borderWidth: 2,
+          yAxisID: 'y1'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        title: { display: true, text: 'Distancia y desnivel por ruta', font: { size: 14 } },
+        legend: { position: 'bottom', labels: { usePointStyle: true, font: { size: 11 } } }
+      },
+      scales: {
+        y: { beginAtZero: true, position: 'left', title: { display: true, text: 'km' } },
+        y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'm' } }
+      }
+    }
+  });
+}
+
+function renderChartCumulativa(datos, vehiculo_id) {
+  if (chartCumulativaInstance) chartCumulativaInstance.destroy();
+  const canvas = document.getElementById("chart-cumulativa");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+
+  const etiquetas = datos.map((d, i) => {
+    const f = d.fecha_inicio ? d.fecha_inicio.substring(0, 10) : '';
+    return f ? f.substring(8, 10) + '/' + f.substring(5, 7) + '/' + f.substring(0, 4) : '#' + (i + 1);
+  });
+  const kms = datos.map(d => parseFloat(d.kms) || 0);
+  const acum = datos.map(d => parseFloat(d.acumulado_kms) || 0);
+
+  chartCumulativaInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: etiquetas,
+      datasets: [
+        {
+          label: 'Distancia (km)',
+          data: kms,
+          backgroundColor: 'rgba(27,94,32,0.55)',
+          borderColor: '#1B5E20',
+          borderWidth: 2,
+          order: 2
+        },
+        {
+          label: 'Acumulado (km)',
+          data: acum,
+          type: 'line',
+          borderColor: '#6A1B9A',
+          backgroundColor: 'rgba(106,27,154,0.12)',
+          borderWidth: 3,
+          fill: true,
+          tension: 0.2,
+          pointRadius: 3,
+          pointHoverRadius: 6,
+          pointBackgroundColor: '#6A1B9A',
+          yAxisID: 'y1',
+          order: 1
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        title: { display: true, text: 'Distancia acumulada', font: { size: 14 } },
+        legend: { position: 'bottom', labels: { usePointStyle: true, font: { size: 11 } } }
+      },
+      scales: {
+        y: { beginAtZero: true, position: 'left', title: { display: true, text: 'km' } },
+        y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'km acum' } }
+      }
+    }
+  });
+}
+
+function renderChartCorrDesnivel(datos) {
+  if (chartCorrDesnivelInstance) chartCorrDesnivelInstance.destroy();
+  const canvas = document.getElementById("chart-corr-desnivel");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+
+  const scatterData = datos.map(d => ({
+    x: parseFloat(d.kms) || 0,
+    y: parseFloat(d.metros_ascenso) || 0,
+    fecha: d.fecha_inicio ? d.fecha_inicio.substring(0, 10) : ''
+  }));
+
+  chartCorrDesnivelInstance = new Chart(ctx, {
+    type: 'scatter',
+    data: {
+      datasets: [{
+        label: 'Ruta',
+        data: scatterData,
+        backgroundColor: 'rgba(198,40,40,0.7)',
+        borderColor: '#C62828',
+        borderWidth: 2,
+        pointRadius: 6,
+        pointHoverRadius: 9
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        title: { display: true, text: 'Correlación: Distancia vs Desnivel', font: { size: 14 } },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const fecha = context.raw.fecha ? formatFechaISO(context.raw.fecha) : '';
+              return (fecha ? fecha + ' — ' : '') + context.parsed.x.toFixed(1) + ' km, ' + context.parsed.y.toFixed(0) + ' m';
+            }
+          }
+        }
+      },
+      scales: {
+        x: { beginAtZero: true, title: { display: true, text: 'Distancia (km)' } },
+        y: { beginAtZero: true, title: { display: true, text: 'Desnivel (m)' } }
+      }
+    }
+  });
+}
+
+function renderChartCorrVelocidad(datos) {
+  if (chartCorrVelocidadInstance) chartCorrVelocidadInstance.destroy();
+  const canvas = document.getElementById("chart-corr-velocidad");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+
+  const scatterData = datos.map(d => ({
+    x: parseFloat(d.kms) || 0,
+    y: parseFloat(d.velocidad_media) || 0,
+    fecha: d.fecha_inicio ? d.fecha_inicio.substring(0, 10) : ''
+  }));
+
+  chartCorrVelocidadInstance = new Chart(ctx, {
+    type: 'scatter',
+    data: {
+      datasets: [{
+        label: 'Ruta',
+        data: scatterData,
+        backgroundColor: 'rgba(0,131,143,0.7)',
+        borderColor: '#00838F',
+        borderWidth: 2,
+        pointRadius: 6,
+        pointHoverRadius: 9
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        title: { display: true, text: 'Correlación: Distancia vs Velocidad media', font: { size: 14 } },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const fecha = context.raw.fecha ? formatFechaISO(context.raw.fecha) : '';
+              return (fecha ? fecha + ' — ' : '') + context.parsed.x.toFixed(1) + ' km, ' + context.parsed.y.toFixed(1) + ' km/h';
+            }
+          }
+        }
+      },
+      scales: {
+        x: { beginAtZero: true, title: { display: true, text: 'Distancia (km)' } },
+        y: { beginAtZero: true, title: { display: true, text: 'Velocidad (km/h)' } }
+      }
+    }
+  });
+}
 
 const cancelarEdicionRuta = () => {
   // Limpiar estado de edición
