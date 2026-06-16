@@ -37,13 +37,14 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
     <script src="../../services/translate/translate.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../services/logs/logs.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../services/theme/theme.js?<?php random_file_enumerator() ?>"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <title><?php echo APP_NAME . '_' . APP_VERSION ?></title>
 </head>
 
 <body onload="initDetalles(); initTheme()">
     <div class="container mt-2 d-flex justify-content-between align-items-center ps-0 !important" style="gap: 1rem;">
         <img class="icon-menu ms-2" src="../../assets/images/icons/left.png" alt="" onclick="gotoBackMantenimientos()">
-        <select id="grupo_select" name="" class="form-control mb-1" onchange="changeGrupos()"></select>
+        <button id="grupo_select" class="form-select text-start" onclick="openGrupoPicker()">Selecciona...</button>
         <img class="icon-menu me-2" src="../../assets/images/icons/menu.png" alt="" onclick="showLateralMenu()">
     </div>
     <div class="container mt-1">

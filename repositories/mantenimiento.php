@@ -349,6 +349,7 @@ function historico_mantenimientos_by_grupo($params)
                                         m.vehiculo_id = ?
                                         AND m.grupo_id = ?
                                         AND m.is_active = 1
+                                        AND m.operacion_id = (SELECT id FROM operaciones WHERE nombre = 'Sustitución')
                                 )
                                 SELECT
                                     n.id,

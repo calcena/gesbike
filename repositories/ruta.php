@@ -85,7 +85,8 @@ function get_rutas_by_vehiculo($params)
                                 tiempo_bajada,
                                 observaciones,
                                 origen,
-                                activo
+                                activo,
+                                regulacion
                                 FROM rutas
                                 WHERE activo = true
                                 and vehiculo_id = ?
@@ -100,11 +101,13 @@ function get_rutas_by_vehiculo($params)
 function add_ruta_manual($params)
 {
     $db = conectar();
+    $regulacion = isset($params['regulacion']) ? (int) $params['regulacion'] : 0;
     // 1. Intentar UPDATE
     $upd = $db->prepare("
         UPDATE rutas SET
             kms = ?,
             observaciones = ?,
+            regulacion = ?,
             activo = 1,
             origen = 'manual'
         WHERE vehiculo_id = ? AND fecha_inicio = ?
@@ -112,6 +115,7 @@ function add_ruta_manual($params)
     $upd->execute([
         (float) ($params['kms'] ?? 0.0),
         $params['observaciones'],
+        $regulacion,
         $params['vehiculo_id'],
         $params['fecha']
     ]);
@@ -131,14 +135,15 @@ function add_ruta_manual($params)
     // 2. Si no existe, INSERT
     $ins = $db->prepare("
         INSERT INTO rutas (
-            vehiculo_id, fecha_inicio, kms, observaciones, activo, origen
-        ) VALUES (?, ?, ?, ?, 1, 'manual')
+            vehiculo_id, fecha_inicio, kms, observaciones, regulacion, activo, origen
+        ) VALUES (?, ?, ?, ?, ?, 1, 'manual')
     ");
     $ins->execute([
         $params['vehiculo_id'],
         $params['fecha'],
         (float) ($params['kms'] ?? 0.0),
         $params['observaciones'] ?? null,
+        $regulacion,
     ]);
 
     $ruta_id = (int) $db->lastInsertId();
@@ -151,12 +156,14 @@ function add_ruta_manual($params)
 
 function update_ruta_manual($params) {
     $db = conectar();
+    $regulacion = isset($params['regulacion']) ? (int) $params['regulacion'] : 0;
     
     $upd = $db->prepare("
         UPDATE rutas SET
             kms = ?,
             observaciones = ?,
             fecha_inicio = ?,
+            regulacion = ?,
             activo = 1,
             origen = 'manual'
         WHERE id = ? AND vehiculo_id = ? AND origen = 'manual'
@@ -166,6 +173,7 @@ function update_ruta_manual($params) {
         (float) ($params['kms'] ?? 0.0),
         $params['observaciones'] ?? null,
         $params['fecha'],
+        $regulacion,
         $params['id'],
         $params['vehiculo_id']
     ]);
@@ -389,7 +397,8 @@ function get_rutas_chart_data($params)
             velocidad_maxima,
             potencia_promedio_w,
             tiempo_total,
-            calorias
+            calorias,
+            regulacion
         FROM rutas
         WHERE activo = 1 AND vehiculo_id = ?
         ORDER BY fecha_inicio ASC, id ASC

@@ -49,6 +49,22 @@ function compressImage($sourcePath, $targetPath, $maxSizeKB = 200) {
         return false;
     }
     
+    // Corregir orientación EXIF (solo JPEG)
+    if ($mime === 'image/jpeg' && function_exists('exif_read_data')) {
+        $exif = @exif_read_data($sourcePath);
+        if (!empty($exif['Orientation'])) {
+            switch ($exif['Orientation']) {
+                case 2: imageflip($image, IMG_FLIP_HORIZONTAL); break;
+                case 3: $image = imagerotate($image, 180, 0); break;
+                case 4: imageflip($image, IMG_FLIP_VERTICAL); break;
+                case 5: $image = imagerotate($image, -90, 0); imageflip($image, IMG_FLIP_HORIZONTAL); break;
+                case 6: $image = imagerotate($image, -90, 0); break;
+                case 7: $image = imagerotate($image, 90, 0); imageflip($image, IMG_FLIP_HORIZONTAL); break;
+                case 8: $image = imagerotate($image, 90, 0); break;
+            }
+        }
+    }
+    
     // Obtener dimensiones originales
     $width = imagesx($image);
     $height = imagesy($image);

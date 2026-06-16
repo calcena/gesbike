@@ -1,23 +1,59 @@
 const initDetalles = async () => {
   await getGrupos(2);
-  selectContainsText("grupo_select", "pastillas");
-  sessionStorage.setItem(
-    "grupo_id",
-    document.getElementById("grupo_select").value
-  );
+  const btn = document.getElementById("grupo_select");
+  const grupoId = sessionStorage.getItem("grupo_id");
+  if (btn && grupoId && window.gruposData) {
+    const g = window.gruposData.find(g => g.id == grupoId);
+    if (g) btn.textContent = g.nombre;
+  }
   await changeGrupos();
   await getKmsByGrupo();
 };
 
 const changeGrupos = async () => {
-  const [primero, segundo] = document
-    .getElementById("grupo_select")
-    .value.split("-")
-    .map(Number);
-  sessionStorage.setItem("grupo_id", primero);
-  sessionStorage.setItem("agrupador_id", segundo);
   await getKmsByGrupo();
   await getHistorico();
+};
+
+const openGrupoPicker = () => {
+  const grupos = window.gruposData || [];
+  const selectedId = sessionStorage.getItem("grupo_id");
+  if (!grupos.length) {
+    Swal.fire("Sin datos", "No hay grupos disponibles", "info");
+    return;
+  }
+
+  const sorted = [...grupos].sort((a, b) => a.nombre.localeCompare(b.nombre));
+  const html = sorted.map((g) => {
+    const isSelected = selectedId && g.id == selectedId;
+    return `
+    <div class="swal-grupo-item d-flex align-items-center p-2 border-bottom ${isSelected ? 'swal-grupo-selected' : ''}"
+         style="cursor:pointer;gap:10px;"
+         onclick="selectGrupo(${g.id}, ${g.agrupador_id || 0}, '${g.nombre.replace(/'/g, "\\'")}')">
+      ${g.imagen ? `<img src="${cacheBustUrl(`../../assets/images/icons/Grupos/${g.imagen}`)}" style="width:32px;height:32px;object-fit:contain;">` : '<div style="width:32px;"></div>'}
+      <span>${g.nombre}</span>
+    </div>`;
+  }).join("");
+
+  Swal.fire({
+    title: "Grupo",
+    html: `<div style="max-height:60vh;overflow-y:auto;">${html}</div>`,
+    showConfirmButton: false,
+    showCloseButton: true,
+    customClass: { title: "swal-title-small" },
+  });
+};
+
+window.selectGrupo = (id, agrupadorId, nombre) => {
+  sessionStorage.setItem("grupo_id", id);
+  sessionStorage.setItem("agrupador_id", agrupadorId);
+  const btn = document.getElementById("grupo_select");
+  if (btn) {
+    btn.textContent = nombre;
+    btn.dataset.selected = id;
+  }
+  Swal.close();
+  changeGrupos();
 };
 
 const getKmsByGrupo = async () => {
@@ -138,15 +174,12 @@ const parseHtmlCardHistorico = async (data) => {
           <span>
             <img class="icon-table me-1" src="${cacheBustUrl(`../../assets/images/icons/Localizaciones/${grupo.localizacion_imagen}`)}" alt="">
             <strong>${grupo.localizacion}</strong>
-            <span class="badge bg-light text-dark ms-2">${totalItems} registro${totalItems !== 1 ? "s" : ""}</span>
           </span>
-          <small class="opacity-75">${formatFechaISO(desde)} - ${formatFechaISO(hasta)}</small>
+          <small style="font-size:0.7rem;">${formatFechaISO(desde)} - ${formatFechaISO(hasta)}</small>
         </div>
         <div class="card-body p-0">`;
 
     grupo.items.forEach((item, idx) => {
-      const primerItem = idx === 0;
-      const ultimoItem = idx === totalItems - 1;
       const duracionKms = Number(item.duracion_kms) || 0;
       const precio = Number(item.precio) || 0;
       const unidades = Number(item.unidades) || 1;
@@ -154,48 +187,31 @@ const parseHtmlCardHistorico = async (data) => {
       html += `
         <div class="historico-item p-2 ${idx > 0 ? "border-top" : ""}">
           <div class="d-flex justify-content-between align-items-start mb-1">
-            <div class="d-flex align-items-center gap-2">
-              <span class="badge rounded-pill bg-light text-dark border">#${item.fila_num}</span>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
               <span class="fw-bold small">${formatFechaISO(item.fecha)}</span>
               <span class="badge bg-info text-dark">${Number(item.kms).toLocaleString()} kms</span>
+              ${precio ? `<span class="badge bg-light text-dark border">${precio.toFixed(2)}€</span>` : ""}
             </div>
             <small class="text-muted">${item.edad_vehiculo}</small>
           </div>
 
-          <div class="row g-1 small">
-            <div class="col-6">
-              <span class="text-muted">Operación:</span>
-              <div class="d-flex align-items-center gap-1">
-                <img class="icon-table" src="${cacheBustUrl(`../../assets/images/icons/Operaciones/${item.operacion_imagen}`)}" alt="">
-                <span>${item.operacion_nombre}</span>
-              </div>
-            </div>
-            <div class="col-6">
-              <span class="text-muted">Recambio:</span>
-              <div class="d-flex align-items-center gap-1">
-                ${item.recambio_imagen ? `<img class="rounded" src="${cacheBustUrl(`../../assets/images/Recambios/${item.recambio_imagen}`)}" alt="" style="width:24px;height:24px;object-fit:cover;">` : ""}
-                <span class="fw-bold">${item.recambio}</span>
-              </div>
-              ${item.recambio_referencia ? `<small class="text-muted ms-3">Ref: ${item.recambio_referencia}</small>` : ""}
-            </div>
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <img class="icon-table" src="${cacheBustUrl(`../../assets/images/icons/Operaciones/${item.operacion_imagen}`)}" alt="">
+            <span class="small">${item.operacion_nombre}</span>
           </div>
 
-          <div class="row g-1 small mt-1">
-            <div class="col-4">
-              <span class="text-muted">Duración:</span>
-              <span class="text-success fw-bold">+${duracionKms.toLocaleString()} kms</span>
-            </div>
-            <div class="col-4">
-              <span class="text-muted">Periodo:</span>
-              <span>${item.duracion_tiempo}</span>
-            </div>
-            <div class="col-2">
-              <span class="text-muted">Precio:</span>
-              <span>${precio.toFixed(2)}€</span>
-            </div>
-            <div class="col-2">
-              <span class="text-muted">Ud.:</span>
-              <span>${unidades}</span>
+          <div class="d-flex align-items-start gap-2 p-2 rounded" style="background:var(--card-bg);border:1px solid var(--border-color);">
+            ${item.recambio_imagen
+              ? `<img class="rounded" src="${cacheBustUrl(`../../assets/images/Recambios/${item.recambio_imagen}`)}" alt="" style="width:40px;height:40px;object-fit:cover;flex-shrink:0;">`
+              : `<div style="width:40px;height:40px;flex-shrink:0;" class="rounded d-flex align-items-center justify-content-center bg-light text-muted"><i class="fas fa-cog"></i></div>`}
+            <div class="flex-grow-1 min-w-0">
+              <div class="fw-bold small">${item.recambio || "—"}</div>
+              ${item.recambio_referencia ? `<small class="text-muted">Ref: ${item.recambio_referencia}</small>` : ""}
+              <div class="d-flex gap-2 mt-1 flex-wrap">
+                ${unidades > 1 ? `<small class="text-muted"><i class="fas fa-box me-1"></i>${unidades} uds.</small>` : ""}
+                ${duracionKms ? `<small class="text-success"><i class="fas fa-road me-1"></i>+${duracionKms.toLocaleString()} kms</small>` : ""}
+                ${item.duracion_tiempo ? `<small class="text-muted"><i class="far fa-clock me-1"></i>${item.duracion_tiempo}</small>` : ""}
+              </div>
             </div>
           </div>
 

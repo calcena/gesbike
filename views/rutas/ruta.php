@@ -38,7 +38,9 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
     <script src="../../services/theme/theme.js?<?php random_file_enumerator() ?>"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
     <title><?php echo APP_NAME . '_' . APP_VERSION ?></title>
 </head>
 
@@ -53,81 +55,85 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
     <div class="container p-2">
 
         <!-- Pestañas (Nav Tabs) -->
-        <ul class="nav nav-tabs" id="myTab" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active px-2 px-md-3" id="tab1-tab" data-bs-toggle="tab" data-bs-target="#tab1" type="button"
-                    role="tab" aria-controls="tab1" aria-selected="true">
-                    <span style="font-size: 22px" class="d-md-none">📋</span>
-                    <span style="font-size: 25px" class="d-none d-md-inline">📋</span>
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link px-2 px-md-3" id="tab2-tab" data-bs-toggle="tab" data-bs-target="#tab2" type="button"
-                    role="tab" aria-controls="tab2" aria-selected="false" onclick="">
-                    <span style="font-size: 22px" class="d-md-none">📌</span>
-                    <span style="font-size: 25px" class="d-none d-md-inline">📌</span>
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link px-2 px-md-3" id="tab3-tab" data-bs-toggle="tab" data-bs-target="#tab3" type="button"
-                    role="tab" aria-controls="tab3" aria-selected="false" onclick="">
-                    <span style="font-size: 22px" class="d-md-none">⌚</span>
-                    <span style="font-size: 25px" class="d-none d-md-inline">⌚</span>
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link px-2 px-md-3" id="tab5-tab" data-bs-toggle="tab" data-bs-target="#tab5" type="button"
-                    role="tab" aria-controls="tab5" aria-selected="false" onclick="cargarGraficaVelocidades()">
-                    <span style="font-size: 22px" class="d-md-none">📈</span>
-                    <span style="font-size: 25px" class="d-none d-md-inline">📈</span>
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link px-2 px-md-3" id="tab4-tab" data-bs-toggle="tab" data-bs-target="#tab4" type="button"
-                    role="tab" aria-controls="tab4" aria-selected="false" onclick="getResumenBiker()">
-                    <span style="font-size: 22px" class="d-md-none">🏆</span>
-                    <span style="font-size: 25px" class="d-none d-md-inline">🏆</span>
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link px-2 px-md-3" id="tab6-tab" data-bs-toggle="tab" data-bs-target="#tab6" type="button"
-                    role="tab" aria-controls="tab6" aria-selected="false" onclick="cargarGraficasAnalisis()">
-                    <span style="font-size: 22px" class="d-md-none">📊</span>
-                    <span style="font-size: 25px" class="d-none d-md-inline">📊</span>
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link px-2 px-md-3" id="tab7-tab" data-bs-toggle="tab" data-bs-target="#tab7" type="button"
-                    role="tab" aria-controls="tab7" aria-selected="false" onclick="cargarGraficasAnalisis()">
-                    <span style="font-size: 22px" class="d-md-none">🔬</span>
-                    <span style="font-size: 25px" class="d-none d-md-inline">🔬</span>
-                </button>
-            </li>
-            <li class="nav-item ms-auto d-flex align-items-end" role="presentation" style="padding-left: 5px;">
-                <div class="input-group" style="margin-bottom: -1px;" id="searchContainer">
-                    <!-- Icono de búsqueda visible en móvil -->
-                    <span class="input-group-text d-md-none"
-                          style="background: transparent; border: none; cursor: pointer; padding: 0 5px 8px 0;"
+        <div style="position: relative;">
+            <ul class="nav nav-tabs" id="myTab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active px-2 px-md-3" id="tab1-tab" data-bs-toggle="tab" data-bs-target="#tab1" type="button"
+                        role="tab" aria-controls="tab1" aria-selected="true">
+                        <span style="font-size: 22px" class="d-md-none">📋</span>
+                        <span style="font-size: 25px" class="d-none d-md-inline">📋</span>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link px-2 px-md-3" id="tab2-tab" data-bs-toggle="tab" data-bs-target="#tab2" type="button"
+                        role="tab" aria-controls="tab2" aria-selected="false" onclick="">
+                        <span style="font-size: 22px" class="d-md-none">📌</span>
+                        <span style="font-size: 25px" class="d-none d-md-inline">📌</span>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link px-2 px-md-3" id="tab3-tab" data-bs-toggle="tab" data-bs-target="#tab3" type="button"
+                        role="tab" aria-controls="tab3" aria-selected="false" onclick="">
+                        <span style="font-size: 22px" class="d-md-none">⌚</span>
+                        <span style="font-size: 25px" class="d-none d-md-inline">⌚</span>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link px-2 px-md-3" id="tab5-tab" data-bs-toggle="tab" data-bs-target="#tab5" type="button"
+                        role="tab" aria-controls="tab5" aria-selected="false" onclick="cargarGraficaVelocidades()">
+                        <span style="font-size: 22px" class="d-md-none">📈</span>
+                        <span style="font-size: 25px" class="d-none d-md-inline">📈</span>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link px-2 px-md-3" id="tab4-tab" data-bs-toggle="tab" data-bs-target="#tab4" type="button"
+                        role="tab" aria-controls="tab4" aria-selected="false" onclick="getResumenBiker()">
+                        <span style="font-size: 22px" class="d-md-none">🏆</span>
+                        <span style="font-size: 25px" class="d-none d-md-inline">🏆</span>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link px-2 px-md-3" id="tab6-tab" data-bs-toggle="tab" data-bs-target="#tab6" type="button"
+                        role="tab" aria-controls="tab6" aria-selected="false" onclick="cargarGraficasAnalisis()">
+                        <span style="font-size: 22px" class="d-md-none">📊</span>
+                        <span style="font-size: 25px" class="d-none d-md-inline">📊</span>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link px-2 px-md-3" id="tab7-tab" data-bs-toggle="tab" data-bs-target="#tab7" type="button"
+                        role="tab" aria-controls="tab7" aria-selected="false" onclick="cargarGraficasAnalisis()">
+                        <span style="font-size: 22px" class="d-md-none">🔬</span>
+                        <span style="font-size: 25px" class="d-none d-md-inline">🔬</span>
+                    </button>
+                </li>
+                <li class="nav-item ms-auto d-flex align-items-end" role="presentation" style="padding-left: 5px;">
+                    <div class="input-group" style="margin-bottom: -1px;" id="searchContainer">
+                        <span class="input-group-text d-none d-md-flex"
+                              style="background: transparent; border: none; padding: 0 5px 8px 0;">
+                            <i class="fas fa-search" style="font-size: 14px;"></i>
+                        </span>
+                        <input type="text" id="searchRutas" class="form-control form-control-sm d-none d-md-block"
+                            placeholder="Buscar..."
+                            style="width: 110px; border-radius: 4px 4px 0 0; border-bottom: 2px solid #dee2e6; padding: 0.25rem 0.4rem; font-size: 0.8rem;"
+                            onkeyup="filtrarRutas(this.value)">
+                    </div>
+                    <span id="searchMobileTrigger"
+                          class="d-md-none"
+                          style="background: transparent; border: none; cursor: pointer; padding: 0 5px 8px 0; font-size: 18px; color: var(--text-primary, #000);"
                           onclick="toggleSearchMobile()">
-                        <i class="fas fa-search" style="font-size: 18px;"></i>
+                        <i class="fas fa-search"></i>
                     </span>
-                    <!-- Input visible en desktop -->
-                    <span class="input-group-text d-none d-md-flex"
-                          style="background: transparent; border: none; padding: 0 5px 8px 0;">
-                        <i class="fas fa-search" style="font-size: 14px;"></i>
-                    </span>
-                    <input type="text" id="searchRutas" class="form-control form-control-sm d-none d-md-block"
-                        placeholder="Buscar..."
-                        style="width: 110px; border-radius: 4px 4px 0 0; border-bottom: 2px solid #dee2e6; padding: 0.25rem 0.4rem; font-size: 0.8rem;"
-                        onkeyup="filtrarRutas(this.value)">
-                    <!-- Input móvil expandido -->
-                    <input type="text" id="searchRutasMobile" class="form-control form-control-sm d-md-none"
-                        placeholder="Buscar..."
-                        style="width: 0; padding: 0; border: none; transition: all 0.3s ease; font-size: 0.8rem;"
-                        onkeyup="filtrarRutas(this.value)">
-                </div>
-            </li>
-        </ul>
+                </li>
+            </ul>
+            <!-- Overlay deslizante para búsqueda móvil (fuera del ul para HTML válido) -->
+            <div id="searchMobileOverlay" class="d-md-none">
+                <input type="text" id="searchMobileInput" class="form-control form-control-sm"
+                    placeholder="Buscar..."
+                    onkeyup="filtrarRutas(this.value)"
+                    onkeydown="if(event.key==='Enter'){ toggleSearchMobile(); }"
+                    onblur="setTimeout(toggleSearchMobile, 200)">
+            </div>
+        </div>
         <!-- Contenido de las pestañas -->
         <div class="tab-content mt-3" id="myTabContent">
             <div class="tab-pane fade show active" id="tab1" role="tabpanel" aria-labelledby="tab1-tab">
@@ -151,7 +157,15 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
                         <label for="obs">Observaciones</label>
                         <textarea name="obs" id="obs_ruta" col="4" rows="4" class="form-control"></textarea>
                     </div>
-
+                </div>
+                <div class="row mt-1">
+                    <div class="col-12 d-flex align-items-center gap-2">
+                        <label class="switch-label" for="regulacion_ruta">Regularización</label>
+                        <label class="switch">
+                            <input type="checkbox" id="regulacion_ruta">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
                 </div>
                 <div class="row mt-2 justify-content-around">
                     <img class="action-icon" src="../../assets/images/icons/papelera.png" alt=""

@@ -35,6 +35,12 @@
     height: 36px;
     object-fit: contain;
 }
+.agenda-icon-sm {
+    width: 1.4em;
+    height: 1.4em;
+    object-fit: contain;
+    vertical-align: middle;
+}
 .agenda-proxima-fecha {
     font-size: 0.85rem;
     color: var(--text-secondary);

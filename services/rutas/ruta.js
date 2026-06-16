@@ -605,11 +605,13 @@ async function sendToAPI(result) {
 }
 
 const guardarRutaManual = async () => {
+  const regulacionCheckbox = document.getElementById("regulacion_ruta");
   const data = {
     vehiculo_id: sessionStorage.getItem("vehiculo_id"),
     kms: document.getElementById("kms_ruta").value,
     observaciones: document.getElementById("obs_ruta").value,
     fecha: document.getElementById("fecha_ruta").value,
+    regulacion: regulacionCheckbox ? (regulacionCheckbox.checked ? 1 : 0) : 0,
   };
 
   let url;
@@ -682,7 +684,7 @@ const guardarRutaManual = async () => {
   }
 };
 
-const editarRutaManual = (id, fecha, kms, observaciones) => {
+const editarRutaManual = (id, fecha, kms, observaciones, regulacion) => {
   // Guardar el ID de la ruta que estamos editando
   window.rutaEditandoId = id;
 
@@ -706,6 +708,8 @@ const editarRutaManual = (id, fecha, kms, observaciones) => {
   setTimeout(() => {
     document.getElementById("kms_ruta").value = kms;
     document.getElementById("obs_ruta").value = observaciones.replace(/'/g, "\\'");
+    const regCheckbox = document.getElementById("regulacion_ruta");
+    if (regCheckbox) regCheckbox.checked = regulacion == 1 || regulacion === "1";
 
     // Extraer solo la fecha en formato YYYY-MM-DD
     let fechaValue = fecha;
@@ -949,6 +953,10 @@ function renderChartCumulativa(datos, vehiculo_id) {
   if (chartCumulativaInstance) chartCumulativaInstance.destroy();
   const canvas = document.getElementById("chart-cumulativa");
   if (!canvas) return;
+  canvas.style.touchAction = 'pan-y';
+  canvas.style.webkitTouchCallout = 'none';
+  canvas.style.webkitUserSelect = 'none';
+  if (canvas.parentElement) canvas.parentElement.style.touchAction = 'pan-y';
   const ctx = canvas.getContext("2d");
 
   const etiquetas = datos.map((d, i) => {
@@ -993,7 +1001,15 @@ function renderChartCumulativa(datos, vehiculo_id) {
       maintainAspectRatio: false,
       plugins: {
         title: { display: true, text: 'Distancia acumulada', font: { size: 14 } },
-        legend: { position: 'bottom', labels: { usePointStyle: true, font: { size: 11 } } }
+        legend: { position: 'bottom', labels: { usePointStyle: true, font: { size: 11 } } },
+        zoom: {
+          pan: { enabled: true, mode: 'x' },
+          zoom: {
+            wheel: { enabled: true },
+            pinch: { enabled: true },
+            drag: { enabled: true, mode: 'x', modifierKey: 'shift' }
+          }
+        }
       },
       scales: {
         y: { beginAtZero: true, position: 'left', title: { display: true, text: 'km' } },
@@ -1007,9 +1023,14 @@ function renderChartCorrDesnivel(datos) {
   if (chartCorrDesnivelInstance) chartCorrDesnivelInstance.destroy();
   const canvas = document.getElementById("chart-corr-desnivel");
   if (!canvas) return;
+  canvas.style.touchAction = 'pan-y';
+  canvas.style.webkitTouchCallout = 'none';
+  canvas.style.webkitUserSelect = 'none';
+  if (canvas.parentElement) canvas.parentElement.style.touchAction = 'pan-y';
   const ctx = canvas.getContext("2d");
 
-  const scatterData = datos.map(d => ({
+  const filtrados = datos.filter(d => d.regulacion != 1);
+  const scatterData = filtrados.map(d => ({
     x: parseFloat(d.kms) || 0,
     y: parseFloat(d.metros_ascenso) || 0,
     fecha: d.fecha_inicio ? d.fecha_inicio.substring(0, 10) : ''
@@ -1040,6 +1061,14 @@ function renderChartCorrDesnivel(datos) {
               return (fecha ? fecha + ' — ' : '') + context.parsed.x.toFixed(1) + ' km, ' + context.parsed.y.toFixed(0) + ' m';
             }
           }
+        },
+        zoom: {
+          pan: { enabled: true, mode: 'xy' },
+          zoom: {
+            wheel: { enabled: true },
+            pinch: { enabled: true },
+            drag: { enabled: true, mode: 'xy', modifierKey: 'shift' }
+          }
         }
       },
       scales: {
@@ -1054,9 +1083,14 @@ function renderChartCorrVelocidad(datos) {
   if (chartCorrVelocidadInstance) chartCorrVelocidadInstance.destroy();
   const canvas = document.getElementById("chart-corr-velocidad");
   if (!canvas) return;
+  canvas.style.touchAction = 'pan-y';
+  canvas.style.webkitTouchCallout = 'none';
+  canvas.style.webkitUserSelect = 'none';
+  if (canvas.parentElement) canvas.parentElement.style.touchAction = 'pan-y';
   const ctx = canvas.getContext("2d");
 
-  const scatterData = datos.map(d => ({
+  const filtrados = datos.filter(d => d.regulacion != 1);
+  const scatterData = filtrados.map(d => ({
     x: parseFloat(d.kms) || 0,
     y: parseFloat(d.velocidad_media) || 0,
     fecha: d.fecha_inicio ? d.fecha_inicio.substring(0, 10) : ''
@@ -1086,6 +1120,14 @@ function renderChartCorrVelocidad(datos) {
               const fecha = context.raw.fecha ? formatFechaISO(context.raw.fecha) : '';
               return (fecha ? fecha + ' — ' : '') + context.parsed.x.toFixed(1) + ' km, ' + context.parsed.y.toFixed(1) + ' km/h';
             }
+          }
+        },
+        zoom: {
+          pan: { enabled: true, mode: 'xy' },
+          zoom: {
+            wheel: { enabled: true },
+            pinch: { enabled: true },
+            drag: { enabled: true, mode: 'xy', modifierKey: 'shift' }
           }
         }
       },
@@ -1549,12 +1591,12 @@ const parseHtmlCardsRutas = async (data) => {
       const iconType =
         item.origen === "gpx"
           ? `<i class="fas fa-map-marker-alt" style="font-size: 20px; color: #000; cursor: pointer;" onclick="event.stopPropagation(); showGpxDetails(${item.id})" title="Ruta GPX - Ver detalles"></i>`
-          : `<i class="fas fa-pen-to-square" style="font-size: 18px; color: #000; cursor: pointer;" onclick="event.stopPropagation(); editarRutaManual('${item.id}', '${item.fecha_inicio}', '${item.kms}', '${item.observaciones || ''}')" title="Ruta manual - Editar"></i>`;
+          : `<i class="fas fa-pen-to-square" style="font-size: 18px; color: #000; cursor: pointer;" onclick="event.stopPropagation(); editarRutaManual('${item.id}', '${item.fecha_inicio}', '${item.kms}', '${item.observaciones || ''}', '${item.regulacion || 0}')" title="Ruta manual - Editar"></i>`;
 
       // Para rutas manuales: modo edición al pulsar
       // Para rutas GPX: eliminación con pulsación larga (long press)
       const cardAttributes = item.origen !== "gpx" ?
-        `onclick="editarRutaManual('${item.id}', '${item.fecha_inicio}', '${item.kms}', '${item.observaciones || ''}')" style="cursor: pointer;"` :
+        `onclick="editarRutaManual('${item.id}', '${item.fecha_inicio}', '${item.kms}', '${item.observaciones || ''}', '${item.regulacion || 0}')" style="cursor: pointer;"` :
         `data-gpx-id="${item.id}" data-gpx-fecha="${item.fecha_inicio}" data-gpx-kms="${item.kms}" class="gpx-card" style="cursor: pointer; user-select: none;" title="Mantenga pulsado para eliminar"`;
 
       return `
@@ -1565,7 +1607,7 @@ const parseHtmlCardsRutas = async (data) => {
                 <div class="d-flex justify-content-between align-items-center">
                   <div class="d-flex align-items-center" style="gap: 10px;">
                     <div style="min-width: 25px;">${iconType}</div>
-                    <p class="text-card-info mb-0">${formatFechaTimeISO(item.fecha_inicio)}</p>
+                    <p class="text-card-info mb-0">${formatFechaTimeISO(item.fecha_inicio)}${item.regulacion == 1 ? ' <span class="badge bg-warning text-dark" style="font-size:0.6rem">R</span>' : ''}</p>
                   </div>
                   <div class="d-flex align-items-center" style="gap: 25px; margin-left: auto; margin-right: 5px;">
                     <span name="kms" class="text-secondary" style="min-width: 60px; text-align: right;">${(parseFloat(item.kms) || 0).toFixed(2).replace('.', ',')}</span>
@@ -1838,50 +1880,38 @@ async function filtrarRutas(searchTerm) {
   tab1.classList.add('show', 'active');
 }
 
-// ========== FUNCIÓN PARA MOSTRAR/OCULTAR INPUT DE BÚSQUEDA EN MÓVIL ==========
+// ========== BÚSQUEDA MÓVIL: INPUT DESLIZANTE SOBRE TABS ==========
 let searchExpanded = false;
 
 function toggleSearchMobile() {
-  const inputMobile = document.getElementById("searchRutasMobile");
-  const inputDesktop = document.getElementById("searchRutas");
+  const overlay = document.getElementById("searchMobileOverlay");
+  const input = document.getElementById("searchMobileInput");
 
   if (!searchExpanded) {
-    // Expandir input
-    inputMobile.style.width = "100px";
-    inputMobile.style.padding = "0.25rem 0.4rem";
-    inputMobile.style.border = "1px solid #ced4da";
-    inputMobile.style.borderRadius = "4px 4px 0 0";
-    inputMobile.style.borderBottom = "2px solid #dee2e6";
-    inputMobile.focus();
+    overlay.style.display = "flex";
+    setTimeout(() => { overlay.classList.add("open"); }, 10);
+    setTimeout(() => input && input.focus(), 200);
     searchExpanded = true;
   } else {
-    // Colapsar input
-    inputMobile.style.width = "0";
-    inputMobile.style.padding = "0";
-    inputMobile.style.border = "none";
-    inputMobile.value = "";
-    // Limpiar búsqueda al cerrar
-    if (inputDesktop) {
-      inputDesktop.value = "";
-    }
+    overlay.classList.remove("open");
+    input.value = "";
     filtrarRutas("");
+    setTimeout(() => { overlay.style.display = "none"; }, 300);
     searchExpanded = false;
   }
 }
 
-// Cerrar input de búsqueda al hacer clic fuera
 document.addEventListener('click', function(event) {
-  const searchContainer = document.getElementById('searchContainer');
-  const inputMobile = document.getElementById("searchRutasMobile");
-
-  if (searchExpanded && searchContainer && !searchContainer.contains(event.target)) {
-    inputMobile.style.width = "0";
-    inputMobile.style.padding = "0";
-    inputMobile.style.border = "none";
-    inputMobile.value = "";
-    filtrarRutas("");
-    searchExpanded = false;
-  }
+  if (!searchExpanded) return;
+  const overlay = document.getElementById("searchMobileOverlay");
+  const input = document.getElementById("searchMobileInput");
+  if (overlay && overlay.contains(event.target)) return;
+  if (event.target.closest('#searchMobileTrigger')) return;
+  overlay.classList.remove("open");
+  input.value = "";
+  filtrarRutas("");
+  setTimeout(() => { overlay.style.display = "none"; }, 300);
+  searchExpanded = false;
 });
 
 // ========== GRÁFICA DE VELOCIDADES MENSUALES ==========

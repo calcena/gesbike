@@ -14,14 +14,19 @@ const toggleAgendaGroup = (id, header) => {
   }
 };
 
-const countVencidosPendientes = (data) => {
+const countVencidosPendientes = (data, currentKms = 0) => {
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
   let v = 0, p = 0;
   (data || []).forEach(item => {
-    if (!item.proxima_fecha) return;
-    const f = new Date(item.proxima_fecha + "T00:00:00");
-    if (f < hoy) v++; else p++;
+    const fechaPasada = item.proxima_fecha
+      ? new Date(item.proxima_fecha + "T00:00:00") < hoy
+      : false;
+    const kmsExcedidos = item.proximos_kms != null && currentKms > 0
+      ? currentKms >= item.proximos_kms
+      : false;
+    if (!item.proxima_fecha && item.proximos_kms == null) return;
+    if (fechaPasada || kmsExcedidos) v++; else p++;
   });
   return { vencidos: v, pendientes: p };
 };
@@ -29,6 +34,14 @@ const countVencidosPendientes = (data) => {
 const loadAgenda = async () => {
   const vehiculoId = sessionStorage.getItem("vehiculo_id");
   if (!vehiculoId) {
+    updateAgendaBadge(0, 0);
+    return;
+  }
+
+  // No mostrar contenido si el vehículo está inactivo
+  const veh = window.vehiculosData && window.vehiculosData.find(v => v.id == vehiculoId);
+  if (veh && veh.is_active == 0) {
+    document.getElementById("main-cards").innerHTML = "";
     updateAgendaBadge(0, 0);
     return;
   }
@@ -54,7 +67,7 @@ const loadAgenda = async () => {
         : 0;
       document.getElementById("main-cards").innerHTML =
         parseHtmlAgenda(content, currentKms);
-      const counts = countVencidosPendientes(content);
+      const counts = countVencidosPendientes(content, currentKms);
       updateAgendaBadge(counts.vencidos, counts.pendientes);
     } else {
       updateAgendaBadge(0, 0);
@@ -109,11 +122,12 @@ const renderAgendaCard = (item, currentKms) => {
 
   const fechaClass = fechaVencida ? "agenda-text-red" : "";
   const kmsClass = kmsVencido ? "agenda-text-red" : "";
+  const vencido = fechaVencida || kmsVencido;
 
   let badgeText, badgeClass;
   if (item.dias_usuario) {
     badgeText = formatDaysToText(item.proxima_fecha);
-    badgeClass = fechaVencida ? "bg-danger"
+    badgeClass = vencido ? "bg-danger"
       : badgeText === "Hoy" || badgeText === "Mañana" ? "bg-warning text-dark"
       : "bg-success";
   } else if (item.km_usuario && item.proximos_kms != null) {
@@ -127,7 +141,7 @@ const renderAgendaCard = (item, currentKms) => {
     }
   } else {
     badgeText = formatDaysToText(item.proxima_fecha);
-    badgeClass = fechaVencida ? "bg-danger"
+    badgeClass = vencido ? "bg-danger"
       : badgeText === "Hoy" || badgeText === "Mañana" ? "bg-warning text-dark"
       : "bg-success";
   }
@@ -148,8 +162,8 @@ const renderAgendaCard = (item, currentKms) => {
                 <span class="badge ${badgeClass}">${badgeText}</span>
               </div>
               <div class="d-flex align-items-center gap-3 mt-1">
-                <small class="text-muted"><i class="fas fa-tag me-1"></i>${item.grupo_nombre}</small>
-                <small class="text-muted"><i class="fas fa-map-marker-alt me-1"></i>${item.localizacion_nombre}</small>
+                <small class="text-muted">${grpImg ? `<img src="${grpImg}" class="agenda-icon-sm me-1" alt="${item.grupo_nombre}">` : '<i class="fas fa-tag me-1"></i>'}${item.grupo_nombre}</small>
+                ${item.localizacion_nombre ? `<small class="text-muted"><i class="fas fa-map-marker-alt me-1"></i>${item.localizacion_nombre}</small>` : ""}
               </div>
             </div>
           </div>
@@ -187,15 +201,23 @@ const parseHtmlAgenda = (data, currentKms = 0) => {
   hoy.setHours(0, 0, 0, 0);
 
   const vencidos = data.filter(item => {
-    if (!item.proxima_fecha) return false;
-    const f = new Date(item.proxima_fecha + "T00:00:00");
-    return f <= hoy;
+    const fechaPasada = item.proxima_fecha
+      ? new Date(item.proxima_fecha + "T00:00:00") <= hoy
+      : false;
+    const kmsExcedidos = item.proximos_kms != null && currentKms > 0
+      ? currentKms >= item.proximos_kms
+      : false;
+    return fechaPasada || kmsExcedidos;
   });
 
   const pendientes = data.filter(item => {
-    if (!item.proxima_fecha) return false;
-    const f = new Date(item.proxima_fecha + "T00:00:00");
-    return f > hoy;
+    const fechaPasada = item.proxima_fecha
+      ? new Date(item.proxima_fecha + "T00:00:00") <= hoy
+      : false;
+    const kmsExcedidos = item.proximos_kms != null && currentKms > 0
+      ? currentKms >= item.proximos_kms
+      : false;
+    return !fechaPasada && !kmsExcedidos;
   });
 
   let html = "";

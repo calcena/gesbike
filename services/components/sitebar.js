@@ -164,21 +164,44 @@ async function updateAgendaBadges() {
     updateAgendaBadge(0, 0);
     return;
   }
+  // Verificar que el vehículo esté activo
+  const vehActivo = window.vehiculosData
+    ? window.vehiculosData.some(v => v.id == vehiculoId && v.is_active == 1)
+    : true;
+  if (!vehActivo) {
+    updateAgendaBadge(0, 0);
+    return;
+  }
   const basePath = window.location.href.includes("views/main.php") ? ".." : "../..";
   try {
-    const resp = await axios.post(
-      `${basePath}/api/programaciones/programacion.php?getTodasPredicciones`,
-      { data: { vehiculo_id: vehiculoId } },
-      { headers: { "Content-Type": "application/json" } }
-    );
-    if (resp.data.success) {
+    const [agendaResp, kmsResp] = await Promise.all([
+      axios.post(
+        `${basePath}/api/programaciones/programacion.php?getTodasPredicciones`,
+        { data: { vehiculo_id: vehiculoId } },
+        { headers: { "Content-Type": "application/json" } }
+      ),
+      axios.post(
+        `${basePath}/api/helpers/helper.php?getKilometrosByVehiculo`,
+        { data: { vehiculo_id: vehiculoId } },
+        { headers: { "Content-Type": "application/json" } }
+      )
+    ]);
+    if (agendaResp.data.success) {
+      const currentKms = kmsResp.data.success && kmsResp.data.content.kms != null
+        ? parseFloat(kmsResp.data.content.kms) || 0
+        : 0;
       const hoy = new Date();
       hoy.setHours(0, 0, 0, 0);
       let v = 0, p = 0;
-      (resp.data.content || []).forEach(item => {
-        if (!item.proxima_fecha) return;
-        const f = new Date(item.proxima_fecha + "T00:00:00");
-        if (f < hoy) v++; else p++;
+      (agendaResp.data.content || []).forEach(item => {
+        const fechaPasada = item.proxima_fecha
+          ? new Date(item.proxima_fecha + "T00:00:00") < hoy
+          : false;
+        const kmsExcedidos = item.proximos_kms != null && currentKms > 0
+          ? currentKms >= item.proximos_kms
+          : false;
+        if (!item.proxima_fecha && item.proximos_kms == null) return;
+        if (fechaPasada || kmsExcedidos) v++; else p++;
       });
       updateAgendaBadge(v, p);
     } else {
