@@ -1,5 +1,7 @@
 const initDetalles = async () => {
   await getGrupos(2);
+  sessionStorage.setItem("grupo_id", 5);
+  sessionStorage.setItem("agrupador_id", 1);
   const btn = document.getElementById("grupo_select");
   const grupoId = sessionStorage.getItem("grupo_id");
   if (btn && grupoId && window.gruposData) {
