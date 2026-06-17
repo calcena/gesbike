@@ -345,6 +345,26 @@ async function initRutas() {
   await getRutasByVehiculo();
   setupGPXUpload();
   setupMultipleGPXUpload();
+
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('tab') === '4') {
+    const tab4 = document.getElementById('tab4-tab');
+    if (tab4) {
+      setTimeout(() => {
+        const bsTab = new bootstrap.Tab(tab4);
+        bsTab.show();
+        if (typeof getResumenBiker === 'function') getResumenBiker();
+      }, 300);
+    }
+  }
+  if (params.get('showLast') === '1') {
+    setTimeout(() => {
+      if (window.rutasOriginales && window.rutasOriginales.length > 0) {
+        const last = window.rutasOriginales[0];
+        if (last && last.id) showGpxDetails(last.id);
+      }
+    }, 500);
+  }
 }
 
 window.selectVehiculoPicker = (id, nombre) => {
@@ -1412,7 +1432,7 @@ function generarContenidoRuta(ruta, hasHR = false) {
         border-bottom: none;
       }
       .label-captura {
-        font-size: 14px;
+        font-size: 12px;
         color: #555;
         font-weight: 600;
       }
@@ -1420,6 +1440,9 @@ function generarContenidoRuta(ruta, hasHR = false) {
         font-size: 14px;
         font-weight: 700;
         color: #2c3e50;
+      }
+      .swal-title-small {
+        font-size: 16px !important;
       }
     </style>
   `;
@@ -1451,7 +1474,7 @@ const showGpxDetails = async (ruta_id) => {
       const htmlContent = generarContenidoRuta(ruta);
 
       Swal.fire({
-        title: "📊 Detalles ",
+        title: "📊 Detalles",
         html: htmlContent,
         width: 600,
         maxHeight: 480,
@@ -1460,6 +1483,7 @@ const showGpxDetails = async (ruta_id) => {
         showConfirmButton: true,
         confirmButtonText: "Cerrar",
         confirmButtonColor: "#3085d6",
+        customClass: { title: 'swal-title-small' },
       });
     }
   } catch (err) {

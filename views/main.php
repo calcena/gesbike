@@ -36,9 +36,38 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
   <script src="../services/logs/logs.js?<?php random_file_enumerator() ?>"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <title><?php echo APP_NAME . '_' . APP_VERSION ?></title>
+  <style>
+    #voice-indicator {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--fab-bg, linear-gradient(135deg, #667eea, #764ba2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 9999;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      transition: transform 0.2s;
+    }
+    #voice-indicator.active {
+      animation: voice-pulse 1s infinite;
+    }
+    @keyframes voice-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.7); }
+      50% { box-shadow: 0 0 0 12px rgba(102, 126, 234, 0); }
+    }
+    #voice-indicator i {
+      color: #fff;
+      font-size: 18px;
+    }
+  </style>
 </head>
 
-<body onload="initMain(); initTheme()">
+<body onload="initMain(); initTheme(); initVoiceRecognition()">
   <div class="container mt-2">
     <div class="container mt-2 d-flex justify-content-end align-items-center ps-0 !important" style="gap: 1rem;">
       <button class="form-select w-100 text-start" id="vehiculo-select" onclick="openVehiculoPicker(1)">
@@ -57,6 +86,144 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
     include_once("components/footer.php"); ?>
   </div>
   <?php include __DIR__ . '/components/sidebar.php'; ?>
+  <div id="voice-indicator" onclick="toggleVoiceRecognition()" title="Comandos de voz">
+    <i class="fas fa-microphone"></i>
+  </div>
+  <script>
+    let voiceRecognition = null;
+    let voiceListening = false;
+    window.voiceCommands = [];
+
+    async function initVoiceRecognition() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) return;
+
+      await loadVoiceCommands();
+
+      voiceRecognition = new SpeechRecognition();
+      voiceRecognition.lang = 'es-ES';
+      voiceRecognition.continuous = true;
+      voiceRecognition.interimResults = false;
+      voiceRecognition.maxAlternatives = 3;
+
+      function normalizeStr(s) {
+        return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      }
+
+      function speak(text, cb) {
+        stopVoiceRecognition();
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = 'es-ES';
+        utter.rate = 0.9;
+        if (cb) utter.onend = cb;
+        speechSynthesis.speak(utter);
+      }
+
+      function restartVoiceAfterSpeak() {
+        setTimeout(startVoiceRecognition, 1500);
+      }
+
+      function playAudioNotFound() {
+        speak('Comando no encontrado', restartVoiceAfterSpeak);
+      }
+
+      function seleccionarVehiculoPorNombre(nombre) {
+        const v = (window.vehiculosData || []).find(ve =>
+          normalizeStr(ve.nombre).includes(normalizeStr(nombre))
+        );
+        if (!v) return false;
+        sessionStorage.setItem("vehiculo_id", v.id);
+        const btn = document.getElementById("vehiculo-select");
+        if (btn) {
+          btn.textContent = v.nombre;
+          btn.dataset.selected = v.id;
+        }
+        window.paginaActual = 1;
+        getListMantenimientosByVehiculo();
+        getMotorVehiculo();
+        speak('Bicicleta ' + v.nombre + ' seleccionada', restartVoiceAfterSpeak);
+        return true;
+      }
+
+      voiceRecognition.onresult = function(event) {
+        let matched = false;
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = normalizeStr(event.results[i][0].transcript).trim();
+          for (const cmd of window.voiceCommands) {
+            if (!transcript.includes(normalizeStr(cmd.frase))) continue;
+            matched = true;
+            stopVoiceRecognition();
+            if (cmd.url.startsWith('internal:')) {
+              if (cmd.url.startsWith('internal:selectVehiculo:')) {
+                const vehiculoNombre = cmd.url.replace('internal:selectVehiculo:', '');
+                if (!seleccionarVehiculoPorNombre(vehiculoNombre)) {
+                  playAudioNotFound();
+                }
+              }
+            } else {
+              window.location.href = cmd.url;
+            }
+            return;
+          }
+        }
+        if (!matched) {
+          playAudioNotFound();
+        }
+      };
+
+      voiceRecognition.onerror = function(event) {
+        if (event.error === 'aborted') return;
+        voiceListening = false;
+        document.getElementById('voice-indicator').classList.remove('active');
+      };
+
+      voiceRecognition.onend = function() {
+        if (voiceListening) {
+          voiceRecognition.start();
+        }
+      };
+
+      startVoiceRecognition();
+    }
+
+    async function loadVoiceCommands() {
+      try {
+        const res = await axios.post(
+          '../api/comandos_voz/comando_voz.php?getComandosVoz',
+          {},
+          { headers: { 'Content-Type': 'application/json' } }
+        );
+        if (res.data.success && Array.isArray(res.data.content)) {
+          window.voiceCommands = res.data.content;
+        }
+      } catch (e) {
+        console.warn('Error loading voice commands:', e);
+      }
+    }
+
+    function startVoiceRecognition() {
+      if (!voiceRecognition) return;
+      voiceListening = true;
+      document.getElementById('voice-indicator').classList.add('active');
+      try { voiceRecognition.start(); } catch(e) {}
+    }
+
+    function stopVoiceRecognition() {
+      voiceListening = false;
+      document.getElementById('voice-indicator').classList.remove('active');
+      if (voiceRecognition) {
+        try { voiceRecognition.stop(); } catch(e) {}
+      }
+    }
+
+    function toggleVoiceRecognition() {
+      if (voiceListening) {
+        stopVoiceRecognition();
+      } else {
+        startVoiceRecognition();
+      }
+    }
+  </script>
 </body>
 
 
