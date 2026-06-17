@@ -6,10 +6,6 @@ require_once ROOT_PATH . '/database/DatabaseConnection.php';
 get_session_status();
 debug_mode();
 
-global $db;
-
-$db = conectar();
-
 $action = !empty($_GET) ? array_keys($_GET)[0] : '';
 
 switch ($action) {

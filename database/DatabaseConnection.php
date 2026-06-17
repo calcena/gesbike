@@ -40,8 +40,8 @@ function conectar()
         try {
             $connection = new PDO(
                 'sqlite:' . DB_PATH,
-                null, // username (no aplica para SQLite)
-                null, // password (no aplica para SQLite)
+                null,
+                null,
                 [
                     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -49,7 +49,6 @@ function conectar()
                 ]
             );
 
-            // Opcional: habilitar foreign keys en SQLite
             $connection->exec("PRAGMA foreign_keys = ON;");
 
             error_log("✅ Conexión SQLite exitosa a: " . DB_PATH);
@@ -64,5 +63,39 @@ function conectar()
         }
     }
 
+    return $connection;
+}
+
+function conectar_comandos_voz()
+{
+    static $connection = null;
+    if ($connection === null) {
+        if (!defined('VOICE_DB_PATH') || VOICE_DB_PATH === '') {
+            error_log("conectar_comandos_voz: VOICE_DB_PATH no está definida");
+            die("<p style='color:red; font-family:monospace;'>"
+                . "Error de configuración: falta VOICE_DB_PATH en .env"
+                . "</p>");
+        }
+        try {
+            $connection = new PDO(
+                'sqlite:' . VOICE_DB_PATH,
+                null,
+                null,
+                [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                    PDO::ATTR_PERSISTENT => false,
+                ]
+            );
+            error_log("✅ Conexión SQLite exitosa a: " . VOICE_DB_PATH);
+        } catch (PDOException $e) {
+            error_log("DatabaseConnection.php - Error de conexión comandos_voz: " . $e->getMessage());
+            die("<p style='color:red; font-family:monospace;'>"
+                . "No se pudo conectar a la base de datos de comandos de voz.<br>"
+                . "Verifica la ruta: <strong>" . htmlspecialchars(VOICE_DB_PATH) . "</strong><br>"
+                . "<small>" . htmlspecialchars($e->getMessage()) . "</small>"
+                . "</p>");
+        }
+    }
     return $connection;
 }

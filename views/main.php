@@ -92,19 +92,21 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
   <script>
     let voiceRecognition = null;
     let voiceListening = false;
+    let voiceCommandsLoaded = false;
     window.voiceCommands = [];
 
     async function initVoiceRecognition() {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) return;
 
-      await loadVoiceCommands();
+      if (voiceRecognition) {
+        try { voiceRecognition.abort(); } catch(e) {}
+        voiceRecognition = null;
+      }
 
-      voiceRecognition = new SpeechRecognition();
-      voiceRecognition.lang = 'es-ES';
-      voiceRecognition.continuous = true;
-      voiceRecognition.interimResults = false;
-      voiceRecognition.maxAlternatives = 3;
+      if (!voiceCommandsLoaded) {
+        await loadVoiceCommands();
+      }
 
       function normalizeStr(s) {
         return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -112,6 +114,7 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
 
       function speak(text, cb) {
         stopVoiceRecognition();
+        speechSynthesis.cancel();
         const utter = new SpeechSynthesisUtterance(text);
         utter.lang = 'es-ES';
         utter.rate = 0.9;
@@ -145,6 +148,12 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
         return true;
       }
 
+      voiceRecognition = new SpeechRecognition();
+      voiceRecognition.lang = 'es-ES';
+      voiceRecognition.continuous = true;
+      voiceRecognition.interimResults = false;
+      voiceRecognition.maxAlternatives = 3;
+
       voiceRecognition.onresult = function(event) {
         let matched = false;
         for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -153,13 +162,24 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
             if (!transcript.includes(normalizeStr(cmd.frase))) continue;
             matched = true;
             stopVoiceRecognition();
-            if (cmd.url.startsWith('internal:')) {
-              if (cmd.url.startsWith('internal:selectVehiculo:')) {
-                const vehiculoNombre = cmd.url.replace('internal:selectVehiculo:', '');
-                if (!seleccionarVehiculoPorNombre(vehiculoNombre)) {
-                  playAudioNotFound();
-                }
+
+            if (cmd.url === 'internal:cancelar') {
+              speak(cmd.respuesta || 'Se cancela micro');
+              return;
+            }
+
+            if (cmd.url.startsWith('internal:selectVehiculo:')) {
+              const vehiculoNombre = cmd.url.replace('internal:selectVehiculo:', '');
+              if (!seleccionarVehiculoPorNombre(vehiculoNombre)) {
+                playAudioNotFound();
               }
+              return;
+            }
+
+            if (cmd.respuesta) {
+              speak(cmd.respuesta, function() {
+                window.location.href = cmd.url;
+              });
             } else {
               window.location.href = cmd.url;
             }
@@ -173,13 +193,19 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
 
       voiceRecognition.onerror = function(event) {
         if (event.error === 'aborted') return;
+        if (event.error === 'no-speech') return;
         voiceListening = false;
         document.getElementById('voice-indicator').classList.remove('active');
+        if (voiceListening === false && voiceRecognition) {
+          setTimeout(startVoiceRecognition, 2000);
+        }
       };
 
       voiceRecognition.onend = function() {
-        if (voiceListening) {
-          voiceRecognition.start();
+        if (voiceListening && voiceRecognition) {
+          setTimeout(function() {
+            try { voiceRecognition.start(); } catch(e) {}
+          }, 500);
         }
       };
 
@@ -195,6 +221,7 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
         );
         if (res.data.success && Array.isArray(res.data.content)) {
           window.voiceCommands = res.data.content;
+          voiceCommandsLoaded = true;
         }
       } catch (e) {
         console.warn('Error loading voice commands:', e);
@@ -223,6 +250,28 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
         startVoiceRecognition();
       }
     }
+
+    window.addEventListener('pageshow', function(e) {
+      if (e.persisted) {
+        initVoiceRecognition();
+      }
+    });
+
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState === 'visible' && voiceRecognition && voiceListening) {
+        try { voiceRecognition.start(); } catch(e) {
+          initVoiceRecognition();
+        }
+      }
+    });
+
+    window.addEventListener('beforeunload', function() {
+      if (voiceRecognition) {
+        try { voiceRecognition.abort(); } catch(e) {}
+        voiceRecognition = null;
+      }
+      voiceListening = false;
+    });
   </script>
 </body>
 

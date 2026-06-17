@@ -69,6 +69,21 @@ const loadAgenda = async () => {
         parseHtmlAgenda(content, currentKms);
       const counts = countVencidosPendientes(content, currentKms);
       updateAgendaBadge(counts.vencidos, counts.pendientes);
+
+      const params = new URLSearchParams(window.location.search);
+      const section = params.get('section');
+      if (section === 'vencidos' || section === 'pendientes') {
+        const openId = section === 'vencidos' ? 'collapseVencidos' : 'collapsePendientes';
+        const closeId = section === 'vencidos' ? 'collapsePendientes' : 'collapseVencidos';
+        [openId, closeId].forEach(id => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          const shouldShow = id === openId;
+          el.classList.toggle('show', shouldShow);
+          const header = el.closest('.col-12')?.querySelector('.agenda-group-header');
+          if (header) header.setAttribute('aria-expanded', shouldShow);
+        });
+      }
     } else {
       updateAgendaBadge(0, 0);
     }
@@ -224,7 +239,7 @@ const parseHtmlAgenda = (data, currentKms = 0) => {
 
   if (vencidos.length > 0) {
     html += `<div class="col-12 mb-2">
-      <div class="agenda-group-header agenda-group-danger" onclick="toggleAgendaGroup('collapseVencidos', this)">
+      <div class="agenda-group-header agenda-group-danger" onclick="toggleAgendaGroup('collapseVencidos', this)" aria-expanded="false">
         <i class="fas fa-exclamation-triangle me-1"></i> Vencidos <span class="badge bg-light text-danger badge-num ms-1">${vencidos.length}</span>
         <i class="fas fa-chevron-down ms-auto"></i>
       </div>
@@ -234,7 +249,7 @@ const parseHtmlAgenda = (data, currentKms = 0) => {
 
   if (pendientes.length > 0) {
     html += `<div class="col-12">
-      <div class="agenda-group-header agenda-group-success" onclick="toggleAgendaGroup('collapsePendientes', this)">
+      <div class="agenda-group-header agenda-group-success" onclick="toggleAgendaGroup('collapsePendientes', this)" aria-expanded="false">
         <i class="fas fa-clock me-1"></i> Futuros <span class="badge bg-light text-success badge-num ms-1">${pendientes.length}</span>
         <i class="fas fa-chevron-down ms-auto"></i>
       </div>

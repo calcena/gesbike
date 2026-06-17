@@ -5,8 +5,6 @@ require_once $root . '/helpers/config.php';
 require_once $root . '/database/DatabaseConnection.php';
 require_once $root . '/models/comando_voz.php';
 
-global $db;
-
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }

@@ -73,6 +73,7 @@ function load_env($max_levels = 3)
         'API_KEY_BACK',
         'DB_TYPE',
         'DB_PATH',
+        'VOICE_DB_PATH',
     ];
 
     foreach ($required as $key) {
