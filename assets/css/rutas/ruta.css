@@ -207,3 +207,55 @@ input:checked + .slider:before {
 #searchMobileOverlay input::placeholder {
     color: var(--text-muted, #999);
 }
+
+.km-marker,
+.marker-waypoint {
+    background: none !important;
+    border: none !important;
+}
+.marker-waypoint-inner {
+    width: 32px;
+    height: 32px;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 800;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    border: 2px solid #fff;
+}
+.km-marker-inner {
+    width: 28px;
+    height: 28px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(102, 126, 234, 0.5);
+    border: 2px solid #fff;
+}
+
+#map-container {
+    width: 100%;
+}
+#map-container .leaflet-container {
+    z-index: 1 !important;
+    border-radius: 10px;
+}
+.ruta-details-wrapper {
+    max-height: 650px;
+    overflow-y: auto;
+}
+.ruta-details-wrapper::-webkit-scrollbar {
+    width: 4px;
+}
+.ruta-details-wrapper::-webkit-scrollbar-thumb {
+    background: #667eea;
+    border-radius: 4px;
+}

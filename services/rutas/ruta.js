@@ -328,6 +328,11 @@ function processGPX(text) {
     velocidad_maxima: Number(maxSpeedFiltered.toFixed(1)),
     potencia_promedio_w: Math.round(avgPower),
     calorias: Math.round(calories),
+    track_points: trkpts.map(p => ({
+      lat: parseFloat(p.lat.toFixed(6)),
+      lon: parseFloat(p.lon.toFixed(6)),
+      ele: Math.round(p.ele)
+    })),
   };
 }
 
@@ -515,6 +520,7 @@ async function sendToAPISilent(result) {
     tiempo_bajada: result.tiempo_bajada,
     frecuencia_cardiaca_promedio: result.frecuencia_cardiaca_promedio,
     frecuencia_cardiaca_maxima: result.frecuencia_cardiaca_maxima,
+    gpx_data: JSON.stringify(result.track_points),
   };
 
   const response = await axios.post(
@@ -589,6 +595,7 @@ async function sendToAPI(result) {
     fecha_fin: result.fecha_fin,
     frecuencia_cardiaca_promedio: result.frecuencia_cardiaca_promedio,
     frecuencia_cardiaca_maxima: result.frecuencia_cardiaca_maxima,
+    gpx_data: JSON.stringify(result.track_points),
   };
 
   try {
@@ -1467,23 +1474,94 @@ const showGpxDetails = async (ruta_id) => {
 
     if (response.data.success) {
       const ruta = response.data.content[0];
-
-      // Guardar los datos de la ruta globalmente para usarlos en la captura
       window.rutaActual = ruta;
 
-      const htmlContent = generarContenidoRuta(ruta);
+      let hasMapData = false;
+      let trackPoints = [];
+      if (ruta.gpx_data && ruta.gpx_data !== 'null' && ruta.gpx_data !== '[]') {
+        try {
+          trackPoints = JSON.parse(ruta.gpx_data);
+          hasMapData = trackPoints.length > 2;
+        } catch (e) {}
+      }
+
+      const statsHtml = generarContenidoRuta(ruta);
+
+      let fullHtml;
+      if (hasMapData) {
+        fullHtml = `
+          <div class="ruta-details-wrapper">
+            <details id="map-details" class="ruta-collapse">
+              <summary class="ruta-collapse-summary">🗺️ Mapa de ruta</summary>
+              <div id="map-container" style="height: 350px; border-radius: 10px; z-index: 1; border: 2px solid #dee2e6; display: none;"></div>
+            </details>
+            <details id="elevation-details" class="ruta-collapse">
+              <summary class="ruta-collapse-summary">📈 Perfil de elevación</summary>
+              <div id="elevation-chart-wrapper" style="height: 180px; margin-top: 8px; padding: 5px; border: 1px solid #dee2e6; border-radius: 8px; display: none;">
+                <canvas id="elevationChart"></canvas>
+              </div>
+            </details>
+            <div style="margin-top: 10px;">${statsHtml}</div>
+          </div>
+          <style>
+            .ruta-details-wrapper { max-height: 650px; overflow-y: auto; }
+            .leaflet-container { z-index: 1 !important; border-radius: 10px; }
+            .ruta-collapse { margin-bottom: 8px; border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden; }
+            .ruta-collapse-summary { padding: 10px 14px; cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text-primary, #333); background: var(--card-bg, #f8f9fa); user-select: none; }
+            .ruta-collapse-summary:hover { background: var(--hover-bg, #e9ecef); }
+            .ruta-collapse[open] .ruta-collapse-summary { border-bottom: 1px solid #dee2e6; }
+          </style>
+        `;
+      } else {
+        fullHtml = statsHtml;
+      }
 
       Swal.fire({
-        title: "📊 Detalles",
-        html: htmlContent,
-        width: 600,
-        maxHeight: 480,
+        title: hasMapData ? "🗺️ Detalles de ruta" : "📊 Detalles",
+        html: fullHtml,
+        width: 800,
         padding: "10px",
-        showCloseButton: false,
+        showCloseButton: true,
         showConfirmButton: true,
         confirmButtonText: "Cerrar",
-        confirmButtonColor: "#3085d6",
         customClass: { title: 'swal-title-small' },
+        didOpen: () => {
+          if (hasMapData) {
+            const mapDetails = document.getElementById('map-details');
+            const mapContainer = document.getElementById('map-container');
+            const elevDetails = document.getElementById('elevation-details');
+            const elevWrapper = document.getElementById('elevation-chart-wrapper');
+
+            let mapInitialized = false;
+            let chartInitialized = false;
+
+            mapDetails.addEventListener('toggle', () => {
+              if (mapDetails.open) {
+                mapContainer.style.display = 'block';
+                if (!mapInitialized) {
+                  initRouteMap(trackPoints);
+                  mapInitialized = true;
+                } else if (window.__routeMap) {
+                  setTimeout(() => window.__routeMap.invalidateSize(), 50);
+                }
+              } else {
+                mapContainer.style.display = 'none';
+              }
+            });
+
+            elevDetails.addEventListener('toggle', () => {
+              if (elevDetails.open) {
+                elevWrapper.style.display = 'block';
+                if (!chartInitialized) {
+                  initElevationChart(trackPoints);
+                  chartInitialized = true;
+                }
+              } else {
+                elevWrapper.style.display = 'none';
+              }
+            });
+          }
+        }
       });
     }
   } catch (err) {
@@ -1495,6 +1573,154 @@ const showGpxDetails = async (ruta_id) => {
     });
   }
 };
+
+function computeCumulativeDistances(points) {
+  const distances = [0];
+  for (let i = 1; i < points.length; i++) {
+    const d = haversine(points[i-1].lat, points[i-1].lon, points[i].lat, points[i].lon);
+    distances.push(distances[i-1] + d);
+  }
+  return distances;
+}
+
+function initRouteMap(trackPoints) {
+  const container = document.getElementById('map-container');
+  if (!container) return;
+
+  const map = L.map(container, { zoomControl: true });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© OpenStreetMap'
+  }).addTo(map);
+
+  const simplified = downsamplePoints(trackPoints, 2000);
+  const latlngs = simplified.map(p => [p.lat, p.lon]);
+  const polyline = L.polyline(latlngs, {
+    color: '#667eea',
+    weight: 4,
+    opacity: 0.85
+  }).addTo(map);
+
+  map.fitBounds(polyline.getBounds(), { padding: [30, 30] });
+
+  L.marker(latlngs[0], {
+    icon: L.divIcon({
+      className: 'marker-waypoint',
+      html: '<div class="marker-waypoint-inner" style="background:linear-gradient(135deg,#2196F3,#1976D2)"><i class="fas fa-map-pin" style="font-size:16px;color:#fff"></i></div>',
+      iconSize: [36, 36],
+      iconAnchor: [18, 18]
+    })
+  }).addTo(map).bindPopup('Salida (0 km)');
+  L.marker(latlngs[latlngs.length - 1], {
+    icon: L.divIcon({
+      className: 'marker-waypoint',
+      html: '<div class="marker-waypoint-inner" style="background:linear-gradient(135deg,#4CAF50,#388E3C)"><i class="fas fa-flag-checkered" style="font-size:16px;color:#fff"></i></div>',
+      iconSize: [36, 36],
+      iconAnchor: [18, 18]
+    })
+  }).addTo(map).bindPopup('Llegada');
+
+  const fullDistances = computeCumulativeDistances(trackPoints);
+  const totalKm = fullDistances[fullDistances.length - 1] / 1000;
+  const interval = 5;
+  const halfwayKm = new Array(Math.floor(totalKm / interval)).fill(0).map((_, i) => (i + 1) * interval);
+
+  halfwayKm.forEach(targetKm => {
+    const targetM = targetKm * 1000;
+    let bestIdx = 0;
+    let bestDiff = Infinity;
+    for (let i = 0; i < fullDistances.length; i++) {
+      const diff = Math.abs(fullDistances[i] - targetM);
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        bestIdx = i;
+      }
+    }
+    const pt = trackPoints[bestIdx];
+    if (bestIdx === 0 || bestIdx === trackPoints.length - 1) return;
+    L.marker([pt.lat, pt.lon], {
+      icon: L.divIcon({
+        className: 'km-marker',
+        html: `<div class="km-marker-inner">${targetKm}</div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+      })
+    }).addTo(map).bindPopup(`${pt.ele} m`);
+  });
+
+  window.__routeMap = map;
+  setTimeout(() => map.invalidateSize(), 100);
+}
+
+function downsamplePoints(points, maxPoints) {
+  if (points.length <= maxPoints) return points;
+  const step = Math.ceil(points.length / maxPoints);
+  const result = [];
+  for (let i = 0; i < points.length; i += step) {
+    result.push(points[i]);
+  }
+  if (result[result.length - 1] !== points[points.length - 1]) {
+    result.push(points[points.length - 1]);
+  }
+  return result;
+}
+
+function initElevationChart(trackPoints) {
+  const canvas = document.getElementById('elevationChart');
+  if (!canvas) return;
+
+  const sampled = downsamplePoints(trackPoints, 500);
+  const distances = computeCumulativeDistances(sampled);
+  const distKm = distances.map(d => parseFloat((d / 1000).toFixed(2)));
+  const elevations = sampled.map(p => p.ele);
+  const ctx = canvas.getContext('2d');
+
+  const gradient = ctx.createLinearGradient(0, 0, 0, 180);
+  gradient.addColorStop(0, 'rgba(102, 126, 234, 0.3)');
+  gradient.addColorStop(1, 'rgba(102, 126, 234, 0.02)');
+
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: distKm,
+      datasets: [{
+        label: 'Elevación (m)',
+        data: elevations,
+        borderColor: '#667eea',
+        backgroundColor: gradient,
+        fill: true,
+        tension: 0.3,
+        pointRadius: 0,
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 500 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.parsed.y} m @ ${ctx.parsed.x} km`
+          }
+        }
+      },
+      scales: {
+        x: {
+          title: { display: true, text: 'Distancia (km)', font: { size: 11 } },
+          ticks: { maxTicksLimit: 8, font: { size: 10 }, callback: (v) => Number.isInteger(v) ? v : '' },
+          grid: { display: false }
+        },
+        y: {
+          title: { display: true, text: 'Elevación (m)', font: { size: 11 } },
+          ticks: { font: { size: 10 } },
+          grid: { color: 'rgba(0,0,0,0.06)' }
+        }
+      }
+    }
+  });
+}
 
 // ========== FUNCIONES DE GESTIÓN DE RUTAS ==========
 

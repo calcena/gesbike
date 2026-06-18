@@ -36,6 +36,8 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
     <script src="../../services/translate/translate.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../services/logs/logs.js?<?php random_file_enumerator() ?>"></script>
     <script src="../../services/theme/theme.js?<?php random_file_enumerator() ?>"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>

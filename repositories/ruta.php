@@ -214,6 +214,7 @@ function create_ruta_file($params)
             tiempo_subida = ?,
             tiempo_plano = ?,
             tiempo_bajada= ?,
+            gpx_data = ?,
             activo = 1,
             origen = 'gpx'
         WHERE vehiculo_id = ? AND fecha_inicio = ?
@@ -235,6 +236,7 @@ function create_ruta_file($params)
         $params['tiempo_subida'],
         $params['tiempo_plano'],
         $params['tiempo_bajada'],
+        $params['gpx_data'] ?? null,
         $params['vehiculo_id'],
         $params['fecha_inicio']
     ]);
@@ -256,8 +258,9 @@ function create_ruta_file($params)
         INSERT INTO rutas (
             vehiculo_id, fecha_inicio, fecha_fin, tiempo_total, tiempo_movimiento,
             kms, metros_ascenso, metros_descenso, altitud_maxima,
-            velocidad_media, velocidad_maxima, potencia_promedio_w, calorias, pct_subida, pct_plano, pct_bajada, tiempo_subida, tiempo_plano, tiempo_bajada,activo, origen
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? , ?, 1, 'gpx')
+            velocidad_media, velocidad_maxima, potencia_promedio_w, calorias, pct_subida, pct_plano, pct_bajada, tiempo_subida, tiempo_plano, tiempo_bajada,
+            gpx_data, activo, origen
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? , ?, ?, 1, 'gpx')
     ");
     $ins->execute([
         $params['vehiculo_id'],
@@ -278,7 +281,8 @@ function create_ruta_file($params)
         (int) ($params['pct_bajada'] ?? 0),
         $params['tiempo_subida'],
         $params['tiempo_plano'],
-        $params['tiempo_bajada']
+        $params['tiempo_bajada'],
+        $params['gpx_data'] ?? null
     ]);
 
     $ruta_id = (int) $db->lastInsertId();
