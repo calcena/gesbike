@@ -411,6 +411,42 @@ function get_rutas_chart_data($params)
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
+function create_temperaturas_repo($ruta_id, $temperaturas)
+{
+    $db = conectar();
+    $db->beginTransaction();
+    try {
+        $del = $db->prepare("DELETE FROM ruta_temperatura WHERE ruta_id = ?");
+        $del->execute([$ruta_id]);
+
+        $ins = $db->prepare("INSERT INTO ruta_temperatura (ruta_id, kilometro, lat, lon, temperatura, lluvia, hora) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        foreach ($temperaturas as $t) {
+            $ins->execute([
+                $ruta_id,
+                $t['kilometro'] ?? null,
+                $t['lat'] ?? null,
+                $t['lon'] ?? null,
+                $t['temperatura'] ?? null,
+                $t['lluvia'] ?? 0,
+                $t['hora'] ?? null
+            ]);
+        }
+        $db->commit();
+        return count($temperaturas);
+    } catch (Exception $e) {
+        $db->rollBack();
+        throw $e;
+    }
+}
+
+function get_temperaturas_repo($ruta_id)
+{
+    $db = conectar();
+    $stmt = $db->prepare("SELECT id, ruta_id, kilometro, lat, lon, temperatura, lluvia, hora, created_at FROM ruta_temperatura WHERE ruta_id = ? ORDER BY kilometro ASC");
+    $stmt->execute([$ruta_id]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
 function get_velocidades_by_month($params)
 {
     $db = conectar();

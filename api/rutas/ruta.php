@@ -24,6 +24,8 @@ switch ($action) {
     case 'getResumenBiker':
     case 'getVelocidadesMensuales':
     case 'getRutasChartData':
+    case 'guardarTemperaturas':
+    case 'getTemperaturas':
         $controllerFile = ROOT_PATH . '/controllers/ruta.php';
         if (!file_exists($controllerFile)) {
             http_response_code(500);

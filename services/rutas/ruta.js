@@ -202,10 +202,17 @@ function processGPX(text) {
     throw new Error("Archivo GPX inválido: " + parseError.textContent);
   }
 
-  const trkpts = Array.from(doc.querySelectorAll("trkpt"))
+  const GPX_NS = "http://www.topografix.com/GPX/1/1";
+
+  let trkptsNodes = doc.getElementsByTagNameNS(GPX_NS, "trkpt");
+  if (trkptsNodes.length === 0) trkptsNodes = doc.querySelectorAll("trkpt");
+
+  const trkpts = Array.from(trkptsNodes)
     .map((pt) => {
-      const eleElem = pt.querySelector("ele");
-      const timeElem = pt.querySelector("time");
+      let eleElem = pt.getElementsByTagNameNS(GPX_NS, "ele")[0];
+      let timeElem = pt.getElementsByTagNameNS(GPX_NS, "time")[0];
+      if (!eleElem) eleElem = pt.querySelector("ele");
+      if (!timeElem) timeElem = pt.querySelector("time");
 
       return {
         lat: parseFloat(pt.getAttribute("lat")),
@@ -331,7 +338,8 @@ function processGPX(text) {
     track_points: trkpts.map(p => ({
       lat: parseFloat(p.lat.toFixed(6)),
       lon: parseFloat(p.lon.toFixed(6)),
-      ele: Math.round(p.ele)
+      ele: Math.round(p.ele),
+      time: p.time.toISOString()
     })),
   };
 }
@@ -394,34 +402,39 @@ window.selectVehiculoPicker = (id, nombre) => {
 
 // ========== FUNCIONALIDAD PARA UN SOLO ARCHIVO ==========
 function setupGPXUpload() {
-  const input = document.getElementById("gpxFile");
+  const inputs = ["gpxFile", "gpxFileOrux"];
   const loadingIndicator = document.getElementById("loading-indicator");
 
-  input.addEventListener("change", async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  inputs.forEach(id => {
+    const input = document.getElementById(id);
+    if (!input) return;
 
-    const loading = loadingIndicator;
-    if (loading) loading.style.display = "block";
-    document.getElementById("output-container").innerHTML = "";
+    input.addEventListener("change", async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
 
-    try {
-      const text = await file.text();
-      let result;
-      result = processGPX(text);
-      const container = document.getElementById("output-container");
-      container.innerHTML = generarContenidoRuta(result, file.name.endsWith(".tcx"));
-      await sendToAPI(result);
-    } catch (err) {
-      console.error("💥 Error:", err);
-      document.getElementById("output-container").innerHTML = `
-        <div class="col-12">
-          <div class="alert alert-danger">${err.message}</div>
-        </div>
-      `;
-    } finally {
-      if (loading) loading.style.display = "none";
-    }
+      const loading = loadingIndicator;
+      if (loading) loading.style.display = "block";
+      document.getElementById("output-container").innerHTML = "";
+
+      try {
+        const text = await file.text();
+        let result;
+        result = processGPX(text);
+        const container = document.getElementById("output-container");
+        container.innerHTML = generarContenidoRuta(result, file.name.endsWith(".tcx"));
+        await sendToAPI(result);
+      } catch (err) {
+        console.error("💥 Error:", err);
+        document.getElementById("output-container").innerHTML = `
+          <div class="col-12">
+            <div class="alert alert-danger">${err.message}</div>
+          </div>
+        `;
+      } finally {
+        if (loading) loading.style.display = "none";
+      }
+    });
   });
 }
 
@@ -618,6 +631,11 @@ async function sendToAPI(result) {
       });
       await getRutasByVehiculo();
       await crearBackup();
+
+      const rutaId = response.data.content;
+      if (rutaId && result.track_points && result.track_points.length > 0) {
+        fetchWeatherForRoute(result, rutaId);
+      }
     } else {
       throw new Error(response.data.message || "Error del servidor");
     }
@@ -629,6 +647,380 @@ async function sendToAPI(result) {
       timer: 3000,
     });
   }
+}
+
+function samplePointsByDistance(trackPoints, intervalKm = 1) {
+  if (!trackPoints || trackPoints.length < 2) return [];
+  const intervalM = intervalKm * 1000;
+  const distances = computeCumulativeDistances(trackPoints);
+  const totalM = distances[distances.length - 1];
+  if (totalM <= 0) return [];
+
+  const samples = [];
+  for (let d = 0; d <= totalM; d += intervalM) {
+    let idx = 0;
+    for (let i = 1; i < distances.length; i++) {
+      if (distances[i] >= d) { idx = i; break; }
+    }
+    const p = trackPoints[idx];
+    const time = p.time || null;
+    samples.push({
+      lat: p.lat,
+      lon: p.lon,
+      ele: p.ele,
+      time: time,
+      kilometro: parseFloat((d / 1000).toFixed(3))
+    });
+  }
+  return samples;
+}
+
+function getNearestHour(timestamp, targetTime) {
+  if (!targetTime) return 0;
+  const target = new Date(targetTime).getTime();
+  const hours = [];
+  for (let i = 0; i < 24; i++) {
+    const h = new Date(timestamp);
+    h.setHours(i, 0, 0, 0);
+    hours.push(h.getTime());
+  }
+  let nearest = 0;
+  let minDiff = Infinity;
+  for (let i = 0; i < hours.length; i++) {
+    const diff = Math.abs(target - hours[i]);
+    if (diff < minDiff) { minDiff = diff; nearest = i; }
+  }
+  return nearest;
+}
+
+async function fetchWeatherForRoute(result, rutaId) {
+  if (!result.track_points || result.track_points.length < 2) return;
+  if (!result.fecha_inicio || !result.fecha_fin) return;
+
+  const samples = samplePointsByDistance(result.track_points, 1);
+  if (samples.length === 0) return;
+
+  const fechaInicio = new Date(result.fecha_inicio);
+  const fechaFin = new Date(result.fecha_fin);
+  const totalMs = fechaFin.getTime() - fechaInicio.getTime();
+  const totalKm = parseFloat(result.kms) || 1;
+
+  Swal.fire({
+    title: 'Obteniendo datos climáticos...',
+    html: '<div class="text-center"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 text-muted" id="clima-progress">Procesando 0/' + samples.length + ' puntos</p></div>',
+    allowOutsideClick: false,
+    showConfirmButton: false,
+    didOpen: () => { Swal.showLoading(); }
+  });
+
+  const cacheMap = new Map();
+  const weatherData = [];
+
+  const BATCH_SIZE = 10;
+  for (let i = 0; i < samples.length; i += BATCH_SIZE) {
+    const batch = samples.slice(i, i + BATCH_SIZE);
+    const batchResults = await Promise.all(batch.map(async (pt) => {
+      const frac = totalMs > 0 ? (pt.kilometro / totalKm) : 0;
+      const ptTime = pt.time ? new Date(pt.time) : new Date(fechaInicio.getTime() + frac * totalMs);
+      const dateStr = ptTime.toISOString().slice(0, 10);
+      const hour = ptTime.getHours();
+      const latKey = pt.lat.toFixed(2);
+      const lonKey = pt.lon.toFixed(2);
+      const cacheKey = `${latKey}_${lonKey}_${dateStr}`;
+
+      if (cacheMap.has(cacheKey)) {
+        const cached = cacheMap.get(cacheKey);
+        const temp = cached.temps[hour] ?? null;
+        const rain = cached.precip[hour] > 0 ? 1 : 0;
+        return { kilometro: pt.kilometro, lat: pt.lat, lon: pt.lon, temperatura: temp, lluvia: rain, hora: ptTime.toISOString() };
+      }
+
+      try {
+        const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${pt.lat}&longitude=${pt.lon}&start_date=${dateStr}&end_date=${dateStr}&hourly=temperature_2m,precipitation&timezone=auto`;
+        const resp = await fetch(url);
+        if (!resp.ok) return null;
+        const json = await resp.json();
+        const hourly = json.hourly || {};
+        const temps = hourly.temperature_2m || [];
+        const precip = hourly.precipitation || [];
+
+        cacheMap.set(cacheKey, { temps, precip });
+
+        const temp = temps[hour] ?? null;
+        const rain = precip[hour] > 0 ? 1 : 0;
+        return { kilometro: pt.kilometro, lat: pt.lat, lon: pt.lon, temperatura: temp, lluvia: rain, hora: ptTime.toISOString() };
+      } catch (e) {
+        console.warn('Weather fetch error for point', pt.kilometro, 'km:', e);
+        return null;
+      }
+    }));
+
+    for (const r of batchResults) {
+      if (r) weatherData.push(r);
+    }
+
+    const progressEl = document.getElementById('clima-progress');
+    if (progressEl) progressEl.textContent = `Procesando ${Math.min(i + BATCH_SIZE, samples.length)}/${samples.length} puntos`;
+  }
+
+  Swal.close();
+
+  if (weatherData.length === 0) {
+    Swal.fire({ text: 'No se pudieron obtener datos climáticos', icon: 'warning', timer: 3000, showConfirmButton: false });
+    return;
+  }
+
+  try {
+    const response = await axios.post(
+      getApiUrl('ruta.php?guardarTemperaturas'),
+      { data: { ruta_id: rutaId, temperaturas: weatherData } },
+      { headers: { "Content-Type": "application/json" } }
+    );
+    if (response.data.success) {
+      Swal.fire({ text: `✅ Datos climáticos guardados (${weatherData.length} puntos)`, icon: "success", timer: 2500, showConfirmButton: false });
+    }
+  } catch (err) {
+    console.error('Error saving weather data:', err);
+    Swal.fire({ text: 'Error al guardar datos climáticos', icon: 'error', timer: 3000, showConfirmButton: false });
+  }
+}
+
+async function fetchWeatherForRouteSilent(result, rutaId) {
+  if (!result.track_points || result.track_points.length < 2) return [];
+  if (!result.fecha_inicio || !result.fecha_fin) return [];
+
+  const samples = samplePointsByDistance(result.track_points, 1);
+  if (samples.length === 0) return [];
+
+  const fechaInicio = new Date(result.fecha_inicio);
+  const fechaFin = new Date(result.fecha_fin);
+  const totalMs = fechaFin.getTime() - fechaInicio.getTime();
+  const totalKm = parseFloat(result.kms) || 1;
+
+  const cacheMap = new Map();
+  const weatherData = [];
+
+  const BATCH_SIZE = 10;
+  for (let i = 0; i < samples.length; i += BATCH_SIZE) {
+    const batch = samples.slice(i, i + BATCH_SIZE);
+    const batchResults = await Promise.all(batch.map(async (pt) => {
+      const frac = totalMs > 0 ? (pt.kilometro / totalKm) : 0;
+      const ptTime = pt.time ? new Date(pt.time) : new Date(fechaInicio.getTime() + frac * totalMs);
+      const dateStr = ptTime.toISOString().slice(0, 10);
+      const hour = ptTime.getHours();
+      const latKey = pt.lat.toFixed(2);
+      const lonKey = pt.lon.toFixed(2);
+      const cacheKey = `${latKey}_${lonKey}_${dateStr}`;
+
+      if (cacheMap.has(cacheKey)) {
+        const cached = cacheMap.get(cacheKey);
+        const temp = cached.temps[hour] ?? null;
+        const rain = cached.precip[hour] > 0 ? 1 : 0;
+        return { kilometro: pt.kilometro, lat: pt.lat, lon: pt.lon, temperatura: temp, lluvia: rain, hora: ptTime.toISOString() };
+      }
+
+      try {
+        const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${pt.lat}&longitude=${pt.lon}&start_date=${dateStr}&end_date=${dateStr}&hourly=temperature_2m,precipitation&timezone=auto`;
+        const resp = await fetch(url);
+        if (!resp.ok) return null;
+        const json = await resp.json();
+        const hourly = json.hourly || {};
+        const temps = hourly.temperature_2m || [];
+        const precip = hourly.precipitation || [];
+
+        cacheMap.set(cacheKey, { temps, precip });
+
+        const temp = temps[hour] ?? null;
+        const rain = precip[hour] > 0 ? 1 : 0;
+        return { kilometro: pt.kilometro, lat: pt.lat, lon: pt.lon, temperatura: temp, lluvia: rain, hora: ptTime.toISOString() };
+      } catch (e) {
+        return null;
+      }
+    }));
+
+    for (const r of batchResults) {
+      if (r) weatherData.push(r);
+    }
+  }
+
+  if (weatherData.length === 0) return [];
+
+  try {
+    await axios.post(
+      getApiUrl('ruta.php?guardarTemperaturas'),
+      { data: { ruta_id: rutaId, temperaturas: weatherData } },
+      { headers: { "Content-Type": "application/json" } }
+    );
+  } catch (err) {
+    console.error('Error saving weather data (silent):', err);
+  }
+
+  return weatherData;
+}
+
+async function loadTemperatureData(rutaId) {
+  try {
+    const response = await axios.post(
+      getApiUrl('ruta.php?getTemperaturas'),
+      { data: { ruta_id: rutaId } },
+      { headers: { "Content-Type": "application/json" } }
+    );
+    if (response.data.success && response.data.content) {
+      return response.data.content;
+    }
+    return [];
+  } catch (e) {
+    console.warn('Error loading temperature data:', e);
+    return [];
+  }
+}
+
+function initTemperatureChart(trackPoints, tempData) {
+  const canvas = document.getElementById('tempChart');
+  if (!canvas || !tempData || tempData.length === 0) return;
+
+  const fullDistances = computeCumulativeDistances(trackPoints);
+  const totalKm = fullDistances[fullDistances.length - 1] / 1000;
+  const tickStep = totalKm <= 5 ? 1 : totalKm <= 20 ? 1 : totalKm <= 50 ? 2 : totalKm <= 100 ? 5 : 10;
+  const xMax = Math.ceil(totalKm);
+
+  const chartData = tempData.map(d => ({
+    x: parseFloat(d.kilometro),
+    y: d.temperatura !== null && d.temperatura !== undefined ? parseFloat(d.temperatura) : null
+  })).filter(d => d.y !== null);
+
+  const lluviaData = tempData
+    .filter(d => d.lluvia == 1 && d.temperatura !== null && d.temperatura !== undefined)
+    .map(d => ({
+      x: parseFloat(d.kilometro),
+      y: parseFloat(d.temperatura)
+    }));
+
+  const ctx = canvas.getContext('2d');
+  const gradient = ctx.createLinearGradient(0, 0, 0, 180);
+  gradient.addColorStop(0, 'rgba(255, 107, 53, 0.3)');
+  gradient.addColorStop(1, 'rgba(255, 107, 53, 0.02)');
+
+  const temps = chartData.filter(d => d.y !== null);
+  let maxPoint = null;
+  let minPoint = null;
+  if (temps.length > 0) {
+    const maxVal = Math.max(...temps.map(d => d.y));
+    const minVal = Math.min(...temps.map(d => d.y));
+    maxPoint = temps.find(d => d.y === maxVal);
+    minPoint = temps.find(d => d.y === minVal);
+  }
+
+  const verticalRainPlugin = {
+    id: 'verticalRainLines',
+    afterDatasetsDraw(chart) {
+      const c = chart.ctx;
+      const xScale = chart.scales.x;
+      const yScale = chart.scales.y;
+      const yBottom = yScale.getPixelForValue(yScale.min);
+
+      lluviaData.forEach(pt => {
+        const xPx = xScale.getPixelForValue(pt.x);
+        const yPx = yScale.getPixelForValue(pt.y);
+
+        c.save();
+        c.beginPath();
+        c.setLineDash([4, 4]);
+        c.strokeStyle = 'rgba(33, 150, 243, 0.7)';
+        c.lineWidth = 1.5;
+        c.moveTo(xPx, yBottom);
+        c.lineTo(xPx, yPx);
+        c.stroke();
+        c.restore();
+      });
+
+      if (maxPoint) {
+        const xPx = xScale.getPixelForValue(maxPoint.x);
+        const yPx = yScale.getPixelForValue(maxPoint.y);
+        c.save();
+        c.beginPath();
+        c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
+        c.fillStyle = '#DC143C';
+        c.fill();
+        c.strokeStyle = '#fff';
+        c.lineWidth = 1.5;
+        c.stroke();
+        c.restore();
+      }
+
+      if (minPoint) {
+        const xPx = xScale.getPixelForValue(minPoint.x);
+        const yPx = yScale.getPixelForValue(minPoint.y);
+        c.save();
+        c.beginPath();
+        c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
+        c.fillStyle = '#5B9BD5';
+        c.fill();
+        c.strokeStyle = '#fff';
+        c.lineWidth = 1.5;
+        c.stroke();
+        c.restore();
+      }
+    }
+  };
+
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [
+        {
+          type: 'line',
+          label: 'Temperatura (°C)',
+          data: chartData,
+          borderColor: '#FF6B35',
+          backgroundColor: gradient,
+          fill: true,
+          tension: 0.3,
+          pointRadius: 0,
+          borderWidth: 2,
+          spanGaps: false,
+          yAxisID: 'y',
+          order: 0
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 500 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const pt = tempData.find(d => Math.abs(parseFloat(d.kilometro) - ctx.parsed.x) < 0.01);
+              let label = `${ctx.parsed.y}°C @ ${ctx.parsed.x} km`;
+              if (pt && pt.lluvia == 1) label += ' 💧';
+              return label;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          min: 0,
+          max: xMax,
+          title: { display: true, text: 'Distancia (km)', font: { size: 11 } },
+          ticks: { stepSize: tickStep, font: { size: 10 }, callback: (v) => Math.abs(v % tickStep) < 0.01 ? v : '' },
+          grid: { display: false }
+        },
+        y: {
+          type: 'linear',
+          position: 'left',
+          title: { display: true, text: 'Temperatura (°C)', font: { size: 11 } },
+          ticks: { font: { size: 10 } },
+          grid: { color: 'rgba(0,0,0,0.06)' }
+        }
+      }
+    },
+    plugins: [verticalRainPlugin]
+  });
 }
 
 const guardarRutaManual = async () => {
@@ -947,7 +1339,7 @@ function renderChartDistanciaDesnivel(datos) {
           label: 'Distancia (km)',
           data: kms,
           backgroundColor: 'rgba(13,71,161,0.65)',
-          borderColor: '#0D47A1',
+          borderColor: '#6A0DAD',
           borderWidth: 2,
           yAxisID: 'y'
         },
@@ -1360,7 +1752,7 @@ function configurarLongPressCards() {
 }
 
 // Función para generar el contenido HTML de la ruta
-function generarContenidoRuta(ruta, hasHR = false) {
+function generarContenidoRuta(ruta, hasHR = false, tempData = null) {
   const fields = [
     { label: "📆 Inicio", value: formatFechaTimeISO(ruta.fecha_inicio) },
     { label: "📆 Fin", value: formatFechaTimeISO(ruta.fecha_fin) },
@@ -1387,6 +1779,18 @@ function generarContenidoRuta(ruta, hasHR = false) {
       value: `${ruta.pct_bajada}%`,
     },
   ];
+
+  if (tempData && tempData.length > 0) {
+    const temps = tempData.filter(d => d.temperatura !== null && d.temperatura !== undefined).map(d => d.temperatura);
+    const hasRain = tempData.some(d => d.lluvia == 1);
+    if (temps.length > 0) {
+      const tempMax = Math.max(...temps);
+      const tempMin = Math.min(...temps);
+      fields.push({ label: "🌡️ Temp. máxima", value: `${tempMax.toFixed(1)}°C` });
+      fields.push({ label: "🌡️ Temp. mínima", value: `${tempMin.toFixed(1)}°C` });
+      fields.push({ label: "☂️ Lluvia", value: hasRain ? '☔' : '☀️' });
+    }
+  }
   if (
     hasHR ||
     (ruta.frecuencia_cardiaca_promedio !== undefined &&
@@ -1431,7 +1835,6 @@ function generarContenidoRuta(ruta, hasHR = false) {
       .detail-row-captura {
         display: flex;
         justify-content: space-between;
-        margin-bottom: px;
         padding: 4px 0;
         border-bottom: 1px solid #e0e0e0;
       }
@@ -1455,122 +1858,286 @@ function generarContenidoRuta(ruta, hasHR = false) {
   `;
 }
 
+function actualizarStatsConTemperatura(ruta, tempData) {
+  if (!tempData || tempData.length === 0) return;
+  const statsDiv = document.querySelector('.ruta-details-captura');
+  if (!statsDiv) return;
+  const tempRegex = /(🌡️ Temp\. máxima|🌡️ Temp\. mínima|☂️ Lluvia)/;
+  if (tempRegex.test(statsDiv.parentElement?.innerHTML || '')) return;
+  const nuevoHtml = generarContenidoRuta(ruta, false, tempData);
+  const wrapper = statsDiv.parentElement;
+  if (wrapper) wrapper.innerHTML = nuevoHtml;
+}
+
 // Función principal para mostrar detalles de GPX
 const showGpxDetails = async (ruta_id) => {
-  const data = {
-    ruta_id: ruta_id,
+  const controller = new AbortController();
+  let hasMapData = false;
+  let trackPoints = [];
+  let rutaActualData = null;
+
+  const buildFullHtml = () => {
+    const tempDataForStats = window.__tempPreloadedData || null;
+    const statsHtml = generarContenidoRuta(rutaActualData, false, tempDataForStats);
+    if (hasMapData) {
+      return `
+        <div class="ruta-details-wrapper">
+          <details id="map-details" class="ruta-collapse">
+            <summary class="ruta-collapse-summary">🗺️ Mapa de ruta</summary>
+            <div id="map-container" style="height: 350px; border-radius: 10px; z-index: 1; border: 2px solid #dee2e6; display: none;"></div>
+          </details>
+          <details id="elevation-details" class="ruta-collapse">
+            <summary class="ruta-collapse-summary">📈 Perfil de elevación</summary>
+            <div id="elevation-chart-wrapper" style="height: 180px; margin-top: 8px; padding: 5px; border: 1px solid #dee2e6; border-radius: 8px; display: none;">
+              <canvas id="elevationChart"></canvas>
+            </div>
+          </details>
+          <details id="temp-details" class="ruta-collapse">
+            <summary class="ruta-collapse-summary">🌡️ Temperatura</summary>
+            <div id="temp-chart-wrapper" style="height: 180px; margin-top: 8px; padding: 5px; border: 1px solid #dee2e6; border-radius: 8px; display: none;">
+              <canvas id="tempChart"></canvas>
+            </div>
+          </details>
+          <div style="margin-top: 10px;">${statsHtml}</div>
+        </div>
+        <style>
+          .ruta-details-wrapper { }
+          .leaflet-container { z-index: 1 !important; border-radius: 10px; }
+          .ruta-collapse { margin-bottom: 8px; border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden; }
+          .ruta-collapse-summary { padding: 10px 14px; cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text-primary, #333); background: var(--card-bg, #f8f9fa); user-select: none; text-align: left; }
+          .ruta-collapse-summary:hover { background: var(--hover-bg, #e9ecef); }
+          .ruta-collapse[open] .ruta-collapse-summary { border-bottom: 1px solid #dee2e6; }
+          .swal-wa-top {
+            position: absolute; top: 10px; left: 10px; z-index: 10;
+            background: #25D366; color: #fff; border: none; border-radius: 50%;
+            width: 28px; height: 28px; font-size: 14px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2); transition: transform 0.2s;
+          }
+          .swal-wa-top:hover { transform: scale(1.1); }
+          .swal-close-top {
+            font-size: 22px !important; width: 32px !important; height: 32px !important;
+            line-height: 32px !important; padding: 0 !important;
+            top: 8px !important; right: 8px !important;
+          }
+        </style>
+      `;
+    }
+    return statsHtml;
   };
+
+  const setupLazyListeners = () => {
+    if (!hasMapData) return;
+    window.__rutaTrackPoints = trackPoints;
+    const mapDetails = document.getElementById('map-details');
+    const mapContainer = document.getElementById('map-container');
+    const elevDetails = document.getElementById('elevation-details');
+    const elevWrapper = document.getElementById('elevation-chart-wrapper');
+    const tempDetails = document.getElementById('temp-details');
+    const tempWrapper = document.getElementById('temp-chart-wrapper');
+    if (!mapDetails || !elevDetails) return;
+
+    let mapInitialized = false;
+    let chartInitialized = false;
+    let tempChartInitialized = false;
+    let tempDataCache = null;
+
+    mapDetails.addEventListener('toggle', () => {
+      if (mapDetails.open) {
+        mapContainer.style.display = 'block';
+        if (!mapInitialized) {
+          initRouteMap(trackPoints);
+          mapInitialized = true;
+        } else if (window.__routeMap) {
+          setTimeout(() => window.__routeMap.invalidateSize(), 50);
+        }
+      } else {
+        mapContainer.style.display = 'none';
+      }
+    });
+
+    elevDetails.addEventListener('toggle', () => {
+      if (elevDetails.open) {
+        elevWrapper.style.display = 'block';
+        if (!chartInitialized) {
+          initElevationChart(trackPoints);
+          chartInitialized = true;
+        }
+      } else {
+        elevWrapper.style.display = 'none';
+      }
+    });
+
+    if (tempDetails && tempWrapper) {
+      tempDetails.addEventListener('toggle', async () => {
+        if (tempDetails.open) {
+          tempWrapper.style.display = 'block';
+          if (!tempChartInitialized) {
+            if (!tempDataCache) {
+              if (window.__tempPreloadedData && window.__tempPreloadedData.length > 0) {
+                tempDataCache = window.__tempPreloadedData;
+              } else if (window.__tempPreloadedPromise) {
+                tempWrapper.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 text-muted">Cargando datos climáticos...</p></div>';
+                tempDataCache = await window.__tempPreloadedPromise;
+              } else {
+                tempDataCache = await loadTemperatureData(ruta_id);
+              }
+            }
+            if (tempDataCache && tempDataCache.length > 0) {
+              initTemperatureChart(trackPoints, tempDataCache);
+            } else if (trackPoints && trackPoints.length > 0) {
+              tempWrapper.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 text-muted">Consultando datos climáticos...</p></div>';
+              try {
+                const routeResult = {
+                  track_points: trackPoints.map(p => ({
+                    lat: p.lat,
+                    lon: p.lon,
+                    ele: p.ele || 0,
+                    time: p.time || null
+                  })),
+                  fecha_inicio: rutaActualData.fecha_inicio,
+                  fecha_fin: rutaActualData.fecha_fin,
+                  kms: rutaActualData.kms
+                };
+                await fetchWeatherForRoute(routeResult, ruta_id);
+                tempDataCache = await loadTemperatureData(ruta_id);
+                if (tempDataCache && tempDataCache.length > 0) {
+                  tempWrapper.innerHTML = '<div style="height: 180px; padding: 5px; border: 1px solid #dee2e6; border-radius: 8px;"><canvas id="tempChart"></canvas></div>';
+                  initTemperatureChart(trackPoints, tempDataCache);
+                } else {
+                  tempWrapper.innerHTML = '<div class="text-center text-muted p-3">No se pudieron obtener datos climáticos</div>';
+                }
+              } catch (e) {
+                console.error('Error fetching weather retroactively:', e);
+                tempWrapper.innerHTML = '<div class="text-center text-muted p-3">Error al consultar datos climáticos</div>';
+              }
+            } else {
+              tempWrapper.innerHTML = '<div class="text-center text-muted p-3">No hay datos de temperatura disponibles</div>';
+            }
+            tempChartInitialized = true;
+          }
+
+          if (tempDataCache && tempDataCache.length > 0) {
+            window.__tempPreloadedData = tempDataCache;
+            const statsDiv = document.querySelector('.ruta-details-captura');
+            if (statsDiv) {
+              const nuevoHtml = generarContenidoRuta(rutaActualData, false, tempDataCache);
+              const tempRegex = /(🌡️ Temp\. máxima|🌡️ Temp\. mínima|☂️ Lluvia)/;
+              if (!tempRegex.test(statsDiv.parentElement?.innerHTML || '')) {
+                const wrapper = statsDiv.parentElement;
+                if (wrapper) wrapper.innerHTML = nuevoHtml;
+              }
+            }
+          }
+        } else {
+          tempWrapper.style.display = 'none';
+        }
+      });
+    }
+  };
+
+  Swal.fire({
+    title: false,
+    html: '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 text-muted">Cargando detalles...</p></div>',
+    width: 800,
+    padding: "10px",
+    showCloseButton: true,
+    showConfirmButton: false,
+    showDenyButton: false,
+    customClass: {
+      popup: 'swal-ruta-detalle',
+      closeButton: 'swal-close-top'
+    }
+  });
 
   try {
     const response = await axios.post(
       getApiUrl('ruta.php?getRutasById'),
-      { data },
+      { data: { ruta_id } },
       {
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal
       }
     );
 
-    if (response.data.success) {
-      const ruta = response.data.content[0];
-      window.rutaActual = ruta;
+    if (!response.data.success) {
+      const htmlEl = Swal.getHtml();
+      if (htmlEl) htmlEl.innerHTML = '<div class="text-center py-4 text-danger">Error al cargar los detalles</div>';
+      return;
+    }
 
-      let hasMapData = false;
-      let trackPoints = [];
-      if (ruta.gpx_data && ruta.gpx_data !== 'null' && ruta.gpx_data !== '[]') {
-        try {
-          trackPoints = JSON.parse(ruta.gpx_data);
-          hasMapData = trackPoints.length > 2;
-        } catch (e) {}
+    rutaActualData = response.data.content[0];
+    window.rutaActual = rutaActualData;
+
+    if (rutaActualData.gpx_data && rutaActualData.gpx_data !== 'null' && rutaActualData.gpx_data !== '[]') {
+      try {
+        trackPoints = JSON.parse(rutaActualData.gpx_data);
+        hasMapData = trackPoints.length > 2;
+      } catch (e) {}
+    }
+
+    Swal.update({
+      html: buildFullHtml(),
+      showConfirmButton: false,
+      showDenyButton: false
+    });
+
+    setupLazyListeners();
+
+    if (hasMapData) {
+      const popup = Swal.getPopup();
+      if (popup) {
+        popup.style.position = 'relative';
+        const waBtn = document.createElement('button');
+        waBtn.id = 'wa-share-btn';
+        waBtn.className = 'swal-wa-top';
+        waBtn.innerHTML = '<i class="fab fa-whatsapp"></i>';
+        waBtn.title = 'Compartir por WhatsApp';
+        waBtn.onclick = async (e) => {
+          e.preventDefault();
+          await compartirRutaWhatsApp();
+        };
+        popup.insertBefore(waBtn, popup.firstChild);
       }
 
-      const statsHtml = generarContenidoRuta(ruta);
-
-      let fullHtml;
-      if (hasMapData) {
-        fullHtml = `
-          <div class="ruta-details-wrapper">
-            <details id="map-details" class="ruta-collapse">
-              <summary class="ruta-collapse-summary">🗺️ Mapa de ruta</summary>
-              <div id="map-container" style="height: 350px; border-radius: 10px; z-index: 1; border: 2px solid #dee2e6; display: none;"></div>
-            </details>
-            <details id="elevation-details" class="ruta-collapse">
-              <summary class="ruta-collapse-summary">📈 Perfil de elevación</summary>
-              <div id="elevation-chart-wrapper" style="height: 180px; margin-top: 8px; padding: 5px; border: 1px solid #dee2e6; border-radius: 8px; display: none;">
-                <canvas id="elevationChart"></canvas>
-              </div>
-            </details>
-            <div style="margin-top: 10px;">${statsHtml}</div>
-          </div>
-          <style>
-            .ruta-details-wrapper { max-height: 650px; overflow-y: auto; }
-            .leaflet-container { z-index: 1 !important; border-radius: 10px; }
-            .ruta-collapse { margin-bottom: 8px; border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden; }
-            .ruta-collapse-summary { padding: 10px 14px; cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text-primary, #333); background: var(--card-bg, #f8f9fa); user-select: none; }
-            .ruta-collapse-summary:hover { background: var(--hover-bg, #e9ecef); }
-            .ruta-collapse[open] .ruta-collapse-summary { border-bottom: 1px solid #dee2e6; }
-          </style>
-        `;
-      } else {
-        fullHtml = statsHtml;
-      }
-
-      Swal.fire({
-        title: hasMapData ? "🗺️ Detalles de ruta" : "📊 Detalles",
-        html: fullHtml,
-        width: 800,
-        padding: "10px",
-        showCloseButton: true,
-        showConfirmButton: true,
-        confirmButtonText: "Cerrar",
-        customClass: { title: 'swal-title-small' },
-        didOpen: () => {
-          if (hasMapData) {
-            const mapDetails = document.getElementById('map-details');
-            const mapContainer = document.getElementById('map-container');
-            const elevDetails = document.getElementById('elevation-details');
-            const elevWrapper = document.getElementById('elevation-chart-wrapper');
-
-            let mapInitialized = false;
-            let chartInitialized = false;
-
-            mapDetails.addEventListener('toggle', () => {
-              if (mapDetails.open) {
-                mapContainer.style.display = 'block';
-                if (!mapInitialized) {
-                  initRouteMap(trackPoints);
-                  mapInitialized = true;
-                } else if (window.__routeMap) {
-                  setTimeout(() => window.__routeMap.invalidateSize(), 50);
-                }
-              } else {
-                mapContainer.style.display = 'none';
-              }
-            });
-
-            elevDetails.addEventListener('toggle', () => {
-              if (elevDetails.open) {
-                elevWrapper.style.display = 'block';
-                if (!chartInitialized) {
-                  initElevationChart(trackPoints);
-                  chartInitialized = true;
-                }
-              } else {
-                elevWrapper.style.display = 'none';
-              }
-            });
-          }
+      window.__tempPreloadedData = null;
+      window.__tempPreloadedPromise = loadTemperatureData(ruta_id).then(existing => {
+        if (existing && existing.length > 0) {
+          window.__tempPreloadedData = existing;
+          actualizarStatsConTemperatura(rutaActualData, existing);
+          return existing;
         }
+        const routeResult = {
+          track_points: trackPoints.map(p => ({
+            lat: p.lat, lon: p.lon, ele: p.ele || 0, time: p.time || null
+          })),
+          fecha_inicio: rutaActualData.fecha_inicio,
+          fecha_fin: rutaActualData.fecha_fin,
+          kms: rutaActualData.kms
+        };
+        return fetchWeatherForRouteSilent(routeResult, ruta_id).then(downloaded => {
+          if (downloaded && downloaded.length > 0) {
+            window.__tempPreloadedData = downloaded;
+            actualizarStatsConTemperatura(rutaActualData, downloaded);
+            return downloaded;
+          }
+          return loadTemperatureData(ruta_id);
+        });
+      }).then(data => {
+        if (data && data.length > 0 && !window.__tempPreloadedData) {
+          window.__tempPreloadedData = data;
+          actualizarStatsConTemperatura(rutaActualData, data);
+        }
+      }).catch(e => {
+        console.warn('Preload temperature failed:', e);
+        return [];
       });
     }
+
   } catch (err) {
-    console.error("Error al obtener rutas:", err);
-    Swal.fire({
-      icon: "error",
-      title: "Error",
-      text: "No se pudieron cargar los detalles de la ruta",
-    });
+    if (axios.isCancel(err)) return;
+    const htmlEl = Swal.getHtml();
+    if (htmlEl) htmlEl.innerHTML = '<div class="text-center py-4 text-danger">Error al cargar los detalles</div>';
   }
 };
 
@@ -1596,12 +2163,12 @@ function initRouteMap(trackPoints) {
   const simplified = downsamplePoints(trackPoints, 2000);
   const latlngs = simplified.map(p => [p.lat, p.lon]);
   const polyline = L.polyline(latlngs, {
-    color: '#667eea',
+    color: '#6A0DAD',
     weight: 4,
     opacity: 0.85
   }).addTo(map);
 
-  map.fitBounds(polyline.getBounds(), { padding: [30, 30] });
+  map.fitBounds(polyline.getBounds(), { padding: [5, 5], maxZoom: 19 });
 
   L.marker(latlngs[0], {
     icon: L.divIcon({
@@ -1670,23 +2237,28 @@ function initElevationChart(trackPoints) {
   if (!canvas) return;
 
   const sampled = downsamplePoints(trackPoints, 500);
-  const distances = computeCumulativeDistances(sampled);
-  const distKm = distances.map(d => parseFloat((d / 1000).toFixed(2)));
-  const elevations = sampled.map(p => p.ele);
+  const fullDistances = computeCumulativeDistances(trackPoints);
+  const totalKm = fullDistances[fullDistances.length - 1] / 1000;
+  const tickStep = totalKm <= 5 ? 1 : totalKm <= 20 ? 1 : totalKm <= 50 ? 2 : totalKm <= 100 ? 5 : 10;
+  const chartData = sampled.map(pt => {
+    const idx = trackPoints.indexOf(pt);
+    const x = parseFloat((fullDistances[idx] / 1000).toFixed(2));
+    return { x, y: pt.ele };
+  });
   const ctx = canvas.getContext('2d');
 
   const gradient = ctx.createLinearGradient(0, 0, 0, 180);
-  gradient.addColorStop(0, 'rgba(102, 126, 234, 0.3)');
-  gradient.addColorStop(1, 'rgba(102, 126, 234, 0.02)');
+  gradient.addColorStop(0, 'rgba(13, 71, 161, 0.3)');
+  gradient.addColorStop(1, 'rgba(13, 71, 161, 0.02)');
 
+  const xMax = Math.ceil(totalKm);
   new Chart(ctx, {
     type: 'line',
     data: {
-      labels: distKm,
       datasets: [{
         label: 'Elevación (m)',
-        data: elevations,
-        borderColor: '#667eea',
+        data: chartData,
+        borderColor: '#6A0DAD',
         backgroundColor: gradient,
         fill: true,
         tension: 0.3,
@@ -1708,8 +2280,11 @@ function initElevationChart(trackPoints) {
       },
       scales: {
         x: {
+          type: 'linear',
+          min: 0,
+          max: xMax,
           title: { display: true, text: 'Distancia (km)', font: { size: 11 } },
-          ticks: { maxTicksLimit: 8, font: { size: 10 }, callback: (v) => Number.isInteger(v) ? v : '' },
+          ticks: { stepSize: tickStep, font: { size: 10 }, callback: (v) => Math.abs(v % tickStep) < 0.01 ? v : '' },
           grid: { display: false }
         },
         y: {
@@ -1720,6 +2295,349 @@ function initElevationChart(trackPoints) {
       }
     }
   });
+}
+
+async function compartirRutaWhatsApp() {
+  const ruta = window.rutaActual;
+  const trackPoints = window.__rutaTrackPoints;
+  if (!ruta || !trackPoints || trackPoints.length < 2) return;
+
+  Swal.showLoading();
+
+  let tempData = window.__tempPreloadedData || null;
+  if (!tempData && ruta.id) {
+    try {
+      tempData = await loadTemperatureData(ruta.id);
+    } catch (e) {}
+  }
+
+  try {
+    const container = document.createElement('div');
+    container.style.cssText = 'position:fixed;top:0;left:0;width:800px;z-index:-1;background:#fff;';
+    document.body.appendChild(container);
+
+    const titleBar = document.createElement('div');
+    titleBar.style.cssText = 'text-align:center;padding:14px 10px 6px;font-size:17px;font-weight:700;color:#333;font-family:Arial,sans-serif;';
+    const kms = ruta.kms ? parseFloat(ruta.kms).toFixed(2) : '0';
+    const fechaHora = ruta.fecha_inicio ? formatFechaTimeISO(ruta.fecha_inicio) : '';
+    titleBar.textContent = fechaHora ? `${fechaHora} — ${kms} km` : `${kms} km`;
+    container.appendChild(titleBar);
+
+    const sep = document.createElement('hr');
+    sep.style.cssText = 'margin:6px 0;border:none;border-top:2px solid #6A0DAD;';
+    container.appendChild(sep);
+
+    const elevDiv = document.createElement('div');
+    elevDiv.style.cssText = 'width:800px;height:220px;padding:8px;';
+    const canvas = document.createElement('canvas');
+    canvas.width = 800;
+    canvas.height = 220;
+    canvas.style.cssText = 'width:100%;height:100%;';
+    elevDiv.appendChild(canvas);
+    container.appendChild(elevDiv);
+
+    const sep2 = document.createElement('hr');
+    sep2.style.cssText = 'margin:6px 0;border:none;border-top:2px solid #6A0DAD;';
+    container.appendChild(sep2);
+
+    let tempChartDiv = null;
+    let tempCanvas = null;
+    if (tempData && tempData.length > 0) {
+      tempChartDiv = document.createElement('div');
+      tempChartDiv.style.cssText = 'width:800px;height:180px;padding:8px;';
+      tempCanvas = document.createElement('canvas');
+      tempCanvas.width = 800;
+      tempCanvas.height = 180;
+      tempCanvas.style.cssText = 'width:100%;height:100%;';
+      tempChartDiv.appendChild(tempCanvas);
+      container.appendChild(tempChartDiv);
+
+      const sepTemp = document.createElement('hr');
+      sepTemp.style.cssText = 'margin:6px 0;border:none;border-top:2px solid #6A0DAD;';
+      container.appendChild(sepTemp);
+    }
+
+    const fieldsShare = [
+      { label: "📆 Inicio", value: formatFechaTimeISO(ruta.fecha_inicio) },
+      { label: "📆 Fin", value: formatFechaTimeISO(ruta.fecha_fin) },
+      { label: "🕑 Tiempo total", value: ruta.tiempo_total },
+      { label: "⌚ Tiempo en movimiento", value: ruta.tiempo_movimiento },
+      { label: "📏 Distancia", value: `${ruta.kms} km` },
+      { label: "🏎️ Velocidad media", value: `${ruta.velocidad_media} km/h` },
+      { label: "🚀 Velocidad máxima", value: `${ruta.velocidad_maxima} km/h` },
+      { label: "⏫ Ascenso", value: `${ruta.metros_ascenso} m` },
+      { label: "⏬ Descenso", value: `${ruta.metros_descenso} m` },
+      { label: "⛰️ Altitud máxima", value: `${ruta.altitud_maxima} m` },
+      { label: "⚡ Potencia promedio", value: `${ruta.potencia_promedio_w} W` },
+      { label: "💥 Calorías", value: `${ruta.calorias} kcal` },
+      { label: `⬆️ Subida (${ruta.tiempo_subida || "00:00:00"})`, value: `${ruta.pct_subida}%` },
+      { label: `➡️ Plano (${ruta.tiempo_plano || "00:00:00"})`, value: `${ruta.pct_plano}%` },
+    ];
+
+    const hasRainShare = tempData ? tempData.some(d => d.lluvia == 1) : false;
+    fieldsShare.push({
+      label: `⬇️ Bajada (${ruta.tiempo_bajada || "00:00:00"})`,
+      value: `${ruta.pct_bajada}%`
+    });
+    fieldsShare.push({
+      label: "☂️ Lluvia",
+      value: hasRainShare ? '☔' : '☀️'
+    });
+
+    const tempsArr = (tempData && tempData.length > 0)
+      ? tempData.filter(d => d.temperatura !== null && d.temperatura !== undefined).map(d => d.temperatura)
+      : [];
+    if (tempsArr.length > 0) {
+      const tempMaxSh = Math.max(...tempsArr);
+      const tempMinSh = Math.min(...tempsArr);
+      fieldsShare.push({ label: "🌡️ Temp. mínima", value: `${tempMinSh.toFixed(1)}°C` });
+      fieldsShare.push({ label: "🌡️ Temp. máxima", value: `${tempMaxSh.toFixed(1)}°C` });
+    }
+
+    const shareStatsHtml = `
+      <div class="ruta-details-captura">
+        ${fieldsShare.map(f => `
+          <div class="detail-row-captura">
+            <strong class="label-captura">${f.label}:</strong>
+            <span class="value-captura">${f.value}</span>
+          </div>
+        `).join("")}
+      </div>
+      <style>
+        .ruta-details-captura {
+          display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;max-height:none;overflow:visible;border:none;padding:0;
+        }
+        .detail-row-captura {
+          display:flex;flex-direction:column;gap:1px;justify-content:flex-start;border-bottom:none;padding:6px;background:#f4f6f8;border-radius:6px;
+        }
+        .label-captura { font-size:10px;color:#666; }
+        .value-captura { font-size:13px;font-weight:700; }
+      </style>`;
+
+    const statsDiv = document.createElement('div');
+    statsDiv.id = 'share-stats';
+    statsDiv.style.cssText = 'padding:10px;font-family:Arial,sans-serif;';
+    statsDiv.innerHTML = shareStatsHtml;
+    container.appendChild(statsDiv);
+
+    const sampled = downsamplePoints(trackPoints, 500);
+    const fullDistances = computeCumulativeDistances(trackPoints);
+    const totalKm = fullDistances[fullDistances.length - 1] / 1000;
+    const tickStep = totalKm <= 5 ? 1 : totalKm <= 20 ? 1 : totalKm <= 50 ? 2 : totalKm <= 100 ? 5 : 10;
+    const chartData = sampled.map(pt => {
+      const idx = trackPoints.indexOf(pt);
+      return { x: parseFloat((fullDistances[idx] / 1000).toFixed(2)), y: pt.ele };
+    });
+
+    new Chart(canvas, {
+      type: 'line',
+      data: {
+        datasets: [{
+          label: 'Elevación (m)',
+          data: chartData,
+          borderColor: '#6A0DAD',
+          backgroundColor: function(ctx) {
+            if (!ctx.chart.chartArea) return 'transparent';
+            const g = ctx.chart.ctx.createLinearGradient(0, ctx.chart.chartArea.top, 0, ctx.chart.chartArea.bottom);
+            g.addColorStop(0, 'rgba(102,126,234,0.3)');
+            g.addColorStop(1, 'rgba(102,126,234,0.02)');
+            return g;
+          },
+          fill: true,
+          tension: 0.3,
+          pointRadius: 0,
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 0 },
+        plugins: { legend: { display: false } },
+        scales: {
+          x: {
+            type: 'linear', min: 0, max: Math.ceil(totalKm),
+            title: { display: true, text: 'Distancia (km)', font: { size: 11 } },
+            ticks: { stepSize: tickStep, font: { size: 10 }, callback: v => Math.abs(v % tickStep) < 0.01 ? v : '' },
+            grid: { display: false }
+          },
+          y: {
+            title: { display: true, text: 'Elevación (m)', font: { size: 11 } },
+            ticks: { font: { size: 10 } },
+            grid: { color: 'rgba(0,0,0,0.06)' }
+          }
+        }
+      }
+    });
+
+    if (tempCanvas && tempData) {
+      const tempChartData = tempData.map(d => ({
+        x: parseFloat(d.kilometro),
+        y: d.temperatura !== null && d.temperatura !== undefined ? parseFloat(d.temperatura) : null
+      })).filter(d => d.y !== null);
+
+      const lluviaData = tempData
+        .filter(d => d.lluvia == 1 && d.temperatura !== null && d.temperatura !== undefined)
+        .map(d => ({ x: parseFloat(d.kilometro), y: parseFloat(d.temperatura) }));
+
+      const temps = tempChartData.filter(d => d.y !== null);
+      let maxPoint = null;
+      let minPoint = null;
+      if (temps.length > 0) {
+        const maxVal = Math.max(...temps.map(d => d.y));
+        const minVal = Math.min(...temps.map(d => d.y));
+        maxPoint = temps.find(d => d.y === maxVal);
+        minPoint = temps.find(d => d.y === minVal);
+      }
+
+      const tempGradient = tempCanvas.getContext('2d').createLinearGradient(0, 0, 0, 180);
+      tempGradient.addColorStop(0, 'rgba(255, 107, 53, 0.3)');
+      tempGradient.addColorStop(1, 'rgba(255, 107, 53, 0.02)');
+
+      const shareTempPlugin = {
+        id: 'shareTempMarkers',
+        afterDatasetsDraw(chart) {
+          const c = chart.ctx;
+          const xScale = chart.scales.x;
+          const yScale = chart.scales.y;
+          const yBottom = yScale.getPixelForValue(yScale.min);
+
+          lluviaData.forEach(pt => {
+            const xPx = xScale.getPixelForValue(pt.x);
+            const yPx = yScale.getPixelForValue(pt.y);
+            c.save();
+            c.beginPath();
+            c.setLineDash([4, 4]);
+            c.strokeStyle = 'rgba(33, 150, 243, 0.7)';
+            c.lineWidth = 1.5;
+            c.moveTo(xPx, yBottom);
+            c.lineTo(xPx, yPx);
+            c.stroke();
+            c.restore();
+          });
+
+          if (maxPoint) {
+            const xPx = xScale.getPixelForValue(maxPoint.x);
+            const yPx = yScale.getPixelForValue(maxPoint.y);
+            c.save();
+            c.beginPath();
+            c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
+            c.fillStyle = '#DC143C';
+            c.fill();
+            c.strokeStyle = '#fff';
+            c.lineWidth = 1.5;
+            c.stroke();
+            c.restore();
+          }
+
+          if (minPoint) {
+            const xPx = xScale.getPixelForValue(minPoint.x);
+            const yPx = yScale.getPixelForValue(minPoint.y);
+            c.save();
+            c.beginPath();
+            c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
+            c.fillStyle = '#5B9BD5';
+            c.fill();
+            c.strokeStyle = '#fff';
+            c.lineWidth = 1.5;
+            c.stroke();
+            c.restore();
+          }
+        }
+      };
+
+      new Chart(tempCanvas, {
+        type: 'line',
+        data: {
+          datasets: [
+            {
+              type: 'line',
+              label: 'Temperatura (°C)',
+              data: tempChartData,
+              borderColor: '#FF6B35',
+              backgroundColor: tempGradient,
+              fill: true,
+              tension: 0.3,
+              pointRadius: 0,
+              borderWidth: 2,
+              spanGaps: false,
+              yAxisID: 'y',
+              order: 0
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 0 },
+          plugins: { legend: { display: false } },
+          scales: {
+            x: {
+              type: 'linear', min: 0, max: Math.ceil(totalKm),
+              title: { display: true, text: 'Distancia (km)', font: { size: 11 } },
+              ticks: { stepSize: tickStep, font: { size: 10 }, callback: v => Math.abs(v % tickStep) < 0.01 ? v : '' },
+              grid: { display: false }
+            },
+            y: {
+              title: { display: true, text: 'Temperatura (°C)', font: { size: 11 } },
+              ticks: { font: { size: 10 } },
+              grid: { color: 'rgba(0,0,0,0.06)' }
+            }
+          }
+        },
+        plugins: [shareTempPlugin]
+      });
+    }
+
+    const tileBaseUrl = `${getApiBaseUrl()}/api/helpers/tile_proxy.php?z={z}&x={x}&y={y}`;
+    const mapCanvas = await renderMapRouteToCanvas(trackPoints, 800, 400, tileBaseUrl);
+    mapCanvas.style.cssText = 'width:800px;height:400px;display:block;';
+    container.insertBefore(mapCanvas, sep);
+
+    const resultCanvas = await html2canvas(container, {
+      scale: 2,
+      backgroundColor: '#ffffff',
+      logging: false
+    });
+
+    document.body.removeChild(container);
+
+    const blob = await new Promise(resolve => resultCanvas.toBlob(resolve, 'image/png', 1.0));
+    if (!blob) throw new Error('No se pudo generar la imagen');
+
+    Swal.close();
+
+    const fileName = `ruta_${(fechaHora || 'gpx').replace(/[^a-zA-Z0-9]/g, '_')}.png`;
+    const texto = `${fechaHora || ''} — ${kms} km`;
+
+    if (navigator.share && navigator.canShare) {
+      const file = new File([blob], fileName, { type: 'image/png' });
+      const shareData = { text: texto, files: [file] };
+      if (navigator.canShare(shareData)) {
+        try { await navigator.share(shareData); return; }
+        catch (e) { if (e.name === 'AbortError') return; }
+      }
+    }
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isMobile) {
+      window.location.href = 'https://wa.me/';
+    } else {
+      window.open('https://wa.me/', '_blank');
+    }
+
+  } catch (err) {
+    console.error('Error al compartir ruta:', err);
+    Swal.hideLoading();
+    Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo generar la imagen' });
+  }
 }
 
 // ========== FUNCIONES DE GESTIÓN DE RUTAS ==========
@@ -1987,12 +2905,10 @@ const generarAcordeonAnual = (anio, meses, expandir) => {
             <h2 class="accordion-header" id="heading_${anio}">
                 <button class="accordion-button ${buttonClass} py-2" type="button" data-bs-toggle="collapse"
                     data-bs-target="#collapse_${anio}" aria-expanded="${expandir}">
-                    <div class="d-flex justify-content-between w-100 pe-3 align-items-center">
-                        <span class="fw-bold">${anio}</span>
-                        <div class="text-end small">
-                            <span class="me-3">🧭 ${global.total_anual_kms_global.toLocaleString()} km</span>
-                            <span class="">🚴‍♂️ ${global.rutas_anio}</span>
-                        </div>
+                    <div class="d-flex w-100 pe-3 align-items-center" style="display: flex; justify-content: space-between;">
+                        <span class="fw-bold" style="flex: 0 0 auto;">${anio}</span>
+                        <span class="small" style="flex: 1; text-align: center;">🧭 ${(() => { const n = Number(global.total_anual_kms_global); const [int, dec] = n.toFixed(2).split('.'); return int.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + dec; })()} km</span>
+                        <span class="small" style="flex: 0 0 auto;">🚴‍♂️ ${global.rutas_anio}</span>
                     </div>
                 </button>
             </h2>
@@ -2352,4 +3268,95 @@ function renderizarGraficaVelocidades(datos, vehiculo_id, anio) {
       }
     }
   });
+}
+
+function latLngToPixel(lat, lng, zoom) {
+  const world = 256 * Math.pow(2, zoom);
+  const x = (lng + 180) / 360 * world;
+  const latRad = lat * Math.PI / 180;
+  const y = world / 2 - world * Math.log(Math.tan(Math.PI / 4 + latRad / 2)) / (2 * Math.PI);
+  return { x, y };
+}
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+async function renderMapRouteToCanvas(routePoints, canvasWidth, canvasHeight, tileUrlTemplate) {
+  const lats = routePoints.map(p => p.lat);
+  const lngs = routePoints.map(p => p.lon);
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs);
+  const maxLng = Math.max(...lngs);
+  const centerLat = (minLat + maxLat) / 2;
+  const centerLng = (minLng + maxLng) / 2;
+  const pts = downsamplePoints(routePoints, 2000);
+
+  let zoom = 1;
+  for (let z = 19; z >= 1; z--) {
+    const minPx = latLngToPixel(maxLat, minLng, z);
+    const maxPx = latLngToPixel(minLat, maxLng, z);
+    const pw = Math.abs(maxPx.x - minPx.x);
+    const ph = Math.abs(maxPx.y - minPx.y);
+    if (pw <= canvasWidth * 0.95 && ph <= canvasHeight * 0.95) {
+      zoom = z;
+      break;
+    }
+  }
+
+  const centerPx = latLngToPixel(centerLat, centerLng, zoom);
+  const vpLeft = centerPx.x - canvasWidth / 2;
+  const vpTop = centerPx.y - canvasHeight / 2;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = canvasWidth;
+  canvas.height = canvasHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#f8f8f8';
+  ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+  const tileXMin = Math.floor(vpLeft / 256);
+  const tileYMin = Math.floor(vpTop / 256);
+  const tileXMax = Math.ceil((vpLeft + canvasWidth) / 256);
+  const tileYMax = Math.ceil((vpTop + canvasHeight) / 256);
+
+  const tilePromises = [];
+  for (let tx = tileXMin; tx < tileXMax; tx++) {
+    for (let ty = tileYMin; ty < tileYMax; ty++) {
+      const src = tileUrlTemplate.replace('{z}', zoom).replace('{x}', tx).replace('{y}', ty);
+      const drawX = tx * 256 - vpLeft;
+      const drawY = ty * 256 - vpTop;
+      tilePromises.push(
+        loadImage(src).then(img => {
+          ctx.drawImage(img, drawX, drawY, 256, 256);
+        }).catch(() => {
+          ctx.fillStyle = '#e0e0e0';
+          ctx.fillRect(drawX, drawY, 256, 256);
+        })
+      );
+    }
+  }
+  await Promise.all(tilePromises);
+
+  ctx.beginPath();
+  ctx.strokeStyle = '#6A0DAD';
+  ctx.lineWidth = 4;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  for (let i = 0; i < pts.length; i++) {
+    const px = latLngToPixel(pts[i].lat, pts[i].lon, zoom);
+    const vx = px.x - vpLeft;
+    const vy = px.y - vpTop;
+    if (i === 0) ctx.moveTo(vx, vy);
+    else ctx.lineTo(vx, vy);
+  }
+  ctx.stroke();
+
+  return canvas;
 }

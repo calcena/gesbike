@@ -234,6 +234,42 @@ function handle_get_rutas_chart()
     }
 }
 
+function handle_guardar_temperaturas()
+{
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['success' => false, 'error' => 'Método no permitido']);
+        return;
+    }
+    $input = json_decode(file_get_contents('php://input'), true);
+    $params = $input['data'];
+    try {
+        $count = createRutaTemperatura($params['ruta_id'], $params['temperaturas']);
+        echo json_encode(['success' => true, 'content' => ['saved' => $count]]);
+    } catch (Exception $e) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+}
+
+function handle_get_temperaturas()
+{
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['success' => false, 'error' => 'Método no permitido']);
+        return;
+    }
+    $input = json_decode(file_get_contents('php://input'), true);
+    $params = $input['data'];
+    try {
+        $entity = getRutaTemperatura($params['ruta_id']);
+        echo json_encode(['success' => true, 'content' => $entity]);
+    } catch (Exception $e) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+}
+
 // === Enrutar según acción ===
 switch ($action) {
     case 'guardarRutaGPX':
@@ -262,6 +298,12 @@ switch ($action) {
         break;
     case 'getRutasChartData':
         handle_get_rutas_chart();
+        break;
+    case 'guardarTemperaturas':
+        handle_guardar_temperaturas();
+        break;
+    case 'getTemperaturas':
+        handle_get_temperaturas();
         break;
     default:
         http_response_code(400);

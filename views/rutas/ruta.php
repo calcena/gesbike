@@ -180,19 +180,17 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
             </div>
             <div class="tab-pane fade" id="tab3" role="tabpanel" aria-labelledby="tab3-tab">
                 <div class="row">
-                    <div class="col w-100 d-flex justify-content-around">
-                        <label for="gpxFile" class="action-icon-wrapper" style="cursor: pointer;">
-                            <img class="" height="60px" src="../../assets/images/icons/importar_gpx.png"
+                    <div class="col-12 d-flex justify-content-center" style="gap: 40px;">
+                        <div class="action-icon-wrapper" style="cursor: pointer; position: relative;">
+                            <img height="50px" src="../../assets/images/icons/importar_gpx.png"
                                 alt="Importar archivo GPX">
-                        </label>
-                        <input type="file" id="gpxFile" accept=".gpx" style="display: none;"
-                            aria-label="Seleccionar archivo GPX" />
-                        <label for="gpxMultipleFile" class="action-icon-wrapper" style="cursor: pointer;">
-                            <img class="" height="60px" src="../../assets/images/icons/importar_varios_gpx.png"
+                            <input type="file" id="gpxFile" accept=".gpx,application/gpx+xml" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;" />
+                        </div>
+                        <div class="action-icon-wrapper" style="cursor: pointer; position: relative;">
+                            <img height="50px" src="../../assets/images/icons/importar_varios_gpx.png"
                                 alt="Importar multiples archivos GPX">
-                        </label>
-                        <input type="file" id="gpxMultipleFile" accept=".gpx" multiple style="display: none;"
-                            aria-label="Seleccionar archivos GPX" />
+                            <input type="file" id="gpxMultipleFile" multiple accept=".gpx,application/gpx+xml" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;" />
+                        </div>
                     </div>
                 </div>
                 <div class="row mt-3">

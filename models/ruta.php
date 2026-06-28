@@ -53,10 +53,13 @@ function get_rutas_chart($params) {
     return get_rutas_chart_data($params);
 }
 
+function createRutaTemperatura($ruta_id, $temperaturas) {
+    return create_temperaturas_repo($ruta_id, $temperaturas);
+}
 
-
-
-
+function getRutaTemperatura($ruta_id) {
+    return get_temperaturas_repo($ruta_id);
+}
 
 
 
