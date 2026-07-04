@@ -203,6 +203,7 @@ function processGPX(text) {
   }
 
   const GPX_NS = "http://www.topografix.com/GPX/1/1";
+  const GARMIN_NS = "http://www.garmin.com/xmlschemas/TrackPointExtension/v1";
 
   let trkptsNodes = doc.getElementsByTagNameNS(GPX_NS, "trkpt");
   if (trkptsNodes.length === 0) trkptsNodes = doc.querySelectorAll("trkpt");
@@ -214,11 +215,20 @@ function processGPX(text) {
       if (!eleElem) eleElem = pt.querySelector("ele");
       if (!timeElem) timeElem = pt.querySelector("time");
 
+      let hr = null, speed = null, cad = null;
+      const extElems = pt.getElementsByTagNameNS(GARMIN_NS, "hr");
+      if (extElems.length > 0) hr = parseInt(extElems[0].textContent) || null;
+      const spdElems = pt.getElementsByTagNameNS(GARMIN_NS, "speed");
+      if (spdElems.length > 0) speed = parseFloat(spdElems[0].textContent) || null;
+      const cadElems = pt.getElementsByTagNameNS(GARMIN_NS, "cad");
+      if (cadElems.length > 0) cad = parseInt(cadElems[0].textContent) || null;
+
       return {
         lat: parseFloat(pt.getAttribute("lat")),
         lon: parseFloat(pt.getAttribute("lon")),
         ele: eleElem ? parseFloat(eleElem.textContent) : 0,
         time: timeElem ? new Date(timeElem.textContent) : new Date(),
+        hr, speed, cad,
       };
     })
     .filter(
@@ -315,6 +325,10 @@ function processGPX(text) {
   const planoPerc =
     totalDistRuta > 0 ? ((distPlano / totalDistRuta) * 100).toFixed(0) : 0;
 
+  const hrValues = trkpts.filter(p => p.hr != null && p.hr > 0).map(p => p.hr);
+  const frecuencia_cardiaca_promedio = hrValues.length > 0 ? Math.round(hrValues.reduce((a, b) => a + b, 0) / hrValues.length) : null;
+  const frecuencia_cardiaca_maxima = hrValues.length > 0 ? Math.max(...hrValues) : null;
+
   return {
     fecha_inicio: trkpts[0].time.toISOString(),
     fecha_fin: trkpts[trkpts.length - 1].time.toISOString(),
@@ -333,13 +347,18 @@ function processGPX(text) {
     tiempo_plano: tiemposTerreno.tiempoPlano,
     velocidad_media: Number(avgSpeedMoving.toFixed(1)),
     velocidad_maxima: Number(maxSpeedFiltered.toFixed(1)),
+    frecuencia_cardiaca_promedio: frecuencia_cardiaca_promedio,
+    frecuencia_cardiaca_maxima: frecuencia_cardiaca_maxima,
     potencia_promedio_w: Math.round(avgPower),
     calorias: Math.round(calories),
     track_points: trkpts.map(p => ({
       lat: parseFloat(p.lat.toFixed(6)),
       lon: parseFloat(p.lon.toFixed(6)),
       ele: Math.round(p.ele),
-      time: p.time.toISOString()
+      time: p.time.toISOString(),
+      ...(p.hr != null && p.hr > 0 ? { hr: p.hr } : {}),
+      ...(p.speed != null ? { speed: parseFloat((p.speed * 3.6).toFixed(1)) } : {}),
+      ...(p.cad != null ? { cad: p.cad } : {}),
     })),
   };
 }
@@ -358,6 +377,8 @@ async function initRutas() {
   await getRutasByVehiculo();
   setupGPXUpload();
   setupMultipleGPXUpload();
+  setupFITUpload();
+  setupMultipleFITUpload();
 
   const params = new URLSearchParams(window.location.search);
   if (params.get('tab') === '4') {
@@ -422,7 +443,7 @@ function setupGPXUpload() {
         let result;
         result = processGPX(text);
         const container = document.getElementById("output-container");
-        container.innerHTML = generarContenidoRuta(result, file.name.endsWith(".tcx"));
+        container.innerHTML = generarContenidoGPX(result);
         await sendToAPI(result);
       } catch (err) {
         console.error("💥 Error:", err);
@@ -623,19 +644,16 @@ async function sendToAPI(result) {
     );
 
     if (response.data.success) {
-      await Swal.fire({
+      Swal.fire({
         text: "✅ Ruta guardada correctamente",
         icon: "success",
+        toast: true,
+        position: 'top-end',
         timer: 2000,
         showConfirmButton: false,
       });
       await getRutasByVehiculo();
       await crearBackup();
-
-      const rutaId = response.data.content;
-      if (rutaId && result.track_points && result.track_points.length > 0) {
-        fetchWeatherForRoute(result, rutaId);
-      }
     } else {
       throw new Error(response.data.message || "Error del servidor");
     }
@@ -716,7 +734,8 @@ async function fetchWeatherForRoute(result, rutaId) {
   const cacheMap = new Map();
   const weatherData = [];
 
-  const BATCH_SIZE = 10;
+  const BATCH_SIZE = 5;
+  const BATCH_DELAY_MS = 1200;
   for (let i = 0; i < samples.length; i += BATCH_SIZE) {
     const batch = samples.slice(i, i + BATCH_SIZE);
     const batchResults = await Promise.all(batch.map(async (pt) => {
@@ -735,24 +754,31 @@ async function fetchWeatherForRoute(result, rutaId) {
         return { kilometro: pt.kilometro, lat: pt.lat, lon: pt.lon, temperatura: temp, lluvia: rain, hora: ptTime.toISOString() };
       }
 
-      try {
-        const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${pt.lat}&longitude=${pt.lon}&start_date=${dateStr}&end_date=${dateStr}&hourly=temperature_2m,precipitation&timezone=auto`;
-        const resp = await fetch(url);
-        if (!resp.ok) return null;
-        const json = await resp.json();
-        const hourly = json.hourly || {};
-        const temps = hourly.temperature_2m || [];
-        const precip = hourly.precipitation || [];
+      for (let retry = 0; retry < 3; retry++) {
+        try {
+          if (retry > 0) await new Promise(r => setTimeout(r, 2000 * retry));
+          const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${pt.lat}&longitude=${pt.lon}&start_date=${dateStr}&end_date=${dateStr}&hourly=temperature_2m,precipitation&timezone=auto`;
+          const resp = await fetch(url);
+          if (resp.status === 429) continue;
+          if (!resp.ok) return null;
+          const json = await resp.json();
+          const hourly = json.hourly || {};
+          const temps = hourly.temperature_2m || [];
+          const precip = hourly.precipitation || [];
 
-        cacheMap.set(cacheKey, { temps, precip });
+          cacheMap.set(cacheKey, { temps, precip });
 
-        const temp = temps[hour] ?? null;
-        const rain = precip[hour] > 0 ? 1 : 0;
-        return { kilometro: pt.kilometro, lat: pt.lat, lon: pt.lon, temperatura: temp, lluvia: rain, hora: ptTime.toISOString() };
-      } catch (e) {
-        console.warn('Weather fetch error for point', pt.kilometro, 'km:', e);
-        return null;
+          const temp = temps[hour] ?? null;
+          const rain = precip[hour] > 0 ? 1 : 0;
+          return { kilometro: pt.kilometro, lat: pt.lat, lon: pt.lon, temperatura: temp, lluvia: rain, hora: ptTime.toISOString() };
+        } catch (e) {
+          if (retry === 2) {
+            console.warn('Weather fetch error for point', pt.kilometro, 'km:', e);
+            return null;
+          }
+        }
       }
+      return null;
     }));
 
     for (const r of batchResults) {
@@ -761,6 +787,9 @@ async function fetchWeatherForRoute(result, rutaId) {
 
     const progressEl = document.getElementById('clima-progress');
     if (progressEl) progressEl.textContent = `Procesando ${Math.min(i + BATCH_SIZE, samples.length)}/${samples.length} puntos`;
+    if (i + BATCH_SIZE < samples.length) {
+      await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+    }
   }
 
   Swal.close();
@@ -800,7 +829,8 @@ async function fetchWeatherForRouteSilent(result, rutaId) {
   const cacheMap = new Map();
   const weatherData = [];
 
-  const BATCH_SIZE = 10;
+  const BATCH_SIZE = 5;
+  const BATCH_DELAY_MS = 1200;
   for (let i = 0; i < samples.length; i += BATCH_SIZE) {
     const batch = samples.slice(i, i + BATCH_SIZE);
     const batchResults = await Promise.all(batch.map(async (pt) => {
@@ -819,27 +849,35 @@ async function fetchWeatherForRouteSilent(result, rutaId) {
         return { kilometro: pt.kilometro, lat: pt.lat, lon: pt.lon, temperatura: temp, lluvia: rain, hora: ptTime.toISOString() };
       }
 
-      try {
-        const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${pt.lat}&longitude=${pt.lon}&start_date=${dateStr}&end_date=${dateStr}&hourly=temperature_2m,precipitation&timezone=auto`;
-        const resp = await fetch(url);
-        if (!resp.ok) return null;
-        const json = await resp.json();
-        const hourly = json.hourly || {};
-        const temps = hourly.temperature_2m || [];
-        const precip = hourly.precipitation || [];
+      for (let retry = 0; retry < 3; retry++) {
+        try {
+          if (retry > 0) await new Promise(r => setTimeout(r, 2000 * retry));
+          const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${pt.lat}&longitude=${pt.lon}&start_date=${dateStr}&end_date=${dateStr}&hourly=temperature_2m,precipitation&timezone=auto`;
+          const resp = await fetch(url);
+          if (resp.status === 429) continue;
+          if (!resp.ok) return null;
+          const json = await resp.json();
+          const hourly = json.hourly || {};
+          const temps = hourly.temperature_2m || [];
+          const precip = hourly.precipitation || [];
 
-        cacheMap.set(cacheKey, { temps, precip });
+          cacheMap.set(cacheKey, { temps, precip });
 
-        const temp = temps[hour] ?? null;
-        const rain = precip[hour] > 0 ? 1 : 0;
-        return { kilometro: pt.kilometro, lat: pt.lat, lon: pt.lon, temperatura: temp, lluvia: rain, hora: ptTime.toISOString() };
-      } catch (e) {
-        return null;
+          const temp = temps[hour] ?? null;
+          const rain = precip[hour] > 0 ? 1 : 0;
+          return { kilometro: pt.kilometro, lat: pt.lat, lon: pt.lon, temperatura: temp, lluvia: rain, hora: ptTime.toISOString() };
+        } catch (e) {
+          if (retry === 2) return null;
+        }
       }
+      return null;
     }));
 
     for (const r of batchResults) {
       if (r) weatherData.push(r);
+    }
+    if (i + BATCH_SIZE < samples.length) {
+      await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
     }
   }
 
@@ -904,11 +942,32 @@ function initTemperatureChart(trackPoints, tempData) {
   const temps = chartData.filter(d => d.y !== null);
   let maxPoint = null;
   let minPoint = null;
+  let maxVal = null;
+  let minVal = null;
   if (temps.length > 0) {
-    const maxVal = Math.max(...temps.map(d => d.y));
-    const minVal = Math.min(...temps.map(d => d.y));
+    maxVal = Math.max(...temps.map(d => d.y));
+    minVal = Math.min(...temps.map(d => d.y));
     maxPoint = temps.find(d => d.y === maxVal);
     minPoint = temps.find(d => d.y === minVal);
+  }
+
+    function drawTempLabel(c, text, x, y, color, align) {
+    c.save();
+    c.font = 'bold 11px Arial';
+    c.textAlign = align || 'left';
+    const m = c.measureText(text);
+    const pad = 4;
+    const bw = m.width + pad * 2;
+    const bh = 14;
+    let bx;
+    if (align === 'right') bx = x - bw;
+    else if (align === 'center') bx = x - bw / 2;
+    else bx = x;
+    c.fillStyle = '#fff';
+    c.fillRect(bx, y - bh + 3, bw, bh);
+    c.fillStyle = color;
+    c.fillText(text, x, y);
+    c.restore();
   }
 
   const verticalRainPlugin = {
@@ -946,6 +1005,10 @@ function initTemperatureChart(trackPoints, tempData) {
         c.lineWidth = 1.5;
         c.stroke();
         c.restore();
+
+        const align = xPx + 55 > chart.width ? 'right' : 'left';
+        const xOff = xPx + (xPx + 55 > chart.width ? -8 : 8);
+        drawTempLabel(c, `${maxVal.toFixed(1)}°C`, xOff, yPx + 4, '#DC143C', align);
       }
 
       if (minPoint) {
@@ -960,6 +1023,10 @@ function initTemperatureChart(trackPoints, tempData) {
         c.lineWidth = 1.5;
         c.stroke();
         c.restore();
+
+        const align = xPx + 55 > chart.width ? 'right' : 'left';
+        const xOff = xPx + (xPx + 55 > chart.width ? -8 : 8);
+        drawTempLabel(c, `${minVal.toFixed(1)}°C`, xOff, yPx + 10, '#5B9BD5', align);
       }
     }
   };
@@ -1020,6 +1087,136 @@ function initTemperatureChart(trackPoints, tempData) {
       }
     },
     plugins: [verticalRainPlugin]
+  });
+}
+
+function initPulsacionesChart(trackPoints, pulsacionesData) {
+  const canvas = document.getElementById('pulsacionesChart');
+  if (!canvas || !pulsacionesData || pulsacionesData.length === 0) return;
+
+  const fullDistances = computeCumulativeDistances(trackPoints);
+  const totalKm = fullDistances[fullDistances.length - 1] / 1000;
+  const tickStep = totalKm <= 5 ? 1 : totalKm <= 20 ? 1 : totalKm <= 50 ? 2 : totalKm <= 100 ? 5 : 10;
+  const xMax = Math.ceil(totalKm);
+
+  const chartData = pulsacionesData
+    .filter(d => d.pulsaciones !== null && d.pulsaciones !== undefined)
+    .map(d => ({
+      x: parseFloat(d.kilometro),
+      y: parseInt(d.pulsaciones)
+    }));
+
+  if (chartData.length === 0) return;
+
+  const ctx = canvas.getContext('2d');
+  const gradient = ctx.createLinearGradient(0, 0, 0, 180);
+  gradient.addColorStop(0, 'rgba(220, 20, 60, 0.25)');
+  gradient.addColorStop(1, 'rgba(220, 20, 60, 0.02)');
+
+  const maxVal = Math.max(...chartData.map(d => d.y));
+  const minVal = Math.min(...chartData.map(d => d.y));
+  const maxPoint = chartData.find(d => d.y === maxVal);
+  const minPoint = chartData.find(d => d.y === minVal);
+
+  const hrPlugin = {
+    id: 'hrMarkers',
+    afterDatasetsDraw(chart) {
+      const c = chart.ctx;
+      const xScale = chart.scales.x;
+      const yScale = chart.scales.y;
+      const chartW = chart.width;
+
+      if (maxPoint) {
+        const xPx = xScale.getPixelForValue(maxPoint.x);
+        const yPx = yScale.getPixelForValue(maxPoint.y);
+        c.save();
+        c.beginPath();
+        c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
+        c.fillStyle = '#DC143C';
+        c.fill();
+        c.strokeStyle = '#fff';
+        c.lineWidth = 1.5;
+        c.stroke();
+        c.restore();
+
+        c.save();
+        c.font = 'bold 11px Arial';
+        c.fillStyle = '#DC143C';
+        c.textAlign = xPx + 60 > chartW ? 'right' : 'left';
+        c.fillText(`${maxVal} bpm`, xPx + (xPx + 60 > chartW ? -8 : 8), yPx + 4);
+        c.restore();
+      }
+
+      if (minPoint) {
+        const xPx = xScale.getPixelForValue(minPoint.x);
+        const yPx = yScale.getPixelForValue(minPoint.y);
+        c.save();
+        c.beginPath();
+        c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
+        c.fillStyle = '#5B9BD5';
+        c.fill();
+        c.strokeStyle = '#fff';
+        c.lineWidth = 1.5;
+        c.stroke();
+        c.restore();
+
+        c.save();
+        c.font = 'bold 11px Arial';
+        c.fillStyle = '#5B9BD5';
+        c.textAlign = xPx + 60 > chartW ? 'right' : 'left';
+        c.fillText(`${minVal} bpm`, xPx + (xPx + 60 > chartW ? -8 : 8), yPx + 4);
+        c.restore();
+      }
+    }
+  };
+
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [{
+        label: 'Pulsaciones (bpm)',
+        data: chartData,
+        borderColor: '#DC143C',
+        backgroundColor: gradient,
+        fill: true,
+        tension: 0.3,
+        pointRadius: 0,
+        borderWidth: 2,
+        spanGaps: false,
+        yAxisID: 'y'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 500 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.parsed.y} bpm @ ${ctx.parsed.x.toFixed(2)} km`
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          min: 0,
+          max: xMax,
+          title: { display: true, text: 'Distancia (km)', font: { size: 11 } },
+          ticks: { stepSize: tickStep, font: { size: 10 }, callback: (v) => Math.abs(v % tickStep) < 0.01 ? v : '' },
+          grid: { display: false }
+        },
+        y: {
+          type: 'linear',
+          position: 'left',
+          title: { display: true, text: 'Pulsaciones (bpm)', font: { size: 11 } },
+          ticks: { font: { size: 10 } },
+          grid: { color: 'rgba(0,0,0,0.06)' }
+        }
+      }
+    },
+    plugins: [hrPlugin]
   });
 }
 
@@ -1674,6 +1871,12 @@ function configurarLongPressCards() {
   const startPress = (card, e) => {
     if (e.button !== 0 && e.type === 'mousedown') return; // Solo click izquierdo
 
+    // No iniciar long-press si se pulsa sobre el icono (zona de popup/edición)
+    if (e.target.closest) {
+      const iconArea = e.target.closest('.card-icon-area');
+      if (iconArea && card.contains(iconArea)) return;
+    }
+
     isPressing = true;
     currentCard = card;
 
@@ -1751,8 +1954,58 @@ function configurarLongPressCards() {
   });
 }
 
+// Función para generar resumen compacto de GPX (similar a FIT)
+function generarContenidoGPX(ruta) {
+  const hasHR = ruta.frecuencia_cardiaca_promedio != null;
+  const hasPower = ruta.potencia_promedio_w != null && ruta.potencia_promedio_w > 0;
+  return `
+    <div class="ruta-details-captura" style="background: #fff; border: 2px solid #667eea; border-radius: 10px; padding: 15px; max-height: 400px; overflow-y: auto;">
+      <h6 style="color: #667eea; font-weight: bold; margin-bottom: 10px;">
+        <i class="fas fa-check-circle text-success"></i> Ruta GPX importada
+      </h6>
+      <div class="detail-row-captura" style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee;">
+        <span style="font-weight: 500;">Distancia</span>
+        <span style="font-weight: 600;">${ruta.kms} km</span>
+      </div>
+      <div class="detail-row-captura" style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee;">
+        <span style="font-weight: 500;">Velocidad media</span>
+        <span style="font-weight: 600;">${ruta.velocidad_media} km/h</span>
+      </div>
+      <div class="detail-row-captura" style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee;">
+        <span style="font-weight: 500;">Velocidad máxima</span>
+        <span style="font-weight: 600;">${ruta.velocidad_maxima} km/h</span>
+      </div>
+      <div class="detail-row-captura" style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee;">
+        <span style="font-weight: 500;">Ascenso</span>
+        <span style="font-weight: 600;">${ruta.metros_ascenso} m</span>
+      </div>
+      <div class="detail-row-captura" style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee;">
+        <span style="font-weight: 500;">Pulsaciones promedio</span>
+        <span style="font-weight: 600;">${hasHR ? ruta.frecuencia_cardiaca_promedio + " bpm" : "N/A"}</span>
+      </div>
+      <div class="detail-row-captura" style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee;">
+        <span style="font-weight: 500;">Pulsaciones máximas</span>
+        <span style="font-weight: 600;">${hasHR ? ruta.frecuencia_cardiaca_maxima + " bpm" : "N/A"}</span>
+      </div>
+      <div class="detail-row-captura" style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee;">
+        <span style="font-weight: 500;">Potencia promedio</span>
+        <span style="font-weight: 600;">${hasPower ? ruta.potencia_promedio_w + " W" : "N/A"}</span>
+      </div>
+      <div class="detail-row-captura" style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee;">
+        <span style="font-weight: 500;">Calorías</span>
+        <span style="font-weight: 600;">${ruta.calorias || "—"}</span>
+      </div>
+      <div class="detail-row-captura" style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee;">
+        <span style="font-weight: 500;">Puntos del track</span>
+        <span style="font-weight: 600;">${ruta.track_points?.length || 0}</span>
+      </div>
+    </div>
+  `;
+}
+
 // Función para generar el contenido HTML de la ruta
-function generarContenidoRuta(ruta, hasHR = false, tempData = null) {
+function generarContenidoRuta(ruta, hasHR = false, tempData = null, pulsacionesSummary = null) {
+  const hasElevChart = ruta.gpx_data && ruta.gpx_data !== 'null' && ruta.gpx_data !== '[]';
   const fields = [
     { label: "📆 Inicio", value: formatFechaTimeISO(ruta.fecha_inicio) },
     { label: "📆 Fin", value: formatFechaTimeISO(ruta.fecha_fin) },
@@ -1761,9 +2014,11 @@ function generarContenidoRuta(ruta, hasHR = false, tempData = null) {
     { label: "📏 Distancia", value: `${ruta.kms} km` },
     { label: "🏎️ Velocidad media", value: `${ruta.velocidad_media} km/h` },
     { label: "🚀 Velocidad máxima", value: `${ruta.velocidad_maxima} km/h` },
-    { label: "⏫ Ascenso", value: `${ruta.metros_ascenso} m` },
-    { label: "⏬ Descenso", value: `${ruta.metros_descenso} m` },
-    { label: "⛰️ Altitud máxima", value: `${ruta.altitud_maxima} m` },
+    ...(hasElevChart ? [] : [
+      { label: "⏫ Ascenso", value: `${ruta.metros_ascenso} m` },
+      { label: "⏬ Descenso", value: `${ruta.metros_descenso} m` },
+    ]),
+    ...(hasElevChart ? [] : [{ label: "⛰️ Altitud máxima", value: `${ruta.altitud_maxima} m` }]),
     { label: "⚡ Potencia promedio", value: `${ruta.potencia_promedio_w} W` },
     { label: "💥 Calorías", value: `${ruta.calorias} kcal` },
     {
@@ -1780,17 +2035,6 @@ function generarContenidoRuta(ruta, hasHR = false, tempData = null) {
     },
   ];
 
-  if (tempData && tempData.length > 0) {
-    const temps = tempData.filter(d => d.temperatura !== null && d.temperatura !== undefined).map(d => d.temperatura);
-    const hasRain = tempData.some(d => d.lluvia == 1);
-    if (temps.length > 0) {
-      const tempMax = Math.max(...temps);
-      const tempMin = Math.min(...temps);
-      fields.push({ label: "🌡️ Temp. máxima", value: `${tempMax.toFixed(1)}°C` });
-      fields.push({ label: "🌡️ Temp. mínima", value: `${tempMin.toFixed(1)}°C` });
-      fields.push({ label: "☂️ Lluvia", value: hasRain ? '☔' : '☀️' });
-    }
-  }
   if (
     hasHR ||
     (ruta.frecuencia_cardiaca_promedio !== undefined &&
@@ -1827,8 +2071,8 @@ function generarContenidoRuta(ruta, hasHR = false, tempData = null) {
         font-size: 14px;
         background: white;
         border-radius: 10px;
-        padding: 15px;
-        border: 2px solid #2562D3;
+        padding: 4px;
+        border: 1px solid #2562D3;
         max-height: 600px;
         overflow-y: auto;
       }
@@ -1858,15 +2102,13 @@ function generarContenidoRuta(ruta, hasHR = false, tempData = null) {
   `;
 }
 
-function actualizarStatsConTemperatura(ruta, tempData) {
+function actualizarStatsConTemperatura(ruta, tempData, pulsacionesSummary = null) {
   if (!tempData || tempData.length === 0) return;
   const statsDiv = document.querySelector('.ruta-details-captura');
   if (!statsDiv) return;
-  const tempRegex = /(🌡️ Temp\. máxima|🌡️ Temp\. mínima|☂️ Lluvia)/;
+  const tempRegex = /(🌡️ Temp\. máxima|🌡️ Temp\. mínima)/;
   if (tempRegex.test(statsDiv.parentElement?.innerHTML || '')) return;
-  const nuevoHtml = generarContenidoRuta(ruta, false, tempData);
-  const wrapper = statsDiv.parentElement;
-  if (wrapper) wrapper.innerHTML = nuevoHtml;
+  statsDiv.outerHTML = generarContenidoRuta(ruta, false, tempData, pulsacionesSummary);
 }
 
 // Función principal para mostrar detalles de GPX
@@ -1875,10 +2117,11 @@ const showGpxDetails = async (ruta_id) => {
   let hasMapData = false;
   let trackPoints = [];
   let rutaActualData = null;
+  let pulsacionesSummary = null;
 
-  const buildFullHtml = () => {
+  const buildFullHtml = (pulsacionesSummary = null) => {
     const tempDataForStats = window.__tempPreloadedData || null;
-    const statsHtml = generarContenidoRuta(rutaActualData, false, tempDataForStats);
+    const statsHtml = generarContenidoRuta(rutaActualData, false, tempDataForStats, pulsacionesSummary);
     if (hasMapData) {
       return `
         <div class="ruta-details-wrapper">
@@ -1888,23 +2131,31 @@ const showGpxDetails = async (ruta_id) => {
           </details>
           <details id="elevation-details" class="ruta-collapse">
             <summary class="ruta-collapse-summary">📈 Perfil de elevación</summary>
-            <div id="elevation-chart-wrapper" style="height: 180px; margin-top: 8px; padding: 5px; border: 1px solid #dee2e6; border-radius: 8px; display: none;">
+            <div id="elevation-chart-wrapper" style="height: 180px; margin-top: 4px; padding: 1px; border: 1px solid #dee2e6; border-radius: 8px; display: none;">
               <canvas id="elevationChart"></canvas>
             </div>
           </details>
+          ${rutaActualData && rutaActualData.has_pulsaciones == 1 ? `
+          <details id="pulsaciones-details" class="ruta-collapse">
+            <summary class="ruta-collapse-summary">❤️ Pulsaciones</summary>
+            <div id="pulsaciones-chart-wrapper" style="height: 180px; margin-top: 4px; padding: 1px; border: 1px solid #dee2e6; border-radius: 8px; display: none;">
+              <canvas id="pulsacionesChart"></canvas>
+            </div>
+          </details>
+          ` : ''}
           <details id="temp-details" class="ruta-collapse">
             <summary class="ruta-collapse-summary">🌡️ Temperatura</summary>
-            <div id="temp-chart-wrapper" style="height: 180px; margin-top: 8px; padding: 5px; border: 1px solid #dee2e6; border-radius: 8px; display: none;">
+            <div id="temp-chart-wrapper" style="height: 180px; margin-top: 4px; padding: 1px; border: 1px solid #dee2e6; border-radius: 8px; display: none;">
               <canvas id="tempChart"></canvas>
             </div>
           </details>
-          <div style="margin-top: 10px;">${statsHtml}</div>
+          <div>${statsHtml}</div>
         </div>
         <style>
           .ruta-details-wrapper { }
           .leaflet-container { z-index: 1 !important; border-radius: 10px; }
-          .ruta-collapse { margin-bottom: 8px; border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden; }
-          .ruta-collapse-summary { padding: 10px 14px; cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text-primary, #333); background: var(--card-bg, #f8f9fa); user-select: none; text-align: left; }
+          .ruta-collapse { margin-bottom: 2px; border: 1px solid #dee2e6; border-radius: 6px; overflow: hidden; }
+          .ruta-collapse-summary { padding: 8px 6px; cursor: pointer; font-weight: 600; font-size: 13px; color: var(--text-primary, #333); background: var(--card-bg, #f8f9fa); user-select: none; text-align: left; }
           .ruta-collapse-summary:hover { background: var(--hover-bg, #e9ecef); }
           .ruta-collapse[open] .ruta-collapse-summary { border-bottom: 1px solid #dee2e6; }
           .swal-wa-top {
@@ -1999,7 +2250,7 @@ const showGpxDetails = async (ruta_id) => {
                   fecha_fin: rutaActualData.fecha_fin,
                   kms: rutaActualData.kms
                 };
-                await fetchWeatherForRoute(routeResult, ruta_id);
+                await fetchWeatherForRouteSilent(routeResult, ruta_id);
                 tempDataCache = await loadTemperatureData(ruta_id);
                 if (tempDataCache && tempDataCache.length > 0) {
                   tempWrapper.innerHTML = '<div style="height: 180px; padding: 5px; border: 1px solid #dee2e6; border-radius: 8px;"><canvas id="tempChart"></canvas></div>';
@@ -2021,16 +2272,45 @@ const showGpxDetails = async (ruta_id) => {
             window.__tempPreloadedData = tempDataCache;
             const statsDiv = document.querySelector('.ruta-details-captura');
             if (statsDiv) {
-              const nuevoHtml = generarContenidoRuta(rutaActualData, false, tempDataCache);
-              const tempRegex = /(🌡️ Temp\. máxima|🌡️ Temp\. mínima|☂️ Lluvia)/;
+              const tempRegex = /(🌡️ Temp\. máxima|🌡️ Temp\. mínima)/;
               if (!tempRegex.test(statsDiv.parentElement?.innerHTML || '')) {
-                const wrapper = statsDiv.parentElement;
-                if (wrapper) wrapper.innerHTML = nuevoHtml;
+                statsDiv.outerHTML = generarContenidoRuta(rutaActualData, false, tempDataCache, pulsacionesSummary);
               }
             }
           }
         } else {
           tempWrapper.style.display = 'none';
+        }
+      });
+    }
+
+    const pulsacionesDetails = document.getElementById('pulsaciones-details');
+    const pulsacionesWrapper = document.getElementById('pulsaciones-chart-wrapper');
+    if (pulsacionesDetails && pulsacionesWrapper) {
+      let pulsacionesChartInitialized = false;
+      let pulsacionesDataCache = null;
+
+      pulsacionesDetails.addEventListener('toggle', async () => {
+        if (pulsacionesDetails.open) {
+          pulsacionesWrapper.style.display = 'block';
+          if (!pulsacionesChartInitialized) {
+            pulsacionesWrapper.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 text-muted">Cargando datos de pulsaciones...</p></div>';
+            try {
+              pulsacionesDataCache = await getPulsacionesByRuta(ruta_id);
+              if (pulsacionesDataCache && pulsacionesDataCache.length > 0) {
+                pulsacionesWrapper.innerHTML = '<div style="height: 180px; padding: 5px; border: 1px solid #dee2e6; border-radius: 8px;"><canvas id="pulsacionesChart"></canvas></div>';
+                initPulsacionesChart(trackPoints, pulsacionesDataCache);
+              } else {
+                pulsacionesWrapper.innerHTML = '<div class="text-center text-muted p-3">No hay datos de pulsaciones disponibles</div>';
+              }
+            } catch (e) {
+              console.error('Error loading pulsaciones:', e);
+              pulsacionesWrapper.innerHTML = '<div class="text-center text-muted p-3">Error al cargar datos de pulsaciones</div>';
+            }
+            pulsacionesChartInitialized = true;
+          }
+        } else {
+          pulsacionesWrapper.style.display = 'none';
         }
       });
     }
@@ -2040,7 +2320,7 @@ const showGpxDetails = async (ruta_id) => {
     title: false,
     html: '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 text-muted">Cargando detalles...</p></div>',
     width: 800,
-    padding: "10px",
+    padding: "0px",
     showCloseButton: true,
     showConfirmButton: false,
     showDenyButton: false,
@@ -2069,6 +2349,15 @@ const showGpxDetails = async (ruta_id) => {
     rutaActualData = response.data.content[0];
     window.rutaActual = rutaActualData;
 
+    pulsacionesSummary = null;
+    if (rutaActualData.has_pulsaciones == 1) {
+      try {
+        pulsacionesSummary = await getPulsacionesSummaryByRuta(ruta_id);
+      } catch (e) {
+        console.warn('Error loading pulsaciones summary:', e);
+      }
+    }
+
     if (rutaActualData.gpx_data && rutaActualData.gpx_data !== 'null' && rutaActualData.gpx_data !== '[]') {
       try {
         trackPoints = JSON.parse(rutaActualData.gpx_data);
@@ -2077,7 +2366,7 @@ const showGpxDetails = async (ruta_id) => {
     }
 
     Swal.update({
-      html: buildFullHtml(),
+      html: buildFullHtml(pulsacionesSummary),
       showConfirmButton: false,
       showDenyButton: false
     });
@@ -2104,7 +2393,7 @@ const showGpxDetails = async (ruta_id) => {
       window.__tempPreloadedPromise = loadTemperatureData(ruta_id).then(existing => {
         if (existing && existing.length > 0) {
           window.__tempPreloadedData = existing;
-          actualizarStatsConTemperatura(rutaActualData, existing);
+          actualizarStatsConTemperatura(rutaActualData, existing, pulsacionesSummary);
           return existing;
         }
         const routeResult = {
@@ -2118,7 +2407,7 @@ const showGpxDetails = async (ruta_id) => {
         return fetchWeatherForRouteSilent(routeResult, ruta_id).then(downloaded => {
           if (downloaded && downloaded.length > 0) {
             window.__tempPreloadedData = downloaded;
-            actualizarStatsConTemperatura(rutaActualData, downloaded);
+            actualizarStatsConTemperatura(rutaActualData, downloaded, pulsacionesSummary);
             return downloaded;
           }
           return loadTemperatureData(ruta_id);
@@ -2126,7 +2415,7 @@ const showGpxDetails = async (ruta_id) => {
       }).then(data => {
         if (data && data.length > 0 && !window.__tempPreloadedData) {
           window.__tempPreloadedData = data;
-          actualizarStatsConTemperatura(rutaActualData, data);
+          actualizarStatsConTemperatura(rutaActualData, data, pulsacionesSummary);
         }
       }).catch(e => {
         console.warn('Preload temperature failed:', e);
@@ -2232,18 +2521,40 @@ function downsamplePoints(points, maxPoints) {
   return result;
 }
 
-function initElevationChart(trackPoints) {
-  const canvas = document.getElementById('elevationChart');
+function initElevationChart(trackPoints, canvasEl) {
+  const canvas = canvasEl || document.getElementById('elevationChart');
   if (!canvas) return;
 
   const sampled = downsamplePoints(trackPoints, 500);
   const fullDistances = computeCumulativeDistances(trackPoints);
   const totalKm = fullDistances[fullDistances.length - 1] / 1000;
   const tickStep = totalKm <= 5 ? 1 : totalKm <= 20 ? 1 : totalKm <= 50 ? 2 : totalKm <= 100 ? 5 : 10;
+
+  let ascAcumFull = 0, descAcumFull = 0;
+  const fullAsc = [0];
+  const fullDesc = [0];
+  for (let i = 1; i < trackPoints.length; i++) {
+    const diff = (trackPoints[i].ele || 0) - (trackPoints[i - 1].ele || 0);
+    if (diff > 0) ascAcumFull += diff;
+    else descAcumFull += Math.abs(diff);
+    fullAsc.push(Math.round(ascAcumFull));
+    fullDesc.push(Math.round(descAcumFull));
+  }
+
   const chartData = sampled.map(pt => {
     const idx = trackPoints.indexOf(pt);
     const x = parseFloat((fullDistances[idx] / 1000).toFixed(2));
     return { x, y: pt.ele };
+  });
+  const ascData = sampled.map(pt => {
+    const idx = trackPoints.indexOf(pt);
+    const x = parseFloat((fullDistances[idx] / 1000).toFixed(2));
+    return { x, y: fullAsc[idx] };
+  });
+  const descData = sampled.map(pt => {
+    const idx = trackPoints.indexOf(pt);
+    const x = parseFloat((fullDistances[idx] / 1000).toFixed(2));
+    return { x, y: fullDesc[idx] };
   });
   const ctx = canvas.getContext('2d');
 
@@ -2251,30 +2562,103 @@ function initElevationChart(trackPoints) {
   gradient.addColorStop(0, 'rgba(13, 71, 161, 0.3)');
   gradient.addColorStop(1, 'rgba(13, 71, 161, 0.02)');
 
+  const maxVal = Math.max(...chartData.map(d => d.y));
+  const maxPoint = chartData.find(d => d.y === maxVal);
+
+  const ascEnd = ascData[ascData.length - 1];
+  const descEnd = descData[descData.length - 1];
+
   const xMax = Math.ceil(totalKm);
+
+  function drawLabelWithBg(c, text, x, y, color, align) {
+    c.save();
+    c.font = 'bold 11px Arial';
+    c.textAlign = align || 'left';
+    const m = c.measureText(text);
+    const pad = 4;
+    const bw = m.width + pad * 2;
+    const bh = 14;
+    let bx;
+    if (align === 'right') bx = x - bw;
+    else if (align === 'center') bx = x - bw / 2;
+    else bx = x;
+    c.fillStyle = '#fff';
+    c.fillRect(bx, y - bh + 3, bw, bh);
+    c.fillStyle = color;
+    c.fillText(text, x, y);
+    c.restore();
+  }
+
+  const elevationPlugin = {
+    id: 'elevationMaxMarker',
+    afterDraw(chart) {
+      const c = chart.ctx;
+      const xScale = chart.scales.x;
+      const yScale = chart.scales.y;
+      const chartArea = chart.chartArea;
+
+      if (!maxPoint) return;
+
+      const xPx = xScale.getPixelForValue(maxPoint.x);
+      const yPx = yScale.getPixelForValue(maxPoint.y);
+
+      c.save();
+      c.beginPath();
+      c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
+      c.fillStyle = '#9C27B0';
+      c.fill();
+      c.strokeStyle = '#fff';
+      c.lineWidth = 1.5;
+      c.stroke();
+      c.restore();
+
+      const altAlign = xPx + 55 > chart.width ? 'right' : 'left';
+      const altX = xPx + (xPx + 55 > chart.width ? -8 : 8);
+      drawLabelWithBg(c, `${Math.round(maxVal)} m`, altX, yPx - 2, '#9C27B0', altAlign);
+
+      if (ascEnd && descEnd) {
+        const labelY = chart.height - 8;
+        const leftX = chartArea.left + 4;
+        const rightX = chartArea.right - 4;
+        drawLabelWithBg(c, `↑${ascEnd.y} m`, leftX, labelY, '#2E7D32', 'left');
+        drawLabelWithBg(c, `↓${descEnd.y} m`, rightX, labelY, '#E65100', 'right');
+      }
+    }
+  };
+
   new Chart(ctx, {
     type: 'line',
     data: {
-      datasets: [{
-        label: 'Elevación (m)',
-        data: chartData,
-        borderColor: '#6A0DAD',
-        backgroundColor: gradient,
-        fill: true,
-        tension: 0.3,
-        pointRadius: 0,
-        borderWidth: 2
-      }]
+      datasets: [
+        {
+          label: 'Elevación (m)',
+          data: chartData,
+          borderColor: '#6A0DAD',
+          backgroundColor: gradient,
+          fill: true,
+          tension: 0.3,
+          pointRadius: 0,
+          borderWidth: 2
+        }
+      ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       animation: { duration: 500 },
+      interaction: {
+        mode: 'index',
+        intersect: false
+      },
       plugins: {
-        legend: { display: false },
+        legend: {
+          display: false
+        },
         tooltip: {
           callbacks: {
-            label: (ctx) => `${ctx.parsed.y} m @ ${ctx.parsed.x} km`
+            label: (ctx) => {
+              return `${ctx.dataset.label}: ${ctx.parsed.y} m`;
+            }
           }
         }
       },
@@ -2293,7 +2677,8 @@ function initElevationChart(trackPoints) {
           grid: { color: 'rgba(0,0,0,0.06)' }
         }
       }
-    }
+    },
+    plugins: [elevationPlugin]
   });
 }
 
@@ -2308,6 +2693,15 @@ async function compartirRutaWhatsApp() {
   if (!tempData && ruta.id) {
     try {
       tempData = await loadTemperatureData(ruta.id);
+    } catch (e) {}
+  }
+
+  let pulsacionesData = null;
+  let pulsacionesSummary = null;
+  if (ruta.has_pulsaciones) {
+    try {
+      pulsacionesData = await getPulsacionesByRuta(ruta.id);
+      pulsacionesSummary = await getPulsacionesSummaryByRuta(ruta.id);
     } catch (e) {}
   }
 
@@ -2335,10 +2729,28 @@ async function compartirRutaWhatsApp() {
     canvas.style.cssText = 'width:100%;height:100%;';
     elevDiv.appendChild(canvas);
     container.appendChild(elevDiv);
+    initElevationChart(trackPoints, canvas);
 
     const sep2 = document.createElement('hr');
     sep2.style.cssText = 'margin:6px 0;border:none;border-top:2px solid #6A0DAD;';
     container.appendChild(sep2);
+
+    let pulsacionesChartDiv = null;
+    let pulsacionesCanvas = null;
+    if (pulsacionesData && pulsacionesData.length > 0) {
+      pulsacionesChartDiv = document.createElement('div');
+      pulsacionesChartDiv.style.cssText = 'width:800px;height:180px;padding:8px;';
+      pulsacionesCanvas = document.createElement('canvas');
+      pulsacionesCanvas.width = 800;
+      pulsacionesCanvas.height = 180;
+      pulsacionesCanvas.style.cssText = 'width:100%;height:100%;';
+      pulsacionesChartDiv.appendChild(pulsacionesCanvas);
+      container.appendChild(pulsacionesChartDiv);
+
+      const sepPuls = document.createElement('hr');
+      sepPuls.style.cssText = 'margin:6px 0;border:none;border-top:2px solid #6A0DAD;';
+      container.appendChild(sepPuls);
+    }
 
     let tempChartDiv = null;
     let tempCanvas = null;
@@ -2357,6 +2769,7 @@ async function compartirRutaWhatsApp() {
       container.appendChild(sepTemp);
     }
 
+    const hasElevChart = ruta.gpx_data && ruta.gpx_data !== 'null' && ruta.gpx_data !== '[]';
     const fieldsShare = [
       { label: "📆 Inicio", value: formatFechaTimeISO(ruta.fecha_inicio) },
       { label: "📆 Fin", value: formatFechaTimeISO(ruta.fecha_fin) },
@@ -2365,33 +2778,32 @@ async function compartirRutaWhatsApp() {
       { label: "📏 Distancia", value: `${ruta.kms} km` },
       { label: "🏎️ Velocidad media", value: `${ruta.velocidad_media} km/h` },
       { label: "🚀 Velocidad máxima", value: `${ruta.velocidad_maxima} km/h` },
-      { label: "⏫ Ascenso", value: `${ruta.metros_ascenso} m` },
-      { label: "⏬ Descenso", value: `${ruta.metros_descenso} m` },
-      { label: "⛰️ Altitud máxima", value: `${ruta.altitud_maxima} m` },
+      ...(hasElevChart ? [] : [
+        { label: "⏫ Ascenso", value: `${ruta.metros_ascenso} m` },
+        { label: "⏬ Descenso", value: `${ruta.metros_descenso} m` },
+      ]),
+      ...(hasElevChart ? [] : [{ label: "⛰️ Altitud máxima", value: `${ruta.altitud_maxima} m` }]),
       { label: "⚡ Potencia promedio", value: `${ruta.potencia_promedio_w} W` },
       { label: "💥 Calorías", value: `${ruta.calorias} kcal` },
       { label: `⬆️ Subida (${ruta.tiempo_subida || "00:00:00"})`, value: `${ruta.pct_subida}%` },
       { label: `➡️ Plano (${ruta.tiempo_plano || "00:00:00"})`, value: `${ruta.pct_plano}%` },
     ];
 
-    const hasRainShare = tempData ? tempData.some(d => d.lluvia == 1) : false;
     fieldsShare.push({
       label: `⬇️ Bajada (${ruta.tiempo_bajada || "00:00:00"})`,
       value: `${ruta.pct_bajada}%`
     });
-    fieldsShare.push({
-      label: "☂️ Lluvia",
-      value: hasRainShare ? '☔' : '☀️'
-    });
 
-    const tempsArr = (tempData && tempData.length > 0)
-      ? tempData.filter(d => d.temperatura !== null && d.temperatura !== undefined).map(d => d.temperatura)
-      : [];
-    if (tempsArr.length > 0) {
-      const tempMaxSh = Math.max(...tempsArr);
-      const tempMinSh = Math.min(...tempsArr);
-      fieldsShare.push({ label: "🌡️ Temp. mínima", value: `${tempMinSh.toFixed(1)}°C` });
-      fieldsShare.push({ label: "🌡️ Temp. máxima", value: `${tempMaxSh.toFixed(1)}°C` });
+    if (!tempData || tempData.length === 0) {
+      const tempsArr = tempData
+        ? tempData.filter(d => d.temperatura !== null && d.temperatura !== undefined).map(d => d.temperatura)
+        : [];
+      if (tempsArr.length > 0) {
+        const tempMaxSh = Math.max(...tempsArr);
+        const tempMinSh = Math.min(...tempsArr);
+        fieldsShare.push({ label: "🌡️ Temp. mínima", value: `${tempMinSh.toFixed(1)}°C` });
+        fieldsShare.push({ label: "🌡️ Temp. máxima", value: `${tempMaxSh.toFixed(1)}°C` });
+      }
     }
 
     const shareStatsHtml = `
@@ -2424,51 +2836,113 @@ async function compartirRutaWhatsApp() {
     const fullDistances = computeCumulativeDistances(trackPoints);
     const totalKm = fullDistances[fullDistances.length - 1] / 1000;
     const tickStep = totalKm <= 5 ? 1 : totalKm <= 20 ? 1 : totalKm <= 50 ? 2 : totalKm <= 100 ? 5 : 10;
-    const chartData = sampled.map(pt => {
-      const idx = trackPoints.indexOf(pt);
-      return { x: parseFloat((fullDistances[idx] / 1000).toFixed(2)), y: pt.ele };
-    });
 
-    new Chart(canvas, {
-      type: 'line',
-      data: {
-        datasets: [{
-          label: 'Elevación (m)',
-          data: chartData,
-          borderColor: '#6A0DAD',
-          backgroundColor: function(ctx) {
-            if (!ctx.chart.chartArea) return 'transparent';
-            const g = ctx.chart.ctx.createLinearGradient(0, ctx.chart.chartArea.top, 0, ctx.chart.chartArea.bottom);
-            g.addColorStop(0, 'rgba(102,126,234,0.3)');
-            g.addColorStop(1, 'rgba(102,126,234,0.02)');
-            return g;
-          },
-          fill: true,
-          tension: 0.3,
-          pointRadius: 0,
-          borderWidth: 2
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: { duration: 0 },
-        plugins: { legend: { display: false } },
-        scales: {
-          x: {
-            type: 'linear', min: 0, max: Math.ceil(totalKm),
-            title: { display: true, text: 'Distancia (km)', font: { size: 11 } },
-            ticks: { stepSize: tickStep, font: { size: 10 }, callback: v => Math.abs(v % tickStep) < 0.01 ? v : '' },
-            grid: { display: false }
-          },
-          y: {
-            title: { display: true, text: 'Elevación (m)', font: { size: 11 } },
-            ticks: { font: { size: 10 } },
-            grid: { color: 'rgba(0,0,0,0.06)' }
+    if (pulsacionesCanvas && pulsacionesData) {
+      const hrChartData = pulsacionesData
+        .filter(d => d.pulsaciones !== null && d.pulsaciones !== undefined)
+        .map(d => ({ x: parseFloat(d.kilometro), y: parseInt(d.pulsaciones) }));
+
+      if (hrChartData.length > 0) {
+        const hrMaxVal = Math.max(...hrChartData.map(d => d.y));
+        const hrMinVal = Math.min(...hrChartData.map(d => d.y));
+        const hrMaxPoint = hrChartData.find(d => d.y === hrMaxVal);
+        const hrMinPoint = hrChartData.find(d => d.y === hrMinVal);
+
+        const hrGradient = pulsacionesCanvas.getContext('2d').createLinearGradient(0, 0, 0, 180);
+        hrGradient.addColorStop(0, 'rgba(220, 20, 60, 0.25)');
+        hrGradient.addColorStop(1, 'rgba(220, 20, 60, 0.02)');
+
+        const shareHrPlugin = {
+          id: 'shareHrMarkers',
+          afterDatasetsDraw(chart) {
+            const c = chart.ctx;
+            const xScale = chart.scales.x;
+            const yScale = chart.scales.y;
+            const chartW = chart.width;
+
+            if (hrMaxPoint) {
+              const xPx = xScale.getPixelForValue(hrMaxPoint.x);
+              const yPx = yScale.getPixelForValue(hrMaxPoint.y);
+              c.save();
+              c.beginPath();
+              c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
+              c.fillStyle = '#DC143C';
+              c.fill();
+              c.strokeStyle = '#fff';
+              c.lineWidth = 1.5;
+              c.stroke();
+              c.restore();
+
+              c.save();
+              c.font = 'bold 11px Arial';
+              c.fillStyle = '#DC143C';
+              c.textAlign = xPx + 60 > chartW ? 'right' : 'left';
+              c.fillText(`${hrMaxVal} bpm`, xPx + (xPx + 60 > chartW ? -8 : 8), yPx + 4);
+              c.restore();
+            }
+
+            if (hrMinPoint) {
+              const xPx = xScale.getPixelForValue(hrMinPoint.x);
+              const yPx = yScale.getPixelForValue(hrMinPoint.y);
+              c.save();
+              c.beginPath();
+              c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
+              c.fillStyle = '#5B9BD5';
+              c.fill();
+              c.strokeStyle = '#fff';
+              c.lineWidth = 1.5;
+              c.stroke();
+              c.restore();
+
+              c.save();
+              c.font = 'bold 11px Arial';
+              c.fillStyle = '#5B9BD5';
+              c.textAlign = xPx + 60 > chartW ? 'right' : 'left';
+              c.fillText(`${hrMinVal} bpm`, xPx + (xPx + 60 > chartW ? -8 : 8), yPx + 4);
+              c.restore();
+            }
           }
-        }
+        };
+
+        new Chart(pulsacionesCanvas, {
+          type: 'line',
+          data: {
+            datasets: [{
+              label: 'Pulsaciones (bpm)',
+              data: hrChartData,
+              borderColor: '#DC143C',
+              backgroundColor: hrGradient,
+              fill: true,
+              tension: 0.3,
+              pointRadius: 0,
+              borderWidth: 2,
+              spanGaps: false,
+              yAxisID: 'y'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 0 },
+            plugins: { legend: { display: false } },
+            scales: {
+              x: {
+                type: 'linear', min: 0, max: Math.ceil(totalKm),
+                title: { display: true, text: 'Distancia (km)', font: { size: 11 } },
+                ticks: { stepSize: tickStep, font: { size: 10 }, callback: v => Math.abs(v % tickStep) < 0.01 ? v : '' },
+                grid: { display: false }
+              },
+              y: {
+                title: { display: true, text: 'Pulsaciones (bpm)', font: { size: 11 } },
+                ticks: { font: { size: 10 } },
+                grid: { color: 'rgba(0,0,0,0.06)' }
+              }
+            }
+          },
+          plugins: [shareHrPlugin]
+        });
       }
-    });
+    }
 
     if (tempCanvas && tempData) {
       const tempChartData = tempData.map(d => ({
@@ -2528,6 +3002,24 @@ async function compartirRutaWhatsApp() {
             c.lineWidth = 1.5;
             c.stroke();
             c.restore();
+
+            const align = xPx + 55 > chart.width ? 'right' : 'left';
+            const xOff = xPx + (xPx + 55 > chart.width ? -8 : 8);
+            const m = c.measureText(`${maxPoint.y.toFixed(1)}°C`);
+            const pad = 4;
+            const bw = m.width + pad * 2;
+            const bh = 14;
+            let bx;
+            if (align === 'right') bx = xOff - bw;
+            else bx = xOff;
+            c.save();
+            c.fillStyle = '#fff';
+            c.fillRect(bx, yPx + 4 - bh + 3, bw, bh);
+            c.font = 'bold 11px Arial';
+            c.fillStyle = '#DC143C';
+            c.textAlign = align;
+            c.fillText(`${maxPoint.y.toFixed(1)}°C`, xOff, yPx + 4);
+            c.restore();
           }
 
           if (minPoint) {
@@ -2541,6 +3033,24 @@ async function compartirRutaWhatsApp() {
             c.strokeStyle = '#fff';
             c.lineWidth = 1.5;
             c.stroke();
+            c.restore();
+
+            const align = xPx + 55 > chart.width ? 'right' : 'left';
+            const xOff = xPx + (xPx + 55 > chart.width ? -8 : 8);
+            const m = c.measureText(`${minPoint.y.toFixed(1)}°C`);
+            const pad = 4;
+            const bw = m.width + pad * 2;
+            const bh = 14;
+            let bx;
+            if (align === 'right') bx = xOff - bw;
+            else bx = xOff;
+            c.save();
+            c.fillStyle = '#fff';
+            c.fillRect(bx, yPx + 10 - bh + 3, bw, bh);
+            c.font = 'bold 11px Arial';
+            c.fillStyle = '#5B9BD5';
+            c.textAlign = align;
+            c.fillText(`${minPoint.y.toFixed(1)}°C`, xOff, yPx + 10);
             c.restore();
           }
         }
@@ -2590,14 +3100,16 @@ async function compartirRutaWhatsApp() {
     }
 
     const tileBaseUrl = `${getApiBaseUrl()}/api/helpers/tile_proxy.php?z={z}&x={x}&y={y}`;
-    const mapCanvas = await renderMapRouteToCanvas(trackPoints, 800, 400, tileBaseUrl);
+    const mapCanvas = await renderMapRouteToCanvas(trackPoints, 1200, 600, tileBaseUrl);
     mapCanvas.style.cssText = 'width:800px;height:400px;display:block;';
     container.insertBefore(mapCanvas, sep);
 
     const resultCanvas = await html2canvas(container, {
-      scale: 2,
+      scale: 4,
       backgroundColor: '#ffffff',
-      logging: false
+      logging: false,
+      useCORS: true,
+      allowTaint: false
     });
 
     document.body.removeChild(container);
@@ -2774,7 +3286,7 @@ const parseHtmlCardsRutas = async (data) => {
               <div class="flex-grow-1">
                 <div class="d-flex justify-content-between align-items-center">
                   <div class="d-flex align-items-center" style="gap: 10px;">
-                    <div style="min-width: 25px;">${iconType}</div>
+                    <div class="card-icon-area" style="min-width: 25px;">${iconType}</div>
                     <p class="text-card-info mb-0">${formatFechaTimeISO(item.fecha_inicio)}${item.regulacion == 1 ? ' <span class="badge bg-warning text-dark" style="font-size:0.6rem">R</span>' : ''}</p>
                   </div>
                   <div class="d-flex align-items-center" style="gap: 25px; margin-left: auto; margin-right: 5px;">

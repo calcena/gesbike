@@ -205,6 +205,31 @@ function compressImage($sourcePath, $targetPath, $maxSizeKB = 200) {
     return file_exists($targetPath) && filesize($targetPath) <= $maxSizeBytes * 1.5; // Permitir hasta 300KB como último recurso
 }
 
+/**
+ * Genera un thumbnail (100px lado mayor) a partir de una imagen comprimida
+ */
+function generateThumbnail($sourcePath, $thumbPath, $maxDim = 100) {
+    $info = getimagesize($sourcePath);
+    if ($info === false) return false;
+    $mime = $info['mime'];
+    switch ($mime) {
+        case 'image/jpeg': $src = imagecreatefromjpeg($sourcePath); break;
+        case 'image/png':  $src = imagecreatefrompng($sourcePath); break;
+        case 'image/gif':  $src = imagecreatefromgif($sourcePath); break;
+        case 'image/webp': $src = imagecreatefromwebp($sourcePath); break;
+        default: return false;
+    }
+    if (!$src) return false;
+    $w = imagesx($src); $h = imagesy($src);
+    if ($w > $h) { $nw = $maxDim; $nh = intval($h * $maxDim / $w); }
+    else { $nh = $maxDim; $nw = intval($w * $maxDim / $h); }
+    $thumb = imagecreatetruecolor($nw, $nh);
+    imagecopyresampled($thumb, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
+    $result = imagejpeg($thumb, $thumbPath, 80);
+    imagedestroy($src); imagedestroy($thumb);
+    return $result;
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['success' => false, 'message' => 'Método no permitido']);
@@ -279,6 +304,14 @@ $targetPath = $uploadDir . $safeName;
 if (!compressImage($file['tmp_name'], $targetPath, 200)) {
     echo json_encode(['success' => false, 'message' => 'Error al comprimir la imagen.']);
     exit;
+}
+
+// Generar thumbnail para selector
+if ($source === 'vehiculo' || $source === 'recambio') {
+    $thumbDir = $uploadDir . 'thumbs/';
+    if (!is_dir($thumbDir)) mkdir($thumbDir, 0755, true);
+    $thumbPath = $thumbDir . $safeName;
+    generateThumbnail($targetPath, $thumbPath, 100);
 }
 
 // Limpiar archivo temporal

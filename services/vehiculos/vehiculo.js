@@ -58,6 +58,9 @@ const parseHtmlVehiculos = (data) => {
       const imgSrc = item.imagen
         ? cacheBustUrl(`../../assets/images/Vehiculos/${item.imagen}`)
         : cacheBustUrl(`../../assets/images/icons/vehiculos_ico.png`);
+      const thumbSrc = item.imagen
+        ? cacheBustUrl(`../../assets/images/Vehiculos/thumbs/${item.imagen}`)
+        : imgSrc;
       const isInactive = item.is_active == 0;
       const cardClass = isInactive ? "card vehiculo-card inactive" : "card vehiculo-card";
 
@@ -67,7 +70,7 @@ const parseHtmlVehiculos = (data) => {
             <div class="card-body p-2">
               <div class="d-flex align-items-center">
                 <div class="vehiculo-card-img me-3">
-                  <img src="${imgSrc}" alt="${item.nombre}" class="rounded">
+                  <img src="${thumbSrc}" alt="${item.nombre}" class="rounded" loading="lazy" decoding="async" onerror="this.src='${imgSrc}'">
                 </div>
                 <div class="flex-grow-1">
                   <div class="d-flex justify-content-between align-items-start">

@@ -137,7 +137,7 @@ const parseHtmlCardRecambios = async (data) => {
   return data
     .map((item) => {
       const recambioImg = item.imagen
-        ? `<img height="40px" src="${cacheBustUrl(`../../assets/images/Recambios/${item.imagen}`)}">`
+        ? `<img height="40px" src="${cacheBustUrl(`../../assets/images/Recambios/thumbs/${item.imagen}`)}" loading="lazy" decoding="async" onerror="this.src='${cacheBustUrl(`../../assets/images/Recambios/${item.imagen}`)}'">`
         : "";
 
       return `

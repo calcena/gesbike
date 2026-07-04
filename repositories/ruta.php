@@ -10,9 +10,12 @@ function get_rutas_by_id($params)
     $db = conectar();
     $stmt = $db->prepare("
                                 SELECT
-                                *
-                                FROM rutas
-                                WHERE id = ?
+                                r.*,
+                                CASE WHEN EXISTS (
+                                    SELECT 1 FROM ruta_pulsacion rp WHERE rp.ruta_id = r.id
+                                ) THEN 1 ELSE 0 END as has_pulsaciones
+                                FROM rutas r
+                                WHERE r.id = ?
                             ");
     $stmt->execute([$params['ruta_id']]);
     $entity = $stmt->fetchAll(PDO::FETCH_ASSOC);

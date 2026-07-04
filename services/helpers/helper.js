@@ -376,7 +376,7 @@ const openVehiculoPicker = (deep = 1) => {
          style="cursor:pointer;gap:10px;"
          onclick="selectVehiculoPicker(${item.id}, '${item.nombre.replace(/'/g, "\\'")}')">
       ${item.imagen
-        ? `<img src="${cacheBustUrl(`${baseUrl}/assets/images/Vehiculos/${item.imagen}`)}" style="width:50px;height:32px;object-fit:cover;border-radius:4px;">`
+        ? `<img src="${cacheBustUrl(`${baseUrl}/assets/images/Vehiculos/thumbs/${item.imagen}`)}" loading="lazy" decoding="async" style="width:50px;height:32px;object-fit:cover;border-radius:4px;" onerror="this.src='${cacheBustUrl(`${baseUrl}/assets/images/Vehiculos/${item.imagen}`)}';">`
         : `<img src="${cacheBustUrl(`${baseUrl}/assets/images/icons/vehiculos_ico.png`)}" style="width:32px;height:32px;object-fit:contain;">`}
       <div>
         <span>${item.nombre}</span>

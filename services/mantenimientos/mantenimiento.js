@@ -158,7 +158,7 @@ const openRecambioPicker = () => {
     <div class="swal-grupo-item d-flex align-items-center p-2 border-bottom ${isSelected ? 'swal-grupo-selected' : ''}"
          style="cursor:pointer;gap:10px;"
          onclick="selectRecambio(${item.id}, '${item.nombre}')">
-      ${item.imagen ? `<img src="${cacheBustUrl(`../../assets/images/Recambios/${item.imagen}`)}" style="width:32px;height:32px;object-fit:cover;border-radius:4px;">` : '<div style="width:32px;"></div>'}
+      ${item.imagen ? `<img src="${cacheBustUrl(`../../assets/images/Recambios/thumbs/${item.imagen}`)}" loading="lazy" decoding="async" style="width:32px;height:32px;object-fit:cover;border-radius:4px;" onerror="this.src='${cacheBustUrl(`../../assets/images/Recambios/${item.imagen}`)}';">` : '<div style="width:32px;"></div>'}
       <div>
         <span>${item.nombre}</span>
         <small class="text-muted ms-1">(stock: ${item.stock})</small>
