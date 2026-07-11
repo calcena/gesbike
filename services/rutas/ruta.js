@@ -1220,6 +1220,409 @@ function initPulsacionesChart(trackPoints, pulsacionesData) {
   });
 }
 
+function getTrackSpeeds(trackPoints, fechaInicio, fechaFin) {
+  const hasGarminSpeed = trackPoints.some(p => p.speed != null && p.speed > 0);
+  if (hasGarminSpeed) {
+    return trackPoints.map((p, i) => ({ index: i, speed: p.speed }));
+  }
+  const hasTime = trackPoints.some(p => p.time != null);
+  if (!hasTime && fechaInicio && fechaFin && trackPoints.length >= 2) {
+    const start = new Date(fechaInicio).getTime();
+    const end = new Date(fechaFin).getTime();
+    const duration = end - start;
+    if (duration > 0) {
+      trackPoints = trackPoints.map((p, i) => ({
+        ...p,
+        time: new Date(start + (duration * i / (trackPoints.length - 1))).toISOString()
+      }));
+    }
+  }
+  const speeds = [];
+  for (let i = 1; i < trackPoints.length; i++) {
+    const prev = trackPoints[i - 1];
+    const curr = trackPoints[i];
+    const dt = (curr.time ? new Date(curr.time) - (prev.time ? new Date(prev.time) : 0) : 0) / 1000;
+    if (dt <= 0) continue;
+    const dist = haversine(prev.lat, prev.lon, curr.lat, curr.lon);
+    const speedMs = dist / dt;
+    const speedKmh = speedMs * 3.6;
+    if (speedKmh > 0.5) {
+      speeds.push({ index: i, speed: speedKmh });
+    }
+  }
+  const windowSize = 5;
+  const halfWindow = Math.floor(windowSize / 2);
+  const smoothed = [];
+  for (let i = 0; i < speeds.length; i++) {
+    let sum = 0, count = 0;
+    for (let j = Math.max(0, i - halfWindow); j <= Math.min(speeds.length - 1, i + halfWindow); j++) {
+      sum += speeds[j].speed;
+      count++;
+    }
+    smoothed.push({ index: speeds[i].index, speed: sum / count });
+  }
+  return smoothed;
+}
+
+function initVelocidadChart(trackPoints, fechaInicio, fechaFin) {
+  const canvas = document.getElementById('velocidadChart');
+  if (!canvas || !trackPoints || trackPoints.length === 0) return;
+  const speedPoints = getTrackSpeeds(trackPoints, fechaInicio, fechaFin);
+  if (speedPoints.length === 0) return;
+
+  const fullDistances = computeCumulativeDistances(trackPoints);
+  const totalKm = fullDistances[fullDistances.length - 1] / 1000;
+  const tickStep = totalKm <= 5 ? 1 : totalKm <= 20 ? 1 : totalKm <= 50 ? 2 : totalKm <= 100 ? 5 : 10;
+
+  const chartData = speedPoints.map(d => ({
+    x: fullDistances[d.index] / 1000,
+    y: d.speed
+  }));
+
+  const maxVal = Math.max(...chartData.map(d => d.y));
+  const maxPoint = chartData.find(d => d.y === maxVal);
+  const avgVal = chartData.reduce((s, d) => s + d.y, 0) / chartData.length;
+
+  const ctx = canvas.getContext('2d');
+  const gradient = ctx.createLinearGradient(0, 0, 0, 180);
+  gradient.addColorStop(0, 'rgba(76, 175, 80, 0.25)');
+  gradient.addColorStop(1, 'rgba(76, 175, 80, 0.02)');
+
+  const spdPlugin = {
+    id: 'speedMarkers',
+    afterDatasetsDraw(chart) {
+      const c = chart.ctx;
+      const xScale = chart.scales.x;
+      const yScale = chart.scales.y;
+      const chartW = chart.width;
+      const chartH = chart.height;
+
+      if (maxPoint) {
+        const xPx = xScale.getPixelForValue(maxPoint.x);
+        const yPx = yScale.getPixelForValue(maxPoint.y);
+        c.save();
+        c.beginPath();
+        c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
+        c.fillStyle = '#4CAF50';
+        c.fill();
+        c.strokeStyle = '#fff';
+        c.lineWidth = 1.5;
+        c.stroke();
+        c.restore();
+      }
+
+      const avgPx = yScale.getPixelForValue(avgVal);
+      c.save();
+      c.setLineDash([6, 4]);
+      c.strokeStyle = 'rgba(255, 107, 107, 0.8)';
+      c.lineWidth = 1.5;
+      c.beginPath();
+      c.moveTo(0, avgPx);
+      c.lineTo(chartW, avgPx);
+      c.stroke();
+      c.setLineDash([]);
+      c.restore();
+
+      const chartArea = chart.chartArea;
+      if (chartArea) {
+        const labelY = chart.height - 8;
+        const leftX = chartArea.left + 4;
+        const rightX = chartArea.right - 4;
+        c.save();
+        const maxLabel = `↗ ${maxVal.toFixed(1)} km/h`;
+        c.font = 'bold 11px Arial';
+        const maxW = c.measureText(maxLabel).width;
+        const pad = 4;
+        c.fillStyle = 'rgba(255,255,255,0.9)';
+        c.fillRect(leftX - pad, labelY - 10 + pad, maxW + pad * 2, 14);
+        c.fillStyle = '#4CAF50';
+        c.textAlign = 'left';
+        c.fillText(maxLabel, leftX, labelY + 4);
+        c.restore();
+
+        c.save();
+        const avgLabel = `∅ ${avgVal.toFixed(1)} km/h`;
+        c.font = 'bold 11px Arial';
+        const avgW = c.measureText(avgLabel).width;
+        c.fillStyle = 'rgba(255,255,255,0.9)';
+        c.fillRect(rightX - avgW - pad, labelY - 10 + pad, avgW + pad * 2, 14);
+        c.fillStyle = '#FF6B6B';
+        c.textAlign = 'right';
+        c.fillText(avgLabel, rightX, labelY + 4);
+        c.restore();
+      }
+    }
+  };
+
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [{
+        label: 'Velocidad (km/h)',
+        data: chartData,
+        borderColor: '#4CAF50',
+        backgroundColor: gradient,
+        fill: true,
+        tension: 0.3,
+        pointRadius: 0,
+        borderWidth: 2,
+        spanGaps: false,
+        yAxisID: 'y'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 500 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.parsed.y.toFixed(1)} km/h @ ${ctx.parsed.x.toFixed(2)} km`
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          min: 0,
+          max: Math.ceil(totalKm),
+          title: { display: true, text: 'Distancia (km)', font: { size: 11 } },
+          ticks: { stepSize: tickStep, font: { size: 10 }, callback: (v) => Math.abs(v % tickStep) < 0.01 ? v : '' },
+          grid: { display: false }
+        },
+        y: {
+          type: 'linear',
+          position: 'left',
+          title: { display: true, text: 'Velocidad (km/h)', font: { size: 11 } },
+          ticks: { font: { size: 10 } },
+          grid: { color: 'rgba(0,0,0,0.06)' }
+        }
+      }
+    },
+    plugins: [spdPlugin]
+  });
+}
+
+function getTrackPower(trackPoints, fechaInicio, fechaFin) {
+  const hasTime = trackPoints.some(p => p.time != null);
+  if (!hasTime && fechaInicio && fechaFin && trackPoints.length >= 2) {
+    const start = new Date(fechaInicio).getTime();
+    const end = new Date(fechaFin).getTime();
+    const duration = end - start;
+    if (duration > 0) {
+      trackPoints = trackPoints.map((p, i) => ({
+        ...p,
+        time: new Date(start + (duration * i / (trackPoints.length - 1))).toISOString()
+      }));
+    }
+  }
+  const hasPowerData = trackPoints.some(p => p.power != null && p.power > 0);
+  if (hasPowerData) {
+    const raw = [];
+    for (let i = 0; i < trackPoints.length; i++) {
+      if (trackPoints[i].power != null && trackPoints[i].power > 0) {
+        raw.push({ index: i, power: trackPoints[i].power });
+      }
+    }
+    if (raw.length === 0) return [];
+    const windowSize = 9;
+    const halfWindow = Math.floor(windowSize / 2);
+    const smoothed = [];
+    for (let i = 0; i < raw.length; i++) {
+      let sum = 0, count = 0;
+      for (let j = Math.max(0, i - halfWindow); j <= Math.min(raw.length - 1, i + halfWindow); j++) {
+        sum += raw[j].power;
+        count++;
+      }
+      smoothed.push({ index: raw[i].index, power: Math.round(sum / count) });
+    }
+    return smoothed;
+  }
+
+  const segmentDist = 50;
+  const fullDists = computeCumulativeDistances(trackPoints);
+  const segments = [];
+  let segStart = 1;
+  for (let i = 1; i < trackPoints.length; i++) {
+    const segEnd = fullDists[i] - fullDists[segStart];
+    if (segEnd >= segmentDist || i === trackPoints.length - 1) {
+      let segDist = 0;
+      let segTime = 0;
+      for (let j = segStart; j <= i; j++) {
+        if (j > segStart) {
+          const d = fullDists[j] - fullDists[j - 1];
+          segDist += d;
+          segTime += (new Date(trackPoints[j]?.time || 0) - new Date(trackPoints[j - 1]?.time || 0)) / 1000;
+        }
+      }
+      const dAlt = (trackPoints[i]?.ele || 0) - (trackPoints[segStart]?.ele || 0);
+      const avgSpeed = segDist / segTime;
+      const midIdx = Math.floor((segStart + i) / 2);
+      if (segDist > 0 && segTime > 0 && avgSpeed > 0) {
+        const power = estimatePower(segDist, segTime, dAlt, avgSpeed);
+        if (power > 0) {
+          segments.push({ index: midIdx, power: Math.round(power) });
+        }
+      }
+      segStart = i;
+    }
+  }
+
+  if (segments.length === 0) return [];
+  const windowSize = 5;
+  const halfWindow = Math.floor(windowSize / 2);
+  const smoothed = [];
+  for (let i = 0; i < segments.length; i++) {
+    let sum = 0, count = 0;
+    for (let j = Math.max(0, i - halfWindow); j <= Math.min(segments.length - 1, i + halfWindow); j++) {
+      sum += segments[j].power;
+      count++;
+    }
+    smoothed.push({ index: segments[i].index, power: Math.round(sum / count) });
+  }
+  return smoothed;
+}
+
+function initPotenciaChart(trackPoints, fechaInicio, fechaFin) {
+  const canvas = document.getElementById('potenciaChart');
+  if (!canvas || !trackPoints || trackPoints.length === 0) return;
+  const powerPoints = getTrackPower(trackPoints, fechaInicio, fechaFin);
+  if (powerPoints.length === 0) return;
+
+  const fullDistances = computeCumulativeDistances(trackPoints);
+  const totalKm = fullDistances[fullDistances.length - 1] / 1000;
+  const tickStep = totalKm <= 5 ? 1 : totalKm <= 20 ? 1 : totalKm <= 50 ? 2 : totalKm <= 100 ? 5 : 10;
+
+  const chartData = powerPoints.map(d => ({
+    x: fullDistances[d.index] / 1000,
+    y: d.power
+  }));
+
+  const maxVal = Math.max(...chartData.map(d => d.y));
+  const maxPoint = chartData.find(d => d.y === maxVal);
+  const avgVal = chartData.reduce((s, d) => s + d.y, 0) / chartData.length;
+
+  const ctx = canvas.getContext('2d');
+  const gradient = ctx.createLinearGradient(0, 0, 0, 180);
+  gradient.addColorStop(0, 'rgba(0, 188, 212, 0.25)');
+  gradient.addColorStop(1, 'rgba(0, 188, 212, 0.02)');
+
+  const pwrPlugin = {
+    id: 'powerMarkers',
+    afterDatasetsDraw(chart) {
+      const c = chart.ctx;
+      const xScale = chart.scales.x;
+      const yScale = chart.scales.y;
+      const chartW = chart.width;
+
+      if (maxPoint) {
+        const xPx = xScale.getPixelForValue(maxPoint.x);
+        const yPx = yScale.getPixelForValue(maxPoint.y);
+        c.save();
+        c.beginPath();
+        c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
+        c.fillStyle = '#00BCD4';
+        c.fill();
+        c.strokeStyle = '#fff';
+        c.lineWidth = 1.5;
+        c.stroke();
+        c.restore();
+      }
+
+      const avgPx = yScale.getPixelForValue(avgVal);
+      c.save();
+      c.setLineDash([6, 4]);
+      c.strokeStyle = 'rgba(255, 107, 107, 0.8)';
+      c.lineWidth = 1.5;
+      c.beginPath();
+      c.moveTo(0, avgPx);
+      c.lineTo(chartW, avgPx);
+      c.stroke();
+      c.setLineDash([]);
+      c.restore();
+
+      const chartArea = chart.chartArea;
+      if (chartArea) {
+        const labelY = chart.height - 8;
+        const leftX = chartArea.left + 4;
+        const rightX = chartArea.right - 4;
+        c.save();
+        const maxLabel = `↗ ${maxVal} W`;
+        c.font = 'bold 11px Arial';
+        const maxW = c.measureText(maxLabel).width;
+        const pad = 4;
+        c.fillStyle = 'rgba(255,255,255,0.9)';
+        c.fillRect(leftX - pad, labelY - 10 + pad, maxW + pad * 2, 14);
+        c.fillStyle = '#00BCD4';
+        c.textAlign = 'left';
+        c.fillText(maxLabel, leftX, labelY + 4);
+        c.restore();
+
+        c.save();
+        const avgLabel = `∅ ${Math.round(avgVal)} W`;
+        c.font = 'bold 11px Arial';
+        const avgW = c.measureText(avgLabel).width;
+        c.fillStyle = 'rgba(255,255,255,0.9)';
+        c.fillRect(rightX - avgW - pad, labelY - 10 + pad, avgW + pad * 2, 14);
+        c.fillStyle = '#FF6B6B';
+        c.textAlign = 'right';
+        c.fillText(avgLabel, rightX, labelY + 4);
+        c.restore();
+      }
+    }
+  };
+
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [{
+        label: 'Potencia (W)',
+        data: chartData,
+        borderColor: '#00BCD4',
+        backgroundColor: gradient,
+        fill: true,
+        tension: 0.3,
+        pointRadius: 0,
+        borderWidth: 2,
+        spanGaps: false,
+        yAxisID: 'y'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 500 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.parsed.y} W @ ${ctx.parsed.x.toFixed(2)} km`
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          min: 0,
+          max: Math.ceil(totalKm),
+          title: { display: true, text: 'Distancia (km)', font: { size: 11 } },
+          ticks: { stepSize: tickStep, font: { size: 10 }, callback: (v) => Math.abs(v % tickStep) < 0.01 ? v : '' },
+          grid: { display: false }
+        },
+        y: {
+          type: 'linear',
+          position: 'left',
+          title: { display: true, text: 'Potencia (W)', font: { size: 11 } },
+          ticks: { font: { size: 10 } },
+          grid: { color: 'rgba(0,0,0,0.06)' }
+        }
+      }
+    },
+    plugins: [pwrPlugin]
+  });
+}
+
 const guardarRutaManual = async () => {
   const regulacionCheckbox = document.getElementById("regulacion_ruta");
   const data = {
@@ -2012,14 +2415,11 @@ function generarContenidoRuta(ruta, hasHR = false, tempData = null, pulsacionesS
     { label: "🕑 Tiempo total", value: ruta.tiempo_total },
     { label: "⌚ Tiempo en movimiento", value: ruta.tiempo_movimiento },
     { label: "📏 Distancia", value: `${ruta.kms} km` },
-    { label: "🏎️ Velocidad media", value: `${ruta.velocidad_media} km/h` },
-    { label: "🚀 Velocidad máxima", value: `${ruta.velocidad_maxima} km/h` },
     ...(hasElevChart ? [] : [
       { label: "⏫ Ascenso", value: `${ruta.metros_ascenso} m` },
       { label: "⏬ Descenso", value: `${ruta.metros_descenso} m` },
     ]),
     ...(hasElevChart ? [] : [{ label: "⛰️ Altitud máxima", value: `${ruta.altitud_maxima} m` }]),
-    { label: "⚡ Potencia promedio", value: `${ruta.potencia_promedio_w} W` },
     { label: "💥 Calorías", value: `${ruta.calorias} kcal` },
     {
       label: `⬆️ Subida (${ruta.tiempo_subida || "00:00:00"})`,
@@ -2143,6 +2543,18 @@ const showGpxDetails = async (ruta_id) => {
             </div>
           </details>
           ` : ''}
+          <details id="velocidad-details" class="ruta-collapse">
+            <summary class="ruta-collapse-summary">🚀 Velocidad</summary>
+            <div id="velocidad-chart-wrapper" style="height: 180px; margin-top: 4px; padding: 1px; border: 1px solid #dee2e6; border-radius: 8px; display: none;">
+              <canvas id="velocidadChart"></canvas>
+            </div>
+          </details>
+          <details id="potencia-details" class="ruta-collapse">
+            <summary class="ruta-collapse-summary">⚡ Potencia</summary>
+            <div id="potencia-chart-wrapper" style="height: 180px; margin-top: 4px; padding: 1px; border: 1px solid #dee2e6; border-radius: 8px; display: none;">
+              <canvas id="potenciaChart"></canvas>
+            </div>
+          </details>
           <details id="temp-details" class="ruta-collapse">
             <summary class="ruta-collapse-summary">🌡️ Temperatura</summary>
             <div id="temp-chart-wrapper" style="height: 180px; margin-top: 4px; padding: 1px; border: 1px solid #dee2e6; border-radius: 8px; display: none;">
@@ -2311,6 +2723,54 @@ const showGpxDetails = async (ruta_id) => {
           }
         } else {
           pulsacionesWrapper.style.display = 'none';
+        }
+      });
+    }
+
+    const velocidadDetails = document.getElementById('velocidad-details');
+    const velocidadWrapper = document.getElementById('velocidad-chart-wrapper');
+    if (velocidadDetails && velocidadWrapper) {
+      let velocidadChartInitialized = false;
+
+      velocidadDetails.addEventListener('toggle', () => {
+        if (velocidadDetails.open) {
+          velocidadWrapper.style.display = 'block';
+          if (!velocidadChartInitialized) {
+            const hasSpeed = trackPoints.length >= 2;
+            if (hasSpeed) {
+              velocidadWrapper.innerHTML = '<div style="height: 180px; padding: 5px; border: 1px solid #dee2e6; border-radius: 8px;"><canvas id="velocidadChart"></canvas></div>';
+              initVelocidadChart(trackPoints, rutaActualData.fecha_inicio, rutaActualData.fecha_fin);
+            } else {
+              velocidadWrapper.innerHTML = '<div class="text-center text-muted p-3">No hay datos de velocidad disponibles</div>';
+            }
+            velocidadChartInitialized = true;
+          }
+        } else {
+          velocidadWrapper.style.display = 'none';
+        }
+      });
+    }
+
+    const potenciaDetails = document.getElementById('potencia-details');
+    const potenciaWrapper = document.getElementById('potencia-chart-wrapper');
+    if (potenciaDetails && potenciaWrapper) {
+      let potenciaChartInitialized = false;
+
+      potenciaDetails.addEventListener('toggle', () => {
+        if (potenciaDetails.open) {
+          potenciaWrapper.style.display = 'block';
+          if (!potenciaChartInitialized) {
+            const hasPower = trackPoints.length >= 2;
+            if (hasPower) {
+              potenciaWrapper.innerHTML = '<div style="height: 180px; padding: 5px; border: 1px solid #dee2e6; border-radius: 8px;"><canvas id="potenciaChart"></canvas></div>';
+              initPotenciaChart(trackPoints, rutaActualData.fecha_inicio, rutaActualData.fecha_fin);
+            } else {
+              potenciaWrapper.innerHTML = '<div class="text-center text-muted p-3">No hay datos de potencia disponibles</div>';
+            }
+            potenciaChartInitialized = true;
+          }
+        } else {
+          potenciaWrapper.style.display = 'none';
         }
       });
     }
@@ -2752,6 +3212,42 @@ async function compartirRutaWhatsApp() {
       container.appendChild(sepPuls);
     }
 
+    let velocidadChartDiv = null;
+    let velocidadCanvas = null;
+    const hasSpeed = trackPoints.length >= 2;
+    if (hasSpeed) {
+      velocidadChartDiv = document.createElement('div');
+      velocidadChartDiv.style.cssText = 'width:800px;height:180px;padding:8px;';
+      velocidadCanvas = document.createElement('canvas');
+      velocidadCanvas.width = 800;
+      velocidadCanvas.height = 180;
+      velocidadCanvas.style.cssText = 'width:100%;height:100%;';
+      velocidadChartDiv.appendChild(velocidadCanvas);
+      container.appendChild(velocidadChartDiv);
+
+      const sepVel = document.createElement('hr');
+      sepVel.style.cssText = 'margin:6px 0;border:none;border-top:2px solid #6A0DAD;';
+      container.appendChild(sepVel);
+    }
+
+    let potenciaChartDiv = null;
+    let potenciaCanvas = null;
+    const hasPower = trackPoints.length >= 2;
+    if (hasPower) {
+      potenciaChartDiv = document.createElement('div');
+      potenciaChartDiv.style.cssText = 'width:800px;height:180px;padding:8px;';
+      potenciaCanvas = document.createElement('canvas');
+      potenciaCanvas.width = 800;
+      potenciaCanvas.height = 180;
+      potenciaCanvas.style.cssText = 'width:100%;height:100%;';
+      potenciaChartDiv.appendChild(potenciaCanvas);
+      container.appendChild(potenciaChartDiv);
+
+      const sepPwr = document.createElement('hr');
+      sepPwr.style.cssText = 'margin:6px 0;border:none;border-top:2px solid #6A0DAD;';
+      container.appendChild(sepPwr);
+    }
+
     let tempChartDiv = null;
     let tempCanvas = null;
     if (tempData && tempData.length > 0) {
@@ -2776,15 +3272,11 @@ async function compartirRutaWhatsApp() {
       { label: "🕑 Tiempo total", value: ruta.tiempo_total },
       { label: "⌚ Tiempo en movimiento", value: ruta.tiempo_movimiento },
       { label: "📏 Distancia", value: `${ruta.kms} km` },
-      { label: "🏎️ Velocidad media", value: `${ruta.velocidad_media} km/h` },
-      { label: "🚀 Velocidad máxima", value: `${ruta.velocidad_maxima} km/h` },
       ...(hasElevChart ? [] : [
         { label: "⏫ Ascenso", value: `${ruta.metros_ascenso} m` },
         { label: "⏬ Descenso", value: `${ruta.metros_descenso} m` },
       ]),
       ...(hasElevChart ? [] : [{ label: "⛰️ Altitud máxima", value: `${ruta.altitud_maxima} m` }]),
-      { label: "⚡ Potencia promedio", value: `${ruta.potencia_promedio_w} W` },
-      { label: "💥 Calorías", value: `${ruta.calorias} kcal` },
       { label: `⬆️ Subida (${ruta.tiempo_subida || "00:00:00"})`, value: `${ruta.pct_subida}%` },
       { label: `➡️ Plano (${ruta.tiempo_plano || "00:00:00"})`, value: `${ruta.pct_plano}%` },
     ];
@@ -2793,6 +3285,8 @@ async function compartirRutaWhatsApp() {
       label: `⬇️ Bajada (${ruta.tiempo_bajada || "00:00:00"})`,
       value: `${ruta.pct_bajada}%`
     });
+
+    fieldsShare.push({ label: "💥 Calorías", value: `${ruta.calorias} kcal` });
 
     if (!tempData || tempData.length === 0) {
       const tempsArr = tempData
@@ -2940,6 +3434,256 @@ async function compartirRutaWhatsApp() {
             }
           },
           plugins: [shareHrPlugin]
+        });
+      }
+    }
+
+    if (velocidadCanvas && hasSpeed) {
+      const fullDistances = computeCumulativeDistances(trackPoints);
+      const totalKm = fullDistances[fullDistances.length - 1] / 1000;
+      const tickStep = totalKm <= 5 ? 1 : totalKm <= 20 ? 1 : totalKm <= 50 ? 2 : totalKm <= 100 ? 5 : 10;
+
+      const spdPoints = getTrackSpeeds(trackPoints);
+      const spdChartData = spdPoints.map(d => ({
+        x: fullDistances[d.index] / 1000,
+        y: d.speed
+      }));
+
+      if (spdChartData.length > 0) {
+        const spdMaxVal = Math.max(...spdChartData.map(d => d.y));
+        const spdMaxPoint = spdChartData.find(d => d.y === spdMaxVal);
+        const spdAvgVal = spdChartData.reduce((s, d) => s + d.y, 0) / spdChartData.length;
+
+        const spdGradient = velocidadCanvas.getContext('2d').createLinearGradient(0, 0, 0, 180);
+        spdGradient.addColorStop(0, 'rgba(76, 175, 80, 0.25)');
+        spdGradient.addColorStop(1, 'rgba(76, 175, 80, 0.02)');
+
+        const shareSpdPlugin = {
+          id: 'shareSpeedMarkers',
+          afterDatasetsDraw(chart) {
+            const c = chart.ctx;
+            const xScale = chart.scales.x;
+            const yScale = chart.scales.y;
+            const chartW = chart.width;
+
+            if (spdMaxPoint) {
+              const xPx = xScale.getPixelForValue(spdMaxPoint.x);
+              const yPx = yScale.getPixelForValue(spdMaxPoint.y);
+              c.save();
+              c.beginPath();
+              c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
+              c.fillStyle = '#4CAF50';
+              c.fill();
+              c.strokeStyle = '#fff';
+              c.lineWidth = 1.5;
+              c.stroke();
+              c.restore();
+            }
+
+            const avgPx = yScale.getPixelForValue(spdAvgVal);
+            c.save();
+            c.setLineDash([6, 4]);
+            c.strokeStyle = 'rgba(255, 107, 107, 0.8)';
+            c.lineWidth = 1.5;
+            c.beginPath();
+            c.moveTo(0, avgPx);
+            c.lineTo(chartW, avgPx);
+            c.stroke();
+            c.setLineDash([]);
+            c.restore();
+
+            const chartArea = chart.chartArea;
+            if (chartArea) {
+              const labelY = chart.height - 8;
+              const leftX = chartArea.left + 4;
+              const rightX = chartArea.right - 4;
+              c.save();
+              const maxLabel = `↗ ${spdMaxVal.toFixed(1)} km/h`;
+              c.font = 'bold 11px Arial';
+              const maxW = c.measureText(maxLabel).width;
+              const pad = 4;
+              c.fillStyle = 'rgba(255,255,255,0.9)';
+              c.fillRect(leftX - pad, labelY - 10 + pad, maxW + pad * 2, 14);
+              c.fillStyle = '#4CAF50';
+              c.textAlign = 'left';
+              c.fillText(maxLabel, leftX, labelY + 4);
+              c.restore();
+
+              c.save();
+              const avgLabel = `∅ ${spdAvgVal.toFixed(1)} km/h`;
+              c.font = 'bold 11px Arial';
+              const avgW = c.measureText(avgLabel).width;
+              c.fillStyle = 'rgba(255,255,255,0.9)';
+              c.fillRect(rightX - avgW - pad, labelY - 10 + pad, avgW + pad * 2, 14);
+              c.fillStyle = '#FF6B6B';
+              c.textAlign = 'right';
+              c.fillText(avgLabel, rightX, labelY + 4);
+              c.restore();
+            }
+          }
+        };
+
+        new Chart(velocidadCanvas, {
+          type: 'line',
+          data: {
+            datasets: [{
+              label: 'Velocidad (km/h)',
+              data: spdChartData,
+              borderColor: '#4CAF50',
+              backgroundColor: spdGradient,
+              fill: true,
+              tension: 0.3,
+              pointRadius: 0,
+              borderWidth: 2,
+              spanGaps: false,
+              yAxisID: 'y'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 0 },
+            plugins: { legend: { display: false } },
+            scales: {
+              x: {
+                type: 'linear', min: 0, max: Math.ceil(totalKm),
+                title: { display: true, text: 'Distancia (km)', font: { size: 11 } },
+                ticks: { stepSize: tickStep, font: { size: 10 }, callback: v => Math.abs(v % tickStep) < 0.01 ? v : '' },
+                grid: { display: false }
+              },
+              y: {
+                title: { display: true, text: 'Velocidad (km/h)', font: { size: 11 } },
+                ticks: { font: { size: 10 } },
+                grid: { color: 'rgba(0,0,0,0.06)' }
+              }
+            }
+          },
+          plugins: [shareSpdPlugin]
+        });
+      }
+    }
+
+    if (potenciaCanvas && hasPower) {
+      const fullDistances = computeCumulativeDistances(trackPoints);
+      const totalKm = fullDistances[fullDistances.length - 1] / 1000;
+      const tickStep = totalKm <= 5 ? 1 : totalKm <= 20 ? 1 : totalKm <= 50 ? 2 : totalKm <= 100 ? 5 : 10;
+
+      const pwrPoints = getTrackPower(trackPoints);
+      const pwrChartData = pwrPoints.map(d => ({
+        x: fullDistances[d.index] / 1000,
+        y: d.power
+      }));
+
+      if (pwrChartData.length > 0) {
+        const pwrMaxVal = Math.max(...pwrChartData.map(d => d.y));
+        const pwrMaxPoint = pwrChartData.find(d => d.y === pwrMaxVal);
+        const pwrAvgVal = pwrChartData.reduce((s, d) => s + d.y, 0) / pwrChartData.length;
+
+        const pwrGradient = potenciaCanvas.getContext('2d').createLinearGradient(0, 0, 0, 180);
+        pwrGradient.addColorStop(0, 'rgba(0, 188, 212, 0.25)');
+        pwrGradient.addColorStop(1, 'rgba(0, 188, 212, 0.02)');
+
+        const sharePwrPlugin = {
+          id: 'sharePowerMarkers',
+          afterDatasetsDraw(chart) {
+            const c = chart.ctx;
+            const xScale = chart.scales.x;
+            const yScale = chart.scales.y;
+            const chartW = chart.width;
+
+            if (pwrMaxPoint) {
+              const xPx = xScale.getPixelForValue(pwrMaxPoint.x);
+              const yPx = yScale.getPixelForValue(pwrMaxPoint.y);
+              c.save();
+              c.beginPath();
+              c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
+              c.fillStyle = '#00BCD4';
+              c.fill();
+              c.strokeStyle = '#fff';
+              c.lineWidth = 1.5;
+              c.stroke();
+              c.restore();
+            }
+
+            const avgPx = yScale.getPixelForValue(pwrAvgVal);
+            c.save();
+            c.setLineDash([6, 4]);
+            c.strokeStyle = 'rgba(255, 107, 107, 0.8)';
+            c.lineWidth = 1.5;
+            c.beginPath();
+            c.moveTo(0, avgPx);
+            c.lineTo(chartW, avgPx);
+            c.stroke();
+            c.setLineDash([]);
+            c.restore();
+
+            const chartArea = chart.chartArea;
+            if (chartArea) {
+              const labelY = chart.height - 8;
+              const leftX = chartArea.left + 4;
+              const rightX = chartArea.right - 4;
+              c.save();
+              const maxLabel = `↗ ${pwrMaxVal} W`;
+              c.font = 'bold 11px Arial';
+              const maxW = c.measureText(maxLabel).width;
+              const pad = 4;
+              c.fillStyle = 'rgba(255,255,255,0.9)';
+              c.fillRect(leftX - pad, labelY - 10 + pad, maxW + pad * 2, 14);
+              c.fillStyle = '#00BCD4';
+              c.textAlign = 'left';
+              c.fillText(maxLabel, leftX, labelY + 4);
+              c.restore();
+
+              c.save();
+              const avgLabel = `∅ ${Math.round(pwrAvgVal)} W`;
+              c.font = 'bold 11px Arial';
+              const avgW = c.measureText(avgLabel).width;
+              c.fillStyle = 'rgba(255,255,255,0.9)';
+              c.fillRect(rightX - avgW - pad, labelY - 10 + pad, avgW + pad * 2, 14);
+              c.fillStyle = '#FF6B6B';
+              c.textAlign = 'right';
+              c.fillText(avgLabel, rightX, labelY + 4);
+              c.restore();
+            }
+          }
+        };
+
+        new Chart(potenciaCanvas, {
+          type: 'line',
+          data: {
+            datasets: [{
+              label: 'Potencia (W)',
+              data: pwrChartData,
+              borderColor: '#00BCD4',
+              backgroundColor: pwrGradient,
+              fill: true,
+              tension: 0.3,
+              pointRadius: 0,
+              borderWidth: 2,
+              spanGaps: false,
+              yAxisID: 'y'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 0 },
+            plugins: { legend: { display: false } },
+            scales: {
+              x: {
+                type: 'linear', min: 0, max: Math.ceil(totalKm),
+                title: { display: true, text: 'Distancia (km)', font: { size: 11 } },
+                ticks: { stepSize: tickStep, font: { size: 10 }, callback: v => Math.abs(v % tickStep) < 0.01 ? v : '' },
+                grid: { display: false }
+              },
+              y: {
+                title: { display: true, text: 'Potencia (W)', font: { size: 11 } },
+                ticks: { font: { size: 10 } },
+                grid: { color: 'rgba(0,0,0,0.06)' }
+              }
+            }
+          },
+          plugins: [sharePwrPlugin]
         });
       }
     }

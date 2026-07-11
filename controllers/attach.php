@@ -82,14 +82,8 @@ function compressImage($sourcePath, $targetPath, $maxSizeKB = 200) {
         
         // Redimensionar
         $resized = imagecreatetruecolor($newWidth, $newHeight);
-        
-        // Preservar transparencia para PNG
-        if ($mime === 'image/png') {
-            imagealphablending($resized, false);
-            imagesavealpha($resized, true);
-            $transparent = imagecolorallocatealpha($resized, 255, 255, 255, 127);
-            imagefilledrectangle($resized, 0, 0, $newWidth, $newHeight, $transparent);
-        }
+        $white = imagecolorallocate($resized, 255, 255, 255);
+        imagefill($resized, 0, 0, $white);
         
         imagecopyresampled($resized, $image, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
         imagedestroy($image);
@@ -144,13 +138,8 @@ function compressImage($sourcePath, $targetPath, $maxSizeKB = 200) {
         $newHeight = intval($height * $scaleFactor);
         
         $resized = imagecreatetruecolor($newWidth, $newHeight);
-        
-        if ($mime === 'image/png') {
-            imagealphablending($resized, false);
-            imagesavealpha($resized, true);
-            $transparent = imagecolorallocatealpha($resized, 255, 255, 255, 127);
-            imagefilledrectangle($resized, 0, 0, $newWidth, $newHeight, $transparent);
-        }
+        $white = imagecolorallocate($resized, 255, 255, 255);
+        imagefill($resized, 0, 0, $white);
         
         imagecopyresampled($resized, $image, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
         
@@ -224,6 +213,8 @@ function generateThumbnail($sourcePath, $thumbPath, $maxDim = 100) {
     if ($w > $h) { $nw = $maxDim; $nh = intval($h * $maxDim / $w); }
     else { $nh = $maxDim; $nw = intval($w * $maxDim / $h); }
     $thumb = imagecreatetruecolor($nw, $nh);
+    $white = imagecolorallocate($thumb, 255, 255, 255);
+    imagefill($thumb, 0, 0, $white);
     imagecopyresampled($thumb, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
     $result = imagejpeg($thumb, $thumbPath, 80);
     imagedestroy($src); imagedestroy($thumb);
