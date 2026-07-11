@@ -251,7 +251,7 @@ Todos los CSS/JS incluyen `?<?php random_file_enumerator() ?>` que genera un tim
 | imagen | TEXT | Nombre archivo en assets/images/Vehiculos/ |
 | observaciones | TEXT | Notas adicionales |
 | puntero | TEXT | Icono (bullet_nombre.png) |
-| categoria | TEXT | 'pulmonar' o 'electrica' |
+| categoria | TEXT | 'pulmonar', 'electrica' o 'estatica' |
 | usuario_id | INTEGER | FK a usuarios |
 | is_active | INTEGER | 1=activo, 0=inactivo |
 | created_at | TEXT | Fecha creación |
@@ -334,10 +334,24 @@ Todos los CSS/JS incluyen `?<?php random_file_enumerator() ?>` que genera un tim
 | fecha_inicio | DATETIME | Inicio de ruta |
 | fecha_fin | DATETIME | Fin de ruta |
 | tiempo_total | TEXT | Duración total |
-| kms | DECIMAL | Kilómetros |
+| tiempo_movimiento | TEXT | Tiempo en movimiento |
+| kms | DECIMAL(10,3) | Kilómetros (en indoor, estimados) |
 | metros_ascenso | INTEGER | Desnivel positivo |
-| velocidad_media | DECIMAL | Velocidad promedio |
-| potencia_promedio_w | INTEGER | Potencia media |
+| metros_descenso | INTEGER | Desnivel negativo |
+| altitud_maxima | INTEGER | Altitud máxima |
+| velocidad_media | DECIMAL(10,1) | Velocidad promedio (en indoor, estimada) |
+| velocidad_maxima | DECIMAL(10,1) | Velocidad máxima (en indoor, estimada) |
+| potencia_promedio_w | INT | Potencia media en W (en indoor, estimada) |
+| calorias | INT | Calorías consumidas |
+| pct_subida / pct_plano / pct_bajada | DECIMAL(10,1) | % de tiempo en subida/plano/bajada |
+| tiempo_subida / tiempo_plano / tiempo_bajada | TEXT | Tiempo en subida/plano/bajada |
+| observaciones | TEXT | Notas |
+| origen | TEXT | 'gpx' (por defecto) o 'fit_indoor' (FIT de bici estática) |
+| activo | BOOLEAN | 1=activo (por defecto true) |
+| regulacion | INTEGER | 0 |
+| gpx_data | TEXT | XML GPX de la ruta (puede ser grande) |
+| categoria | TEXT | Categoría del vehículo en el momento de la ruta: 'pulmonar', 'electrica', 'estatica' |
+| estimado | INTEGER | 1=datos de distancia/velocidad/potencia estimados (indoor); 0=reales (GPX) |
 
 #### operaciones
 | Campo | Tipo | Descripción |
@@ -500,7 +514,7 @@ Los endpoints siguen el patrón `api/{recurso}/{recurso}.php?{action}`. Todas la
 **Formulario** (`views/vehiculos/form.php`):
 - Subida de imagen: contenedor dashed con icono cámara + "Tocar para añadir foto" (`upload-container`, `upload-preview`, `upload-placeholder`)
 - Input `accept="image/*"` (cámara o galería en móvil)
-- Campos: nombre, anagrama, fecha compra, km iniciales, categoría (pulmonar/electrica), observaciones
+- Campos: nombre, anagrama, fecha compra, km iniciales, categoría (pulmonar/electrica/estatica), observaciones
 - Imagen se sube vía `api/vehiculos/vehiculo.php?uploadVehiculoImage` a `assets/images/Vehiculos/` con UUID
 
 ### 8.4 Gestión de Grupos
@@ -548,6 +562,30 @@ Los endpoints siguen el patrón `api/{recurso}/{recurso}.php?{action}`. Todas la
 - `views/main.php`: cards de vehículos con acceso directo a mantenimientos
 - Sidebar con entrada de km manuales
 
+### 8.9 Importación FIT de Bicicleta Estática (Indoor)
+
+Cuando un vehículo es de categoría `estatica` y se importa un FIT de rodillo (`sub_sport = indoor_cycling`, `sport = training`), GesBike **estima** distancia, velocidad y potencia (que el dispositivo no registra) a partir de la frecuencia cardíaca, las calorías y el tiempo.
+
+**Flujo de importación**
+- Endpoint: `api/rutas/ruta.php?import_ruta_fit` → `controllers/ruta_fit.php`
+- `controllers/ruta_fit.php`: detecta la categoría del vehículo (`get_categoria_vehiculo()`). Si es `estatica`, fuerza `origen='fit_indoor'`, `categoria='estatica'`, `estimado=1`.
+- Parser: `helpers/fit_parser.php` → `parse($filepath, $indoor=false)` con modo indoor (`buildIndoorResult`, `solveFlatSpeed`). Lee `getSubSport`.
+- Estimación: calorías → trabajo mecánico (eficiencia 24%) → potencia media; se reparte por reserva de FC; se rellenan cortes de señal con la media; velocidad/distancia por bisección de `P = 0.5·ρ·CdA·v³ + m·g·Crr·v`.
+- Persistencia: `repositories/ruta.php` `create_ruta_file` guarda `origen`/`categoria`/`estimado` (retrocompatible: GPX legacy deja esos campos a `NULL`/`0`).
+- El aviso en la tarjeta (`services/rutas/ruta_fit.js` → `generarContenidoFIT`) indica "datos estimados".
+
+**Detalle y gráficas (indoor)**
+- Popup: `services/rutas/ruta.js` → `showIndoorDetails` (icono casa). Muestra tarjeta de stats y 3 `<details>` con gráficas:
+  - `indoorHrChart` (Pulsaciones bpm, `#DC143C`)
+  - `indoorSpeedChart` (Velocidad km/h estimada, `#4CAF50`)
+  - `indoorPowerChart` (Potencia W estimada, `#00BCD4`)
+- Render: `renderIndoorCharts(pulsaciones)` (downsample a ~300 pts).
+- **Marcadores máx/mín/media**: igual que en las gráficas de pulsaciones/velocidad/potencia de GPX, cada gráfica indoor usa el plugin `indoorMarkersPlugin` que dibuja punto máximo (`↑`), punto mínimo (`↓`) y línea discontinua de media (`∅`) con sus etiquetas. Colores: máx = color de la serie, mín = `#5B9BD5`, media = `rgba(255,107,107,0.8)`.
+- Compartir: botón WhatsApp (`.swal-wa-top`) → `compartirIndoorWhatsApp()` genera una imagen (html2canvas) con las 3 gráficas (reutilizando `indoorMarkersPlugin`) y el resumen de stats, y la comparte/descarga; en móvil abre `wa.me`.
+
+**Resumen del dashboard**
+- `repositories/ruta.php`: el CASE del resumen biker ya contempla `kms_mes_estatica` / `rutas_mes_estatica` y el desglose por categoría en `services/rutas/ruta.js`.
+
 ## 9. Subida de Imágenes
 
 ### Controlador (`controllers/attach.php`)
@@ -576,10 +614,23 @@ Variables en `theme.css`: `--upload-border`, `--upload-placeholder-text`, `--upl
 ## 10. Sidebar y Navegación
 
 ### Menú Lateral (`views/components/sidebar.php`)
-- Input de km manuales + botones check/cancel
-- Items: Inicio, Mantenimientos, Rutas, Vehículos, Grupos, Recambios, Stock
-- Toggle de tema (luna/sol)
-- Salir
+Orden de los items (separados por `<hr>`):
+1. Input de km manuales + botones check/cancel
+2. **Inicio** → `menuAction('inicio', deep)` (icono PNG `inicio_ico.png`)
+3. **Mantenimientos** → `menuAction('mantenimiento', deep)` (PNG `mantenimiento_ico.png`)
+4. **Sesiones** → `menuAction('rutas', deep)` (icono **FontAwesome `fa-stopwatch`**; la etiqueta dice "Sesiones" pero la acción de routing sigue siendo `'rutas'`)
+5. **Vehículos** → `menuAction('vehiculos', deep)` (PNG `vehiculos_ico.png`)
+6. **Grupos** → `menuAction('grupos', deep)` (PNG `grupo_ico.png`)
+7. **Recambios** → `menuAction('recambios', deep)` (PNG `recambio_ico.png`)
+8. **Stock** → `menuAction('stock', deep)` (PNG `stock_ico.png`)
+9. **Agendas** → `menuAction('agendas', deep)` (FA `fa-calendar-check`, con badges de vencidos/pendientes)
+10. `<hr>` + **Exportar BD** → `exportarBackupZip()` (FA `fa-file-zipper`) — ver sección 10.1
+11. **Modo oscuro/claro** → toggle de tema (`id="theme-toggle-btn"`, FA `fa-moon`)
+12. `<hr>` + **Salir** → `menuAction('salir', deep)` (PNG `exit.png`)
+
+**Convención de iconos del menú** (importante para modo claro/oscuro):
+- Los iconos PNG usan la clase `.menu-icon`. En modo oscuro se aplica `filter: brightness(0) invert(1)` (definido en `assets/css/main/main.css`), con lo que quedan en blanco sobre fondo oscuro.
+- Para iconos **monocromo que se adaptan solos** al tema (blanco/negro) se usa **FontAwesome** con la clase `menu-icon` y `style="font-size: 30px;"` (color `currentColor` → hereda el texto, y en oscuro el filtro lo vuelve blanco). Ejemplos ya presentes: `fa-calendar-check` (Agendas), `fa-moon` (tema), `fa-stopwatch` (Sesiones), `fa-file-zipper` (Exportar BD). No usar PNGs de color para items nuevos; usar FA monocrómico.
 
 ### Routing (`services/components/sitebar.js`)
 `menuAction(action, deep)` calcula basePath según `navigation_deep`:
@@ -587,10 +638,29 @@ Variables en `theme.css`: `--upload-border`, `--upload-placeholder-text`, `--upl
 - deep=1 → `..` (views/*.php)
 - deep=2 → `../..` (views/subcarpeta/*.php)
 
-Casos implementados: inicio, mantenimiento, vehiculos, **grupos**, stock, rutas, recambios, salir.
+Casos implementados: inicio, mantenimiento, vehiculos, **grupos**, stock, rutas (etiqueta "Sesiones"), recambios, salir, agendas.
 
 ### Margins en modo oscuro
 `.menu-item` con `padding: 2px 6px` para iconos más juntos verticalmente.
+
+### 10.1 Restaurar BD (desde un `.zip` dejado en el servidor)
+El usuario deja un `.zip` (que contiene `app.db`, y opcionalmente `gesbike.db`) en el servidor, y al pulsar el botón el programa **extrae** la base de datos en la misma ubicación y **borra el `.zip`** tras hacerlo.
+
+**Importante**: la opción de restaurar NO está en el menú hamburguesa (dentro de la app), porque si `app.db` no existe la app no arranca y no se podría acceder al menú. Por eso el botón de restauración vive en la **página de login (`index.php`)**, donde sí es alcanzable aunque falte la BD.
+
+- **Endpoint**: `api/helpers/restore_zip.php` (POST, **sin autenticación requerida**: debe funcionar aunque no haya sesión ni `app.db`, para permitir la recuperación).
+- **Comportamiento**:
+  1. Busca el primer `*.zip` en `database/` (la misma ubicación que la BD actual).
+  2. Lo abre con `ZipArchive` y extrae **solo** `app.db` (y `gesbike.db` si existe) en `database/`, sobrescribiendo la BD actual (no extrae otros ficheros, por seguridad).
+  3. Tras extraer, hace `@unlink($zipPath)` para borrar el `.zip` del servidor.
+  4. Devuelve JSON `{ success, message, archivos }`. Si no hay `.zip` o no contiene `app.db`, devuelve error.
+- **Frontend (login)**: `index.php` detecta con PHP (`glob('database/*.zip')`) si hay un `.zip` y, en ese caso, renderiza el botón **"Extraer BD"** en la **misma línea** que el botón "Acceder" (este último queda más estrecho, con `flex:1 1 auto`, y el de Extraer BD con `flex:0 0 auto`). El botón llama a `restaurarBackupZip()` (definida inline en `index.php`) que hace `fetch(POST)` al endpoint, muestra el resultado y recarga si tuvo éxito.
+- **Nota**: el usuario debe colocar el `.zip` en `database/` (vía FTP u otro medio) antes de pulsar el botón.
+- **Patrón a seguir para nuevos "botones de acción" en el menú**: añadir un `<div class="menu-item text-center" onclick="miFuncion()">` con icono FA `menu-icon`, y definir `miFuncion()` en un `<script>` al final de `sidebar.php` usando `$GLOBALS['pathUrl']` para resolver rutas relativas.
+
+### Terminología "Sesiones"
+- En el menú hamburguesa, el item de rutas se etiqueta **"Sesiones"** (icono `fa-stopwatch`). La acción de navegación sigue siendo `menuAction('rutas', ...)` (no cambiar el case de routing).
+- En el resumen del tab4 (`getResumenBiker` en `services/rutas/ruta.js`), la fila de la categoría **estática** muestra **"🏠 Sesiones"** en lugar de "🏠 Rutas" (tooltip "Sesiones Estática"). Pulmonar/eléctrica y el total siguen como "Rutas".
 
 ## 11. FAB (Floating Action Button)
 
@@ -659,7 +729,7 @@ Para agregar una nueva entidad:
 - **Imágenes vehículos**: `assets/images/Vehiculos/` con nombre UUID
 - **Imágenes recambios**: `assets/images/Recambios/` con nombre UUID
 - **Iconos grupos**: 22 PNGs predefinidos en `assets/images/icons/Grupos/`
-- **Categoría vehículo**: solo dos valores: `pulmonar` o `electrica`
+- **Categoría vehículo**: tres valores: `pulmonar`, `electrica` o `estatica`
 - **CSS compartido**: `.upload-container/upload-preview/upload-placeholder` en `style.css` para subida de imágenes
 - **Fondo páginas**: gradiente púrpura suave `#f0ecf9→#f8f4ff` en modo claro, sólido `#1a1a2e` en oscuro
 - **Login**: gradiente púrpura intenso `#667eea→#764ba2` (claro), `#0f0c29→#302b63→#24243e` (oscuro)

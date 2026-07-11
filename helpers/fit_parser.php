@@ -29,6 +29,12 @@ define('FIT_CDA', 0.42);         // Drag coefficient × frontal area (m²)
 define('FIT_CRR', 0.018);        // Rolling resistance coefficient
 define('FIT_DRIVETRAIN_LOSS', 0.05); // Drivetrain loss fraction
 
+// Indoor (bicicleta estatica) estimation constants
+define('FIT_INDOOR_GROSS_EFFICIENCY', 0.24); // Eficiencia mecanica bruta del ciclismo (~20-25%)
+define('FIT_KCAL_TO_JOULES', 4184);          // 1 kcal = 4184 J
+define('FIT_INDOOR_HR_REST_DEFAULT', 60);    // FC reposo por defecto si no hay datos
+define('FIT_INDOOR_WATT_PER_HRR', 2.2);      // W por ppm sobre reposo (fallback sin calorias)
+
 class FitParser
 {
     private $data = '';
@@ -40,7 +46,7 @@ class FitParser
     private $lap = null;
     private $fileId = null;
 
-    public function parse($filepath)
+    public function parse($filepath, $indoor = false)
     {
         if (!file_exists($filepath)) {
             throw new Exception("FIT file not found: $filepath");
@@ -52,7 +58,14 @@ class FitParser
         }
         $this->parseHeader();
         $this->parseRecords();
-        return $this->buildResult();
+        return $indoor ? $this->buildIndoorResult() : $this->buildResult();
+    }
+
+    // Devuelve el sub_sport de la sesion (ej: 6 = indoor_cycling) si esta disponible
+    public function getSubSport()
+    {
+        return ($this->session && isset($this->session[6]) && $this->session[6] !== null)
+            ? $this->session[6] : null;
     }
 
     private function readU8($o) { return ord($this->data[$o]); }
@@ -575,6 +588,197 @@ class FitParser
             'track_points' => $trackPoints,
             'pulsaciones' => $pulsaciones,
         ];
+    }
+
+    /**
+     * Analisis para bicicleta estatica (indoor).
+     * No hay GPS/velocidad/distancia reales: se estiman a partir de la
+     * frecuencia cardiaca, las calorias y el tiempo del ejercicio.
+     *
+     * Modelo:
+     *  1. Potencia media mecanica estimada desde calorias:
+     *       P_media = (kcal * 4184 * eficiencia) / tiempo_total
+     *     (fallback a FC si no hay calorias)
+     *  2. Curva de potencia por segundo ponderada por la reserva de FC
+     *     (FC - FC_reposo). Los tramos sin senal (corte) se rellenan con la
+     *     reserva media, de modo que la distancia sigue acumulando en todo
+     *     el ejercicio.
+     *  3. Velocidad virtual en llano resolviendo la fisica: P = f(v).
+     *  4. Distancia = integral de v * dt.
+     */
+    private function buildIndoorResult()
+    {
+        if (empty($this->records)) {
+            throw new Exception("No record messages found in FIT file");
+        }
+
+        // 1. Recolectar registros (timestamp, FC, cadencia)
+        $recs = [];
+        $timestamps = [];
+        $hrValues = [];
+        foreach ($this->records as $rec) {
+            $ts = (isset($rec[FIT_FIELD_TIMESTAMP]) && $rec[FIT_FIELD_TIMESTAMP] !== null)
+                ? $rec[FIT_FIELD_TIMESTAMP] + FIT_EPOCH_OFFSET : null;
+            $hr = (isset($rec[FIT_FIELD_HEART_RATE]) && $rec[FIT_FIELD_HEART_RATE] !== null)
+                ? $rec[FIT_FIELD_HEART_RATE] : null;
+            $cad = (isset($rec[FIT_FIELD_CADENCE]) && $rec[FIT_FIELD_CADENCE] !== null)
+                ? $rec[FIT_FIELD_CADENCE] : null;
+            if ($ts !== null) $timestamps[] = $ts;
+            if ($hr !== null) $hrValues[] = $hr;
+            $recs[] = ['ts' => $ts, 'hr' => $hr, 'cad' => $cad];
+        }
+
+        // 2. Datos de sesion (calorias, tiempos, FC)
+        $sessionCalories = $sessionTotalTime = $sessionTimerTime = null;
+        $sessionAvgHr = $sessionMaxHr = null;
+        if ($this->session) {
+            $s = $this->session;
+            if (isset($s[7]) && $s[7] !== null) $sessionTotalTime = $s[7] / 1000.0;
+            if (isset($s[8]) && $s[8] !== null) $sessionTimerTime = $s[8] / 1000.0;
+            if (isset($s[11]) && $s[11] !== null) $sessionCalories = $s[11];
+            if (isset($s[16]) && $s[16] !== null) $sessionAvgHr = $s[16];
+            if (isset($s[17]) && $s[17] !== null) $sessionMaxHr = $s[17];
+        }
+
+        // 3. Tiempo total del ejercicio (elapsed)
+        $startTs = !empty($timestamps) ? $timestamps[0] : null;
+        $endTs = !empty($timestamps) ? end($timestamps) : null;
+        $elapsed = ($startTs !== null && $endTs !== null) ? ($endTs - $startTs) : 0;
+        if ($sessionTotalTime !== null && $sessionTotalTime > 0) $elapsed = (int) $sessionTotalTime;
+        if ($elapsed <= 0) $elapsed = max(1, count($recs));
+        $timerTime = ($sessionTimerTime !== null && $sessionTimerTime > 0) ? (int) $sessionTimerTime : $elapsed;
+
+        // 4. FC reposo, media y maxima
+        $avgHr = (!empty($hrValues)) ? round(array_sum($hrValues) / count($hrValues)) : null;
+        $maxHr = (!empty($hrValues)) ? max($hrValues) : null;
+        if ($sessionAvgHr !== null) $avgHr = (int) $sessionAvgHr;
+        if ($sessionMaxHr !== null) $maxHr = (int) $sessionMaxHr;
+        $hrRest = (!empty($hrValues)) ? min($hrValues) : FIT_INDOOR_HR_REST_DEFAULT;
+        $hrRest = max(40, min(90, (int) $hrRest));
+
+        // 5. Potencia media mecanica estimada
+        $calorias = ($sessionCalories !== null) ? (int) $sessionCalories : 0;
+        $avgPower = 0;
+        if ($calorias > 0 && $elapsed > 0) {
+            $mechWork = $calorias * FIT_KCAL_TO_JOULES * FIT_INDOOR_GROSS_EFFICIENCY;
+            $avgPower = $mechWork / $elapsed;
+        } elseif ($avgHr !== null) {
+            // Fallback: sin calorias, estimar desde la reserva media de FC
+            $avgPower = max(0, ($avgHr - $hrRest)) * FIT_INDOOR_WATT_PER_HRR;
+        }
+
+        // 6. Reserva de FC por registro (relleno de cortes de senal con la media)
+        $reserveByRec = [];
+        $reserveSamples = [];
+        foreach ($recs as $r) {
+            if ($r['hr'] !== null) {
+                $res = max(0, $r['hr'] - $hrRest);
+                $reserveByRec[] = $res;
+                $reserveSamples[] = $res;
+            } else {
+                $reserveByRec[] = null; // se rellena despues
+            }
+        }
+        $avgReserve = (!empty($reserveSamples)) ? array_sum($reserveSamples) / count($reserveSamples) : 0;
+        foreach ($reserveByRec as $i => $res) {
+            if ($res === null) $reserveByRec[$i] = $avgReserve;
+        }
+
+        // 7. dt por registro
+        $dts = [];
+        $n = count($recs);
+        for ($i = 0; $i < $n; $i++) {
+            $dt = 1;
+            if ($i < $n - 1 && $recs[$i]['ts'] !== null && $recs[$i + 1]['ts'] !== null) {
+                $dt = $recs[$i + 1]['ts'] - $recs[$i]['ts'];
+                if ($dt <= 0 || $dt > 60) $dt = 1;
+            }
+            $dts[] = $dt;
+        }
+
+        // 8. Factor de escala para que la media de potencia = avgPower
+        $weightedReserve = 0;
+        for ($i = 0; $i < $n; $i++) $weightedReserve += $reserveByRec[$i] * $dts[$i];
+        $useHrCurve = ($weightedReserve > 0 && $avgPower > 0);
+        $k = $useHrCurve ? ($avgPower * $elapsed) / $weightedReserve : 0;
+
+        // 9. Integrar velocidad -> distancia y construir pulsaciones
+        $pulsaciones = [];
+        $cumDistM = 0;
+        $maxSpeedMs = 0;
+        for ($i = 0; $i < $n; $i++) {
+            $powerI = $useHrCurve ? ($k * $reserveByRec[$i]) : $avgPower;
+            $vMs = $this->solveFlatSpeed($powerI);
+            $cumDistM += $vMs * $dts[$i];
+            if ($vMs > $maxSpeedMs) $maxSpeedMs = $vMs;
+
+            $tsIso = ($recs[$i]['ts'] !== null) ? date('c', $recs[$i]['ts']) : null;
+            $pulsaciones[] = [
+                'kilometro' => round($cumDistM / 1000.0, 3),
+                'lat' => null,
+                'lon' => null,
+                'pulsaciones' => $recs[$i]['hr'],
+                'cadencia' => $recs[$i]['cad'],
+                'potencia' => round(max(0, $powerI)),
+                'temperatura' => null,
+                'altitud' => null,
+                'velocidad' => round($vMs * 3.6, 1),
+                'timestamp_fit' => $tsIso,
+            ];
+        }
+
+        $kms = round($cumDistM / 1000.0, 3);
+        $velMedia = ($elapsed > 0) ? round(($cumDistM / $elapsed) * 3.6, 1) : 0;
+        $velMaxima = round($maxSpeedMs * 3.6, 1);
+
+        $fechaInicio = ($startTs !== null) ? date('c', $startTs) : null;
+        $fechaFin = ($endTs !== null) ? date('c', $endTs) : null;
+
+        return [
+            'fecha_inicio' => $fechaInicio,
+            'fecha_fin' => $fechaFin,
+            'tiempo_total' => $this->formatDuration((int) $elapsed),
+            'tiempo_movimiento' => $this->formatDuration((int) $timerTime),
+            'kms' => $kms,
+            'metros_ascenso' => 0,
+            'metros_descenso' => 0,
+            'altitud_maxima' => 0,
+            'velocidad_media' => $velMedia,
+            'velocidad_maxima' => $velMaxima,
+            'potencia_promedio_w' => round($avgPower),
+            'calorias' => $calorias,
+            'pct_subida' => 0,
+            'pct_plano' => 100,
+            'pct_bajada' => 0,
+            'tiempo_subida' => $this->formatDuration(0),
+            'tiempo_plano' => $this->formatDuration((int) $elapsed),
+            'tiempo_bajada' => $this->formatDuration(0),
+            'frecuencia_cardiaca_promedio' => $avgHr,
+            'frecuencia_cardiaca_maxima' => $maxHr,
+            'track_points' => [],
+            'pulsaciones' => $pulsaciones,
+            'indoor' => true,
+            'categoria' => 'estatica',
+            'estimado' => 1,
+        ];
+    }
+
+    /**
+     * Resuelve la velocidad en llano (m/s) para una potencia dada usando el
+     * modelo fisico (aero + rodadura), mediante biseccion.
+     */
+    private function solveFlatSpeed($power)
+    {
+        if ($power <= 0) return 0.0;
+        $target = $power * (1 - FIT_DRIVETRAIN_LOSS);
+        $lo = 0.0;
+        $hi = 25.0; // 90 km/h tope teorico
+        for ($i = 0; $i < 40; $i++) {
+            $mid = ($lo + $hi) / 2;
+            $f = 0.5 * FIT_RHO_AIR * FIT_CDA * $mid * $mid * $mid + FIT_MASS * FIT_G * FIT_CRR * $mid;
+            if ($f < $target) $lo = $mid; else $hi = $mid;
+        }
+        return ($lo + $hi) / 2;
     }
 
     private function haversine($lat1, $lon1, $lat2, $lon2)

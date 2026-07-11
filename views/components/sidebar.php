@@ -20,8 +20,8 @@
             <div class="menu-text-option">Mantenimientos</div>
         </div>
         <div class="menu-item text-center" onclick="menuAction('rutas',<?php echo $GLOBALS['navigation_deep'] ?>)">
-            <img src="<?php echo $GLOBALS['pathUrl'] ?>assets/images/icons/ruta_ico.png" alt="Rutas" class="menu-icon">
-            <div class="menu-text-option">Rutas</div>
+            <i class="fas fa-stopwatch menu-icon" style="font-size: 30px;"></i>
+            <div class="menu-text-option">Sesiones</div>
         </div>
         <div class="menu-item text-center" onclick="menuAction('vehiculos',<?php echo $GLOBALS['navigation_deep'] ?>)">
             <img src="<?php echo $GLOBALS['pathUrl'] ?>assets/images/icons/vehiculos_ico.png" alt="Vehículos"
@@ -52,8 +52,8 @@
         </div>
         <hr>
         <div class="menu-item text-center" id="theme-toggle-btn">
-            <i class="fas fa-moon menu-icon" style="font-size: 32px;"></i>
-            <div class="menu-text-option">Modo oscuro</div>
+            <i class="fas fa-moon menu-icon" style="font-size: 22px;"></i>
+            <div class="menu-text-option" style="font-size: 0.7rem;">Modo oscuro</div>
         </div>
         <hr>
         <div class="menu-item text-center" onclick="menuAction('salir',<?php echo $GLOBALS['navigation_deep'] ?>)">

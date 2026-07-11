@@ -80,6 +80,7 @@ $modo = $_GET["modo"] ?? 'nuevo';
             <select class="form-select" id="vehiculo_categoria">
                 <option value="pulmonar">Pulmonar</option>
                 <option value="electrica">Eléctrica</option>
+                <option value="estatica">Estática</option>
             </select>
         </div>
 

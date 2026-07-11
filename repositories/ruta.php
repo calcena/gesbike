@@ -198,6 +198,11 @@ function create_ruta_file($params)
         $db = conectar();
     }
 
+    // Parametros opcionales (retrocompatibles con importaciones antiguas)
+    $origen = $params['origen'] ?? 'gpx';
+    $categoria = $params['categoria'] ?? null;
+    $estimado = (int) ($params['estimado'] ?? 0);
+
     // 1. Intentar UPDATE
     $upd = $db->prepare("
         UPDATE rutas SET
@@ -218,8 +223,10 @@ function create_ruta_file($params)
             tiempo_plano = ?,
             tiempo_bajada= ?,
             gpx_data = ?,
+            categoria = ?,
+            estimado = ?,
             activo = 1,
-            origen = 'gpx'
+            origen = ?
         WHERE vehiculo_id = ? AND fecha_inicio = ?
     ");
     $upd->execute([
@@ -240,6 +247,9 @@ function create_ruta_file($params)
         $params['tiempo_plano'],
         $params['tiempo_bajada'],
         $params['gpx_data'] ?? null,
+        $categoria,
+        $estimado,
+        $origen,
         $params['vehiculo_id'],
         $params['fecha_inicio']
     ]);
@@ -262,8 +272,8 @@ function create_ruta_file($params)
             vehiculo_id, fecha_inicio, fecha_fin, tiempo_total, tiempo_movimiento,
             kms, metros_ascenso, metros_descenso, altitud_maxima,
             velocidad_media, velocidad_maxima, potencia_promedio_w, calorias, pct_subida, pct_plano, pct_bajada, tiempo_subida, tiempo_plano, tiempo_bajada,
-            gpx_data, activo, origen
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? , ?, ?, 1, 'gpx')
+            gpx_data, categoria, estimado, activo, origen
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? , ?, ?, ?, ?, 1, ?)
     ");
     $ins->execute([
         $params['vehiculo_id'],
@@ -285,7 +295,10 @@ function create_ruta_file($params)
         $params['tiempo_subida'],
         $params['tiempo_plano'],
         $params['tiempo_bajada'],
-        $params['gpx_data'] ?? null
+        $params['gpx_data'] ?? null,
+        $categoria,
+        $estimado,
+        $origen
     ]);
 
     $ruta_id = (int) $db->lastInsertId();
@@ -371,9 +384,11 @@ SELECT
     COUNT(r1.id) AS rutas_mes,
     ROUND(SUM(CASE WHEN v1.categoria = 'electrica' THEN r1.kms ELSE 0 END), 2) AS kms_mes_electrica,
     ROUND(SUM(CASE WHEN v1.categoria = 'pulmonar' THEN r1.kms ELSE 0 END), 2) AS kms_mes_pulmonar,
+    ROUND(SUM(CASE WHEN v1.categoria = 'estatica' THEN r1.kms ELSE 0 END), 2) AS kms_mes_estatica,
     ROUND(SUM(r1.kms), 2) AS total_kms_mes,
     COUNT(CASE WHEN v1.categoria = 'pulmonar' THEN r1.id END) AS rutas_mes_pulmonar,
     COUNT(CASE WHEN v1.categoria = 'electrica' THEN r1.id END) AS rutas_mes_electrica,
+    COUNT(CASE WHEN v1.categoria = 'estatica' THEN r1.id END) AS rutas_mes_estatica,
 
     -- Totales del año correspondiente a la fila
     (SELECT COUNT(id) FROM rutas WHERE vehiculo_id IN (SELECT id FROM vehiculos WHERE usuario_id = v1.usuario_id) AND strftime('%Y', fecha_inicio) = strftime('%Y', r1.fecha_inicio)) AS rutas_anio,

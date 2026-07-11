@@ -125,15 +125,32 @@ async function uploadFITFile(file, silent = false) {
 function generarContenidoFIT(data) {
   const hasHR = data.frecuencia_cardiaca_promedio != null;
   const hasPower = data.potencia_promedio_w != null && data.potencia_promedio_w > 0;
+  const isIndoor = data.indoor === true || data.estimado == 1;
+  const est = isIndoor ? ' <span style="color:#e67e22;font-size:0.75rem">(estimada)</span>' : '';
+  const titulo = isIndoor
+    ? '<i class="fas fa-house text-primary"></i> Ejercicio indoor importado'
+    : '<i class="fas fa-check-circle text-success"></i> Ruta FIT importada';
+  const velRow = (data.velocidad_media != null)
+    ? `<div class="detail-row-captura" style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee;">
+        <span style="font-weight: 500;">Velocidad media${est}</span>
+        <span style="font-weight: 600;">${data.velocidad_media} km/h</span>
+      </div>`
+    : '';
+  const avisoIndoor = isIndoor
+    ? `<div style="margin-top:8px;font-size:0.72rem;color:#888;line-height:1.2;">
+        <i class="fas fa-circle-info"></i> Bicicleta estática: la distancia y velocidad son estimaciones calculadas a partir de la frecuencia cardíaca, las calorías y el tiempo.
+      </div>`
+    : '';
   return `
     <div class="ruta-details-captura" style="background: #fff; border: 2px solid #667eea; border-radius: 10px; padding: 15px; max-height: 400px; overflow-y: auto;">
       <h6 style="color: #667eea; font-weight: bold; margin-bottom: 10px;">
-        <i class="fas fa-check-circle text-success"></i> Ruta FIT importada
+        ${titulo}
       </h6>
       <div class="detail-row-captura" style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee;">
-        <span style="font-weight: 500;">Distancia</span>
+        <span style="font-weight: 500;">Distancia${est}</span>
         <span style="font-weight: 600;">${data.kms} km</span>
       </div>
+      ${velRow}
       <div class="detail-row-captura" style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee;">
         <span style="font-weight: 500;">Pulsaciones promedio</span>
         <span style="font-weight: 600;">${hasHR ? data.frecuencia_cardiaca_promedio + " bpm" : "N/A"}</span>
@@ -143,7 +160,7 @@ function generarContenidoFIT(data) {
         <span style="font-weight: 600;">${hasHR ? data.frecuencia_cardiaca_maxima + " bpm" : "N/A"}</span>
       </div>
       <div class="detail-row-captura" style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee;">
-        <span style="font-weight: 500;">Potencia promedio</span>
+        <span style="font-weight: 500;">Potencia promedio${est}</span>
         <span style="font-weight: 600;">${hasPower ? data.potencia_promedio_w + " W" : "N/A"}</span>
       </div>
       <div class="detail-row-captura" style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee;">
@@ -154,6 +171,7 @@ function generarContenidoFIT(data) {
         <span style="font-weight: 500;">Puntos guardados</span>
         <span style="font-weight: 600;">${data.pulsaciones_count}</span>
       </div>
+      ${avisoIndoor}
     </div>
   `;
 }

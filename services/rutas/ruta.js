@@ -999,7 +999,7 @@ function initTemperatureChart(trackPoints, tempData) {
         c.save();
         c.beginPath();
         c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
-        c.fillStyle = '#DC143C';
+        c.fillStyle = darkenColor('#DC143C');
         c.fill();
         c.strokeStyle = '#fff';
         c.lineWidth = 1.5;
@@ -1017,7 +1017,7 @@ function initTemperatureChart(trackPoints, tempData) {
         c.save();
         c.beginPath();
         c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
-        c.fillStyle = '#5B9BD5';
+        c.fillStyle = darkenColor('#5B9BD5');
         c.fill();
         c.strokeStyle = '#fff';
         c.lineWidth = 1.5;
@@ -1115,6 +1115,7 @@ function initPulsacionesChart(trackPoints, pulsacionesData) {
 
   const maxVal = Math.max(...chartData.map(d => d.y));
   const minVal = Math.min(...chartData.map(d => d.y));
+  const avgVal = chartData.reduce((s, d) => s + d.y, 0) / chartData.length;
   const maxPoint = chartData.find(d => d.y === maxVal);
   const minPoint = chartData.find(d => d.y === minVal);
 
@@ -1132,7 +1133,7 @@ function initPulsacionesChart(trackPoints, pulsacionesData) {
         c.save();
         c.beginPath();
         c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
-        c.fillStyle = '#DC143C';
+        c.fillStyle = darkenColor('#DC143C');
         c.fill();
         c.strokeStyle = '#fff';
         c.lineWidth = 1.5;
@@ -1153,7 +1154,7 @@ function initPulsacionesChart(trackPoints, pulsacionesData) {
         c.save();
         c.beginPath();
         c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
-        c.fillStyle = '#5B9BD5';
+        c.fillStyle = darkenColor('#5B9BD5');
         c.fill();
         c.strokeStyle = '#fff';
         c.lineWidth = 1.5;
@@ -1165,6 +1166,35 @@ function initPulsacionesChart(trackPoints, pulsacionesData) {
         c.fillStyle = '#5B9BD5';
         c.textAlign = xPx + 60 > chartW ? 'right' : 'left';
         c.fillText(`${minVal} bpm`, xPx + (xPx + 60 > chartW ? -8 : 8), yPx + 4);
+        c.restore();
+      }
+
+      const avgPx = yScale.getPixelForValue(avgVal);
+      c.save();
+      c.setLineDash([6, 4]);
+      c.strokeStyle = 'rgba(255, 107, 107, 0.8)';
+      c.lineWidth = 1.5;
+      c.beginPath();
+      c.moveTo(0, avgPx);
+      c.lineTo(chartW, avgPx);
+      c.stroke();
+      c.setLineDash([]);
+      c.restore();
+
+      const chartArea = chart.chartArea;
+      if (chartArea) {
+        const labelY = chart.height - 8;
+        const rightX = chartArea.right - 4;
+        const pad = 4;
+        const avgLabel = `∅ ${Math.round(avgVal)} bpm`;
+        c.save();
+        c.font = 'bold 11px Arial';
+        const avgW = c.measureText(avgLabel).width;
+        c.fillStyle = 'rgba(255,255,255,0.9)';
+        c.fillRect(rightX - avgW - pad, labelY - 10 + pad, avgW + pad * 2, 14);
+        c.fillStyle = '#FF6B6B';
+        c.textAlign = 'right';
+        c.fillText(avgLabel, rightX, labelY + 4);
         c.restore();
       }
     }
@@ -1303,7 +1333,7 @@ function initVelocidadChart(trackPoints, fechaInicio, fechaFin) {
         c.save();
         c.beginPath();
         c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
-        c.fillStyle = '#4CAF50';
+        c.fillStyle = darkenColor('#4CAF50');
         c.fill();
         c.strokeStyle = '#fff';
         c.lineWidth = 1.5;
@@ -1522,7 +1552,7 @@ function initPotenciaChart(trackPoints, fechaInicio, fechaFin) {
         c.save();
         c.beginPath();
         c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
-        c.fillStyle = '#00BCD4';
+        c.fillStyle = darkenColor('#00BCD4');
         c.fill();
         c.strokeStyle = '#fff';
         c.lineWidth = 1.5;
@@ -2407,51 +2437,7 @@ function generarContenidoGPX(ruta) {
 }
 
 // Función para generar el contenido HTML de la ruta
-function generarContenidoRuta(ruta, hasHR = false, tempData = null, pulsacionesSummary = null) {
-  const hasElevChart = ruta.gpx_data && ruta.gpx_data !== 'null' && ruta.gpx_data !== '[]';
-  const fields = [
-    { label: "📆 Inicio", value: formatFechaTimeISO(ruta.fecha_inicio) },
-    { label: "📆 Fin", value: formatFechaTimeISO(ruta.fecha_fin) },
-    { label: "🕑 Tiempo total", value: ruta.tiempo_total },
-    { label: "⌚ Tiempo en movimiento", value: ruta.tiempo_movimiento },
-    { label: "📏 Distancia", value: `${ruta.kms} km` },
-    ...(hasElevChart ? [] : [
-      { label: "⏫ Ascenso", value: `${ruta.metros_ascenso} m` },
-      { label: "⏬ Descenso", value: `${ruta.metros_descenso} m` },
-    ]),
-    ...(hasElevChart ? [] : [{ label: "⛰️ Altitud máxima", value: `${ruta.altitud_maxima} m` }]),
-    { label: "💥 Calorías", value: `${ruta.calorias} kcal` },
-    {
-      label: `⬆️ Subida (${ruta.tiempo_subida || "00:00:00"})`,
-      value: `${ruta.pct_subida}%`,
-    },
-    {
-      label: `➡️ Plano (${ruta.tiempo_plano || "00:00:00"})`,
-      value: `${ruta.pct_plano}%`,
-    },
-    {
-      label: `⬇️ Bajada (${ruta.tiempo_bajada || "00:00:00"})`,
-      value: `${ruta.pct_bajada}%`,
-    },
-  ];
-
-  if (
-    hasHR ||
-    (ruta.frecuencia_cardiaca_promedio !== undefined &&
-      ruta.frecuencia_cardiaca_promedio !== null)
-  ) {
-    fields.push(
-      {
-        label: "❤️ FC promedio",
-        value: `${ruta.frecuencia_cardiaca_promedio} bpm`,
-      },
-      {
-        label: "❤️‍🔥 FC máxima",
-        value: `${ruta.frecuencia_cardiaca_maxima || "—"} bpm`,
-      }
-    );
-  }
-
+function renderStatsCaptura(fields) {
   return `
     <div class="ruta-details-captura">
       ${fields
@@ -2502,6 +2488,54 @@ function generarContenidoRuta(ruta, hasHR = false, tempData = null, pulsacionesS
   `;
 }
 
+function generarContenidoRuta(ruta, hasHR = false, tempData = null, pulsacionesSummary = null) {
+  const hasElevChart = ruta.gpx_data && ruta.gpx_data !== 'null' && ruta.gpx_data !== '[]';
+  const fields = [
+    { label: "📆 Inicio", value: formatFechaTimeISO(ruta.fecha_inicio) },
+    { label: "📆 Fin", value: formatFechaTimeISO(ruta.fecha_fin) },
+    { label: "🕑 Tiempo total", value: ruta.tiempo_total },
+    { label: "⌚ Tiempo en movimiento", value: ruta.tiempo_movimiento },
+    { label: "📏 Distancia", value: `${ruta.kms} km` },
+    ...(hasElevChart ? [] : [
+      { label: "⏫ Ascenso", value: `${ruta.metros_ascenso} m` },
+      { label: "⏬ Descenso", value: `${ruta.metros_descenso} m` },
+    ]),
+    ...(hasElevChart ? [] : [{ label: "⛰️ Altitud máxima", value: `${ruta.altitud_maxima} m` }]),
+    { label: "💥 Calorías", value: `${ruta.calorias} kcal` },
+    {
+      label: `⬆️ Subida (${ruta.tiempo_subida || "00:00:00"})`,
+      value: `${ruta.pct_subida}%`,
+    },
+    {
+      label: `➡️ Plano (${ruta.tiempo_plano || "00:00:00"})`,
+      value: `${ruta.pct_plano}%`,
+    },
+    {
+      label: `⬇️ Bajada (${ruta.tiempo_bajada || "00:00:00"})`,
+      value: `${ruta.pct_bajada}%`,
+    },
+  ];
+
+  if (
+    hasHR ||
+    (ruta.frecuencia_cardiaca_promedio !== undefined &&
+      ruta.frecuencia_cardiaca_promedio !== null)
+  ) {
+    fields.push(
+      {
+        label: "❤️ FC promedio",
+        value: `${ruta.frecuencia_cardiaca_promedio} bpm`,
+      },
+      {
+        label: "❤️‍🔥 FC máxima",
+        value: `${ruta.frecuencia_cardiaca_maxima || "—"} bpm`,
+      }
+    );
+  }
+
+  return renderStatsCaptura(fields);
+}
+
 function actualizarStatsConTemperatura(ruta, tempData, pulsacionesSummary = null) {
   if (!tempData || tempData.length === 0) return;
   const statsDiv = document.querySelector('.ruta-details-captura');
@@ -2509,6 +2543,429 @@ function actualizarStatsConTemperatura(ruta, tempData, pulsacionesSummary = null
   const tempRegex = /(🌡️ Temp\. máxima|🌡️ Temp\. mínima)/;
   if (tempRegex.test(statsDiv.parentElement?.innerHTML || '')) return;
   statsDiv.outerHTML = generarContenidoRuta(ruta, false, tempData, pulsacionesSummary);
+}
+
+// Detalle para rutas de bicicleta estática (indoor).
+// No hay GPS: se muestran las estimaciones (distancia/velocidad/potencia) y
+// las gráficas de FC, velocidad y potencia frente al km estimado.
+const showIndoorDetails = async (ruta_id) => {
+  window.__indoorCharts = window.__indoorCharts || {};
+  Object.values(window.__indoorCharts).forEach((c) => { try { c.destroy(); } catch (e) {} });
+  window.__indoorCharts = {};
+
+  Swal.fire({
+    title: false,
+    html: '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 text-muted">Cargando detalles...</p></div>',
+    width: 800,
+    padding: "0px",
+    showCloseButton: true,
+    showConfirmButton: false,
+    customClass: { popup: 'swal-ruta-detalle', closeButton: 'swal-close-top' },
+  });
+
+  try {
+    const [rutaResp, pulsaciones] = await Promise.all([
+      axios.post(getApiUrl('ruta.php?getRutasById'), { data: { ruta_id } }, { headers: { "Content-Type": "application/json" } }),
+      getPulsacionesByRuta(ruta_id),
+    ]);
+
+    if (!rutaResp.data.success || !rutaResp.data.content[0]) {
+      const htmlEl = Swal.getHtml();
+      if (htmlEl) htmlEl.innerHTML = '<div class="text-center py-4 text-danger">Error al cargar los detalles</div>';
+      return;
+    }
+
+    const ruta = rutaResp.data.content[0];
+
+    const fmt = (v, dec = 2) => (parseFloat(v) || 0).toFixed(dec).replace('.', ',');
+    const resumen = pulsacionesResumen(pulsaciones);
+    const filas = [
+      { label: "📆 Inicio", value: formatFechaTimeISO(ruta.fecha_inicio) },
+      { label: "🕑 Tiempo total", value: ruta.tiempo_total || '—' },
+      { label: "📏 Distancia (estimada)", value: `${fmt(ruta.kms)} km` },
+      { label: "🚀 Vel. media (estimada)", value: `${fmt(ruta.velocidad_media, 1)} km/h` },
+      { label: "🚀 Vel. máxima (estimada)", value: `${fmt(ruta.velocidad_maxima, 1)} km/h` },
+      { label: "⚡ Potencia media (estimada)", value: `${parseInt(ruta.potencia_promedio_w) || 0} W` },
+      { label: "❤️ FC promedio", value: `${resumen.avg || '—'} bpm` },
+      { label: "❤️‍🔥 FC máxima", value: `${resumen.max || '—'} bpm` },
+      { label: "💥 Calorías", value: `${ruta.calorias || '—'} kcal` },
+    ];
+
+    const statsHtml = `
+      ${renderStatsCaptura(filas)}
+      <div style="margin-top:8px;font-size:0.72rem;color:#888;line-height:1.2;text-align:left;">
+        <i class="fas fa-circle-info"></i> Distancia, velocidad y potencia son estimaciones calculadas a partir de la frecuencia cardíaca, las calorías y el tiempo.
+      </div>`;
+
+    const graphSection = (id, title, open) => `
+      <details class="ruta-collapse" ${open ? 'open' : ''}>
+        <summary class="ruta-collapse-summary">${title}</summary>
+        <div style="height: 200px; margin-top: 4px; padding: 4px; border: 1px solid #dee2e6; border-radius: 8px;">
+          <canvas id="${id}"></canvas>
+        </div>
+      </details>`;
+
+    const hasPulsos = Array.isArray(pulsaciones) && pulsaciones.length > 0;
+    const chartsHtml = hasPulsos ? `
+      ${graphSection('indoorHrChart', '❤️ Pulsaciones', false)}
+      ${graphSection('indoorSpeedChart', '🚀 Velocidad (estimada)', false)}
+      ${graphSection('indoorPowerChart', '⚡ Potencia (estimada)', false)}
+    ` : '';
+
+    Swal.update({
+      html: `<div class="ruta-details-wrapper">${chartsHtml}<div>${statsHtml}</div></div>
+        <style>
+          .ruta-collapse { margin-bottom: 2px; border: 1px solid #dee2e6; border-radius: 6px; overflow: hidden; }
+          .ruta-collapse-summary { padding: 8px 6px; cursor: pointer; font-weight: 600; font-size: 13px; color: var(--text-primary, #333); background: var(--card-bg, #f8f9fa); user-select: none; text-align: left; }
+          .swal-wa-top {
+            position: absolute; top: 10px; left: 10px; z-index: 10;
+            background: #25D366; color: #fff; border: none; border-radius: 50%;
+            width: 28px; height: 28px; font-size: 14px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2); transition: transform 0.2s;
+          }
+          .swal-wa-top:hover { transform: scale(1.1); }
+          .swal-close-top { font-size: 22px !important; width: 32px !important; height: 32px !important; line-height: 32px !important; padding: 0 !important; top: 8px !important; right: 8px !important; }
+        </style>`,
+      showConfirmButton: false,
+    });
+
+    // Guardar datos para compartir y añadir botón de WhatsApp
+    window.__indoorRuta = ruta;
+    window.__indoorPulsaciones = Array.isArray(pulsaciones) ? pulsaciones : [];
+    const popup = Swal.getPopup();
+    if (popup) {
+      popup.style.position = 'relative';
+      const waBtn = document.createElement('button');
+      waBtn.id = 'wa-share-btn-indoor';
+      waBtn.className = 'swal-wa-top';
+      waBtn.innerHTML = '<i class="fab fa-whatsapp"></i>';
+      waBtn.title = 'Compartir por WhatsApp';
+      waBtn.onclick = async (e) => {
+        e.preventDefault();
+        await compartirIndoorWhatsApp();
+      };
+      popup.insertBefore(waBtn, popup.firstChild);
+    }
+
+    if (hasPulsos) {
+      renderIndoorCharts(pulsaciones);
+    }
+  } catch (err) {
+    console.error('showIndoorDetails', err);
+    const htmlEl = Swal.getHtml();
+    if (htmlEl) htmlEl.innerHTML = '<div class="text-center py-4 text-danger">Error al cargar los detalles</div>';
+  }
+};
+
+function pulsacionesResumen(pulsaciones) {
+  if (!Array.isArray(pulsaciones)) return { avg: null, max: null };
+  const hrs = pulsaciones.map(p => parseInt(p.pulsaciones)).filter(v => !isNaN(v) && v > 0);
+  if (hrs.length === 0) return { avg: null, max: null };
+  return {
+    avg: Math.round(hrs.reduce((s, v) => s + v, 0) / hrs.length),
+    max: Math.max(...hrs),
+  };
+}
+
+// Plugin de marcadores máx/mín/media para gráficas de bicicleta estática (indoor).
+// Dibuja punto máximo, punto mínimo y línea discontinua de media, igual que en las
+// gráficas de pulsaciones/velocidad/potencia de las categorías pulmonar y eléctrica.
+// Oscurece un color hex (#RRGGBB) multiplicando por f (sin cambiar el tono),
+// para que los puntos de marcador destaquen sobre la línea del gráfico.
+function darkenColor(hex, f = 0.72) {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!m) return hex;
+  const r = Math.max(0, Math.round(parseInt(m[1], 16) * f));
+  const g = Math.max(0, Math.round(parseInt(m[2], 16) * f));
+  const b = Math.max(0, Math.round(parseInt(m[3], 16) * f));
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function indoorMarkersPlugin({ maxColor, minColor, avgColor, unit, decimals = 0, showMin = true, maxLabelPos = 'point' }) {
+  return {
+    id: 'indoorMarkers',
+    afterDatasetsDraw(chart) {
+      const c = chart.ctx;
+      const xScale = chart.scales.x;
+      const yScale = chart.scales.y;
+      const chartW = chart.width;
+      const data = chart.data.datasets[0] && chart.data.datasets[0].data;
+      if (!data || data.length === 0) return;
+
+      const ys = data.map(d => d.y);
+      const maxVal = Math.max(...ys);
+      const minVal = Math.min(...ys);
+      const avgVal = ys.reduce((s, v) => s + v, 0) / ys.length;
+      const maxPoint = data.find(d => d.y === maxVal);
+      const minPoint = data.find(d => d.y === minVal);
+      const fmtV = (v) => decimals ? v.toFixed(decimals) : Math.round(v);
+
+      const drawPoint = (point, color, prefix, labelPos) => {
+        if (!point) return;
+        const xPx = xScale.getPixelForValue(point.x);
+        const yPx = yScale.getPixelForValue(point.y);
+        c.save();
+        c.beginPath();
+        c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
+        c.fillStyle = darkenColor(color);
+        c.fill();
+        c.strokeStyle = '#fff';
+        c.lineWidth = 1.5;
+        c.stroke();
+        c.restore();
+
+        if (labelPos !== 'bottom') {
+          c.save();
+          c.font = 'bold 11px Arial';
+          c.fillStyle = color;
+          c.textAlign = xPx + 60 > chartW ? 'right' : 'left';
+          c.fillText(`${prefix} ${fmtV(point.y)} ${unit}`, xPx + (xPx + 60 > chartW ? -8 : 8), yPx + 4);
+          c.restore();
+        }
+      };
+
+      drawPoint(maxPoint, maxColor, '↑', maxLabelPos);
+      if (showMin) drawPoint(minPoint, minColor, '↓', 'point');
+
+      const avgPx = yScale.getPixelForValue(avgVal);
+      c.save();
+      c.setLineDash([6, 4]);
+      c.strokeStyle = avgColor;
+      c.lineWidth = 1.5;
+      c.beginPath();
+      c.moveTo(0, avgPx);
+      c.lineTo(chartW, avgPx);
+      c.stroke();
+      c.setLineDash([]);
+      c.restore();
+
+      const chartArea = chart.chartArea;
+      if (chartArea) {
+        const labelY = chart.height - 8;
+        const leftX = chartArea.left + 4;
+        const rightX = chartArea.right - 4;
+        const pad = 4;
+        c.save();
+        c.font = 'bold 11px Arial';
+
+        if (maxLabelPos === 'bottom') {
+          const maxLabel = `↗ ${fmtV(maxVal)} ${unit}`;
+          const maxW = c.measureText(maxLabel).width;
+          c.fillStyle = 'rgba(255,255,255,0.9)';
+          c.fillRect(leftX - pad, labelY - 10 + pad, maxW + pad * 2, 14);
+          c.fillStyle = maxColor;
+          c.textAlign = 'left';
+          c.fillText(maxLabel, leftX, labelY + 4);
+        }
+
+        const avgLabel = `∅ ${fmtV(avgVal)} ${unit}`;
+        const avgW = c.measureText(avgLabel).width;
+        c.fillStyle = 'rgba(255,255,255,0.9)';
+        c.fillRect(rightX - avgW - pad, labelY - 10 + pad, avgW + pad * 2, 14);
+        c.fillStyle = avgColor;
+        c.textAlign = 'right';
+        c.fillText(avgLabel, rightX, labelY + 4);
+        c.restore();
+      }
+    }
+  };
+}
+
+function renderIndoorCharts(pulsaciones) {
+  // Downsample para rendimiento (~300 puntos máx)
+  const step = Math.max(1, Math.ceil(pulsaciones.length / 300));
+  const sampled = pulsaciones.filter((_, i) => i % step === 0);
+
+  const buildXY = (campo, filtroPositivo) => sampled
+    .map(p => ({ x: parseFloat(p.kilometro) || 0, y: p[campo] != null ? parseFloat(p[campo]) : null }))
+    .filter(d => d.y != null && (!filtroPositivo || d.y > 0));
+
+  const mkChart = (canvasId, label, data, color, markerOpts) => {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || data.length === 0) return;
+    const ctx = canvas.getContext('2d');
+    window.__indoorCharts[canvasId] = new Chart(ctx, {
+      type: 'line',
+      data: {
+        datasets: [{
+          label,
+          data,
+          borderColor: color,
+          backgroundColor: color + '33',
+          borderWidth: 1.5,
+          pointRadius: 0,
+          fill: true,
+          tension: 0.3,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        parsing: false,
+        plugins: { legend: { display: false }, title: { display: true, text: label, align: 'start', font: { size: 13, weight: 'bold' } } },
+        scales: {
+          x: { type: 'linear', title: { display: true, text: 'km (estimado)' }, ticks: { maxTicksLimit: 8 } },
+          y: { beginAtZero: false },
+        },
+      },
+      plugins: [indoorMarkersPlugin(markerOpts)],
+    });
+  };
+
+  mkChart('indoorHrChart', 'Pulsaciones (bpm)', buildXY('pulsaciones', true),
+    '#DC143C', { maxColor: '#DC143C', minColor: '#5B9BD5', avgColor: 'rgba(255,107,107,0.8)', unit: 'bpm' });
+  mkChart('indoorSpeedChart', 'Velocidad (km/h)', buildXY('velocidad', false),
+    '#4CAF50', { maxColor: '#4CAF50', minColor: '#5B9BD5', avgColor: 'rgba(255,107,107,0.8)', unit: 'km/h', decimals: 1, showMin: false, maxLabelPos: 'bottom' });
+  mkChart('indoorPowerChart', 'Potencia (W)', buildXY('potencia', false),
+    '#00BCD4', { maxColor: '#00BCD4', minColor: '#5B9BD5', avgColor: 'rgba(255,107,107,0.8)', unit: 'W', showMin: false, maxLabelPos: 'bottom' });
+}
+
+// Compartir sesión de bicicleta estática (indoor) por WhatsApp como imagen.
+async function compartirIndoorWhatsApp() {
+  const ruta = window.__indoorRuta;
+  const pulsaciones = window.__indoorPulsaciones || [];
+  if (!ruta) return;
+
+  Swal.showLoading();
+
+  try {
+    const container = document.createElement('div');
+    container.style.cssText = 'position:fixed;top:0;left:0;width:800px;z-index:-1;background:#fff;';
+    document.body.appendChild(container);
+
+    const kms = ruta.kms ? parseFloat(ruta.kms).toFixed(2) : '0';
+    const fechaHora = ruta.fecha_inicio ? formatFechaTimeISO(ruta.fecha_inicio) : '';
+
+    const titleBar = document.createElement('div');
+    titleBar.style.cssText = 'text-align:center;padding:14px 10px 6px;font-size:17px;font-weight:700;color:#333;font-family:Arial,sans-serif;';
+    titleBar.innerHTML = `🏠 Bicicleta estática${fechaHora ? ' — ' + fechaHora : ''}<br><span style="font-size:13px;font-weight:600;color:#667eea;">${kms} km (estimado)</span>`;
+    container.appendChild(titleBar);
+
+    const addSep = () => {
+      const sep = document.createElement('hr');
+      sep.style.cssText = 'margin:6px 0;border:none;border-top:2px solid #6A0DAD;';
+      container.appendChild(sep);
+    };
+    addSep();
+
+    // Gráficas (FC, velocidad, potencia) desde pulsaciones
+    const chartInstances = [];
+    const step = pulsaciones.length > 0 ? Math.max(1, Math.ceil(pulsaciones.length / 500)) : 1;
+    const sampled = pulsaciones.filter((_, i) => i % step === 0);
+    const buildXY = (campo, filtroPositivo) => sampled
+      .map(p => ({ x: parseFloat(p.kilometro) || 0, y: p[campo] != null ? parseFloat(p[campo]) : null }))
+      .filter(d => d.y != null && (!filtroPositivo || d.y > 0));
+
+    const addChart = (titulo, data, color, markerOpts) => {
+      if (!data || data.length === 0) return;
+      const div = document.createElement('div');
+      div.style.cssText = 'width:800px;height:180px;padding:8px;';
+      const canvas = document.createElement('canvas');
+      canvas.width = 800; canvas.height = 180;
+      canvas.style.cssText = 'width:100%;height:100%;';
+      div.appendChild(canvas);
+      container.appendChild(div);
+      const chart = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: { datasets: [{ label: titulo, data, borderColor: color, backgroundColor: color + '33', borderWidth: 1.5, pointRadius: 0, fill: true, tension: 0.3 }] },
+        options: {
+          responsive: false, animation: false, parsing: false,
+          plugins: { legend: { display: false }, title: { display: true, text: titulo, align: 'start', font: { size: 13, weight: 'bold' } } },
+          scales: { x: { type: 'linear', title: { display: true, text: 'km (estimado)' }, ticks: { maxTicksLimit: 8 } }, y: { beginAtZero: false } },
+        },
+        plugins: [indoorMarkersPlugin(markerOpts)],
+      });
+      chartInstances.push(chart);
+      addSep();
+    };
+
+    addChart('❤️ Pulsaciones (bpm)', buildXY('pulsaciones', true), '#DC143C',
+      { maxColor: '#DC143C', minColor: '#5B9BD5', avgColor: 'rgba(255,107,107,0.8)', unit: 'bpm' });
+    addChart('🚀 Velocidad estimada (km/h)', buildXY('velocidad', false), '#4CAF50',
+      { maxColor: '#4CAF50', minColor: '#5B9BD5', avgColor: 'rgba(255,107,107,0.8)', unit: 'km/h', decimals: 1, showMin: false, maxLabelPos: 'bottom' });
+    addChart('⚡ Potencia estimada (W)', buildXY('potencia', false), '#00BCD4',
+      { maxColor: '#00BCD4', minColor: '#5B9BD5', avgColor: 'rgba(255,107,107,0.8)', unit: 'W', showMin: false, maxLabelPos: 'bottom' });
+
+    const resumen = pulsacionesResumen(pulsaciones);
+    const fmt = (v, dec = 2) => (parseFloat(v) || 0).toFixed(dec).replace('.', ',');
+    const fieldsShare = [
+      { label: "📆 Inicio", value: formatFechaTimeISO(ruta.fecha_inicio) },
+      { label: "🕑 Tiempo total", value: ruta.tiempo_total || '—' },
+      { label: "📏 Distancia (est.)", value: `${fmt(ruta.kms)} km` },
+      { label: "🚀 Vel. media (est.)", value: `${fmt(ruta.velocidad_media, 1)} km/h` },
+      { label: "🚀 Vel. máxima (est.)", value: `${fmt(ruta.velocidad_maxima, 1)} km/h` },
+      { label: "⚡ Potencia (est.)", value: `${parseInt(ruta.potencia_promedio_w) || 0} W` },
+      { label: "❤️ FC media", value: `${resumen.avg || '—'} bpm` },
+      { label: "❤️ FC máxima", value: `${resumen.max || '—'} bpm` },
+      { label: "💥 Calorías", value: `${ruta.calorias || 0} kcal` },
+    ];
+
+    const shareStatsHtml = `
+      <div class="ruta-details-captura">
+        ${fieldsShare.map(f => `
+          <div class="detail-row-captura">
+            <strong class="label-captura">${f.label}:</strong>
+            <span class="value-captura">${f.value}</span>
+          </div>`).join("")}
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:#888;font-family:Arial,sans-serif;">
+        ℹ️ Distancia, velocidad y potencia son estimaciones calculadas a partir de la frecuencia cardíaca, las calorías y el tiempo.
+      </div>
+      <style>
+        .ruta-details-captura { display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;max-height:none;overflow:visible;border:none;padding:0; }
+        .detail-row-captura { display:flex;flex-direction:column;gap:1px;justify-content:flex-start;border-bottom:none;padding:6px;background:#f4f6f8;border-radius:6px; }
+        .label-captura { font-size:10px;color:#666; }
+        .value-captura { font-size:13px;font-weight:700; }
+      </style>`;
+
+    const statsDiv = document.createElement('div');
+    statsDiv.style.cssText = 'padding:10px;font-family:Arial,sans-serif;';
+    statsDiv.innerHTML = shareStatsHtml;
+    container.appendChild(statsDiv);
+
+    const resultCanvas = await html2canvas(container, {
+      scale: 4, backgroundColor: '#ffffff', logging: false, useCORS: true, allowTaint: false
+    });
+
+    chartInstances.forEach(c => { try { c.destroy(); } catch (e) {} });
+    document.body.removeChild(container);
+
+    const blob = await new Promise(resolve => resultCanvas.toBlob(resolve, 'image/png', 1.0));
+    if (!blob) throw new Error('No se pudo generar la imagen');
+
+    Swal.close();
+
+    const fileName = `indoor_${(fechaHora || 'estatica').replace(/[^a-zA-Z0-9]/g, '_')}.png`;
+    const texto = `🏠 Bicicleta estática${fechaHora ? ' — ' + fechaHora : ''} — ${kms} km (estimado)`;
+
+    if (navigator.share && navigator.canShare) {
+      const file = new File([blob], fileName, { type: 'image/png' });
+      const shareData = { text: texto, files: [file] };
+      if (navigator.canShare(shareData)) {
+        try { await navigator.share(shareData); return; }
+        catch (e) { if (e.name === 'AbortError') return; }
+      }
+    }
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isMobile) {
+      window.location.href = 'https://wa.me/';
+    } else {
+      window.open('https://wa.me/', '_blank');
+    }
+  } catch (err) {
+    console.error('Error al compartir sesión indoor:', err);
+    Swal.hideLoading();
+    Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo generar la imagen' });
+  }
 }
 
 // Función principal para mostrar detalles de GPX
@@ -2981,7 +3438,7 @@ function downsamplePoints(points, maxPoints) {
   return result;
 }
 
-function initElevationChart(trackPoints, canvasEl) {
+function initElevationChart(trackPoints, canvasEl, titleText = null) {
   const canvas = canvasEl || document.getElementById('elevationChart');
   if (!canvas) return;
 
@@ -3063,11 +3520,11 @@ function initElevationChart(trackPoints, canvasEl) {
       const yPx = yScale.getPixelForValue(maxPoint.y);
 
       c.save();
-      c.beginPath();
-      c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
-      c.fillStyle = '#9C27B0';
-      c.fill();
-      c.strokeStyle = '#fff';
+       c.beginPath();
+       c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
+       c.fillStyle = darkenColor('#9C27B0');
+       c.fill();
+       c.strokeStyle = '#fff';
       c.lineWidth = 1.5;
       c.stroke();
       c.restore();
@@ -3114,6 +3571,7 @@ function initElevationChart(trackPoints, canvasEl) {
         legend: {
           display: false
         },
+        title: titleText ? { display: true, text: titleText, align: 'start', font: { size: 13, weight: 'bold' } } : { display: false },
         tooltip: {
           callbacks: {
             label: (ctx) => {
@@ -3189,7 +3647,7 @@ async function compartirRutaWhatsApp() {
     canvas.style.cssText = 'width:100%;height:100%;';
     elevDiv.appendChild(canvas);
     container.appendChild(elevDiv);
-    initElevationChart(trackPoints, canvas);
+    initElevationChart(trackPoints, canvas, '📈 Perfil de elevación');
 
     const sep2 = document.createElement('hr');
     sep2.style.cssText = 'margin:6px 0;border:none;border-top:2px solid #6A0DAD;';
@@ -3339,6 +3797,7 @@ async function compartirRutaWhatsApp() {
       if (hrChartData.length > 0) {
         const hrMaxVal = Math.max(...hrChartData.map(d => d.y));
         const hrMinVal = Math.min(...hrChartData.map(d => d.y));
+        const hrAvgVal = hrChartData.reduce((s, d) => s + d.y, 0) / hrChartData.length;
         const hrMaxPoint = hrChartData.find(d => d.y === hrMaxVal);
         const hrMinPoint = hrChartData.find(d => d.y === hrMinVal);
 
@@ -3360,7 +3819,7 @@ async function compartirRutaWhatsApp() {
               c.save();
               c.beginPath();
               c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
-              c.fillStyle = '#DC143C';
+              c.fillStyle = darkenColor('#DC143C');
               c.fill();
               c.strokeStyle = '#fff';
               c.lineWidth = 1.5;
@@ -3381,7 +3840,7 @@ async function compartirRutaWhatsApp() {
               c.save();
               c.beginPath();
               c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
-              c.fillStyle = '#5B9BD5';
+              c.fillStyle = darkenColor('#5B9BD5');
               c.fill();
               c.strokeStyle = '#fff';
               c.lineWidth = 1.5;
@@ -3393,6 +3852,35 @@ async function compartirRutaWhatsApp() {
               c.fillStyle = '#5B9BD5';
               c.textAlign = xPx + 60 > chartW ? 'right' : 'left';
               c.fillText(`${hrMinVal} bpm`, xPx + (xPx + 60 > chartW ? -8 : 8), yPx + 4);
+              c.restore();
+            }
+
+            const avgPx = yScale.getPixelForValue(hrAvgVal);
+            c.save();
+            c.setLineDash([6, 4]);
+            c.strokeStyle = 'rgba(255, 107, 107, 0.8)';
+            c.lineWidth = 1.5;
+            c.beginPath();
+            c.moveTo(0, avgPx);
+            c.lineTo(chartW, avgPx);
+            c.stroke();
+            c.setLineDash([]);
+            c.restore();
+
+            const chartArea = chart.chartArea;
+            if (chartArea) {
+              const labelY = chart.height - 8;
+              const rightX = chartArea.right - 4;
+              const pad = 4;
+              const avgLabel = `∅ ${Math.round(hrAvgVal)} bpm`;
+              c.save();
+              c.font = 'bold 11px Arial';
+              const avgW = c.measureText(avgLabel).width;
+              c.fillStyle = 'rgba(255,255,255,0.9)';
+              c.fillRect(rightX - avgW - pad, labelY - 10 + pad, avgW + pad * 2, 14);
+              c.fillStyle = '#FF6B6B';
+              c.textAlign = 'right';
+              c.fillText(avgLabel, rightX, labelY + 4);
               c.restore();
             }
           }
@@ -3418,7 +3906,7 @@ async function compartirRutaWhatsApp() {
             responsive: true,
             maintainAspectRatio: false,
             animation: { duration: 0 },
-            plugins: { legend: { display: false } },
+            plugins: { legend: { display: false }, title: { display: true, text: '❤️ Pulsaciones (bpm)', align: 'start', font: { size: 13, weight: 'bold' } } },
             scales: {
               x: {
                 type: 'linear', min: 0, max: Math.ceil(totalKm),
@@ -3472,7 +3960,7 @@ async function compartirRutaWhatsApp() {
               c.save();
               c.beginPath();
               c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
-              c.fillStyle = '#4CAF50';
+              c.fillStyle = darkenColor('#4CAF50');
               c.fill();
               c.strokeStyle = '#fff';
               c.lineWidth = 1.5;
@@ -3543,7 +4031,7 @@ async function compartirRutaWhatsApp() {
             responsive: true,
             maintainAspectRatio: false,
             animation: { duration: 0 },
-            plugins: { legend: { display: false } },
+            plugins: { legend: { display: false }, title: { display: true, text: '🚀 Velocidad (km/h)', align: 'start', font: { size: 13, weight: 'bold' } } },
             scales: {
               x: {
                 type: 'linear', min: 0, max: Math.ceil(totalKm),
@@ -3597,7 +4085,7 @@ async function compartirRutaWhatsApp() {
               c.save();
               c.beginPath();
               c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
-              c.fillStyle = '#00BCD4';
+              c.fillStyle = darkenColor('#00BCD4');
               c.fill();
               c.strokeStyle = '#fff';
               c.lineWidth = 1.5;
@@ -3668,7 +4156,7 @@ async function compartirRutaWhatsApp() {
             responsive: true,
             maintainAspectRatio: false,
             animation: { duration: 0 },
-            plugins: { legend: { display: false } },
+            plugins: { legend: { display: false }, title: { display: true, text: '⚡ Potencia (W)', align: 'start', font: { size: 13, weight: 'bold' } } },
             scales: {
               x: {
                 type: 'linear', min: 0, max: Math.ceil(totalKm),
@@ -3740,7 +4228,7 @@ async function compartirRutaWhatsApp() {
             c.save();
             c.beginPath();
             c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
-            c.fillStyle = '#DC143C';
+            c.fillStyle = darkenColor('#DC143C');
             c.fill();
             c.strokeStyle = '#fff';
             c.lineWidth = 1.5;
@@ -3772,7 +4260,7 @@ async function compartirRutaWhatsApp() {
             c.save();
             c.beginPath();
             c.arc(xPx, yPx, 5, 0, 2 * Math.PI);
-            c.fillStyle = '#5B9BD5';
+            c.fillStyle = darkenColor('#5B9BD5');
             c.fill();
             c.strokeStyle = '#fff';
             c.lineWidth = 1.5;
@@ -3824,7 +4312,7 @@ async function compartirRutaWhatsApp() {
           responsive: true,
           maintainAspectRatio: false,
           animation: { duration: 0 },
-          plugins: { legend: { display: false } },
+          plugins: { legend: { display: false }, title: { display: true, text: '🌡️ Temperatura (°C)', align: 'start', font: { size: 13, weight: 'bold' } } },
           scales: {
             x: {
               type: 'linear', min: 0, max: Math.ceil(totalKm),
@@ -3846,6 +4334,10 @@ async function compartirRutaWhatsApp() {
     const tileBaseUrl = `${getApiBaseUrl()}/api/helpers/tile_proxy.php?z={z}&x={x}&y={y}`;
     const mapCanvas = await renderMapRouteToCanvas(trackPoints, 1200, 600, tileBaseUrl);
     mapCanvas.style.cssText = 'width:800px;height:400px;display:block;';
+    const mapTitle = document.createElement('div');
+    mapTitle.style.cssText = 'width:800px;padding:8px 8px 0;font-size:13px;font-weight:700;color:#333;font-family:Arial,sans-serif;';
+    mapTitle.textContent = '🗺️ Mapa de ruta';
+    container.insertBefore(mapTitle, sep);
     container.insertBefore(mapCanvas, sep);
 
     const resultCanvas = await html2canvas(container, {
@@ -4012,14 +4504,21 @@ function cambiarPagina(nuevaPagina) {
 const parseHtmlCardsRutas = async (data) => {
   return data
     .map((item) => {
-      const iconType =
-        item.origen === "gpx"
-          ? `<i class="fas fa-map-marker-alt" style="font-size: 20px; color: #000; cursor: pointer;" onclick="event.stopPropagation(); showGpxDetails(${item.id})" title="Ruta GPX - Ver detalles"></i>`
-          : `<i class="fas fa-pen-to-square" style="font-size: 18px; color: #000; cursor: pointer;" onclick="event.stopPropagation(); editarRutaManual('${item.id}', '${item.fecha_inicio}', '${item.kms}', '${item.observaciones || ''}', '${item.regulacion || 0}')" title="Ruta manual - Editar"></i>`;
+      const esIndoor = item.origen === "fit_indoor";
+      const esImportada = item.origen === "gpx" || esIndoor;
+
+      let iconType;
+      if (item.origen === "gpx") {
+        iconType = `<i class="fas fa-map-marker-alt" style="font-size: 20px; color: #000; cursor: pointer;" onclick="event.stopPropagation(); showGpxDetails(${item.id})" title="Ruta GPX - Ver detalles"></i>`;
+      } else if (esIndoor) {
+        iconType = `<i class="fas fa-house" style="font-size: 18px; color: var(--text-primary); cursor: pointer;" onclick="event.stopPropagation(); showIndoorDetails(${item.id})" title="Bicicleta estática - Ver detalles (datos estimados)"></i>`;
+      } else {
+        iconType = `<i class="fas fa-pen-to-square" style="font-size: 18px; color: #000; cursor: pointer;" onclick="event.stopPropagation(); editarRutaManual('${item.id}', '${item.fecha_inicio}', '${item.kms}', '${item.observaciones || ''}', '${item.regulacion || 0}')" title="Ruta manual - Editar"></i>`;
+      }
 
       // Para rutas manuales: modo edición al pulsar
-      // Para rutas GPX: eliminación con pulsación larga (long press)
-      const cardAttributes = item.origen !== "gpx" ?
+      // Para rutas importadas (GPX / FIT indoor): eliminación con pulsación larga (long press)
+      const cardAttributes = !esImportada ?
         `onclick="editarRutaManual('${item.id}', '${item.fecha_inicio}', '${item.kms}', '${item.observaciones || ''}', '${item.regulacion || 0}')" style="cursor: pointer;"` :
         `data-gpx-id="${item.id}" data-gpx-fecha="${item.fecha_inicio}" data-gpx-kms="${item.kms}" class="gpx-card" style="cursor: pointer; user-select: none;" title="Mantenga pulsado para eliminar"`;
 
@@ -4071,21 +4570,25 @@ const getResumenBiker = async () => {
         (acc, item) => {
           acc.kmsPulmonar += parseFloat(item.kms_mes_pulmonar || 0);
           acc.kmsElectrica += parseFloat(item.kms_mes_electrica || 0);
+          acc.kmsEstatica += parseFloat(item.kms_mes_estatica || 0);
           acc.rutasPulmonar += parseInt(item.rutas_mes_pulmonar || 0);
           acc.rutasElectrica += parseInt(item.rutas_mes_electrica || 0);
+          acc.rutasEstatica += parseInt(item.rutas_mes_estatica || 0);
           return acc;
         },
         {
           kmsPulmonar: 0,
           kmsElectrica: 0,
+          kmsEstatica: 0,
           rutasPulmonar: 0,
           rutasElectrica: 0,
+          rutasEstatica: 0,
         }
       );
 
-      const totalKms = totalesGlobales.kmsPulmonar + totalesGlobales.kmsElectrica;
+      const totalKms = totalesGlobales.kmsPulmonar + totalesGlobales.kmsElectrica + totalesGlobales.kmsEstatica;
       const totalRutas =
-        totalesGlobales.rutasPulmonar + totalesGlobales.rutasElectrica;
+        totalesGlobales.rutasPulmonar + totalesGlobales.rutasElectrica + totalesGlobales.rutasEstatica;
 
       // 3. Generar HTML del resumen superior
       let htmlResumen = `
@@ -4093,21 +4596,28 @@ const getResumenBiker = async () => {
           <div class="d-flex justify-content-around" style="font-size: 0.9rem;">
             <div class="text-center px-1 py-1" style="min-width: 80px;" title="Kms Pulmonar">
               <div class="text-muted mb-0" style="font-size: 0.75rem;">🫁 Kms</div>
-              <div class="fw-bold text-primary text-end">${totalesGlobales.kmsPulmonar.toLocaleString(
+              <div class="fw-bold text-primary text-center">${totalesGlobales.kmsPulmonar.toLocaleString(
                 undefined,
                 { minimumFractionDigits: 0, maximumFractionDigits: 1 }
               )}</div>
             </div>
             <div class="text-center px-1 py-1" style="min-width: 80px;" title="Kms Eléctrica">
               <div class="text-muted mb-0" style="font-size: 0.75rem;">🔌 Kms</div>
-              <div class="fw-bold text-success text-end">${totalesGlobales.kmsElectrica.toLocaleString(
+              <div class="fw-bold text-success text-center">${totalesGlobales.kmsElectrica.toLocaleString(
+                undefined,
+                { minimumFractionDigits: 0, maximumFractionDigits: 1 }
+              )}</div>
+            </div>
+            <div class="text-center px-1 py-1" style="min-width: 80px;" title="Kms Estática">
+              <div class="text-muted mb-0" style="font-size: 0.75rem;">🏠 Kms</div>
+              <div class="fw-bold text-center" style="color: orange;">${totalesGlobales.kmsEstatica.toLocaleString(
                 undefined,
                 { minimumFractionDigits: 0, maximumFractionDigits: 1 }
               )}</div>
             </div>
             <div class="text-center px-1 py-1" style="min-width: 80px;" title="Total Kms">
               <div class="text-muted mb-0" style="font-size: 0.75rem;">🧭 Total</div>
-              <div class="fw-bold text-dark text-end">${totalKms.toLocaleString(
+              <div class="fw-bold text-dark text-center">${totalKms.toLocaleString(
                 undefined,
                 { minimumFractionDigits: 0, maximumFractionDigits: 1 }
               )}</div>
@@ -4116,19 +4626,25 @@ const getResumenBiker = async () => {
           <div class="d-flex justify-content-around" style="font-size: 0.9rem; margin-top: -5px;">
             <div class="text-center px-1 py-1" style="min-width: 80px;" title="Rutas Pulmonar">
               <div class="text-muted mb-0" style="font-size: 0.75rem;">🫁 Rutas</div>
-              <div class="fw-bold text-primary text-end">${
+              <div class="fw-bold text-primary text-center">${
                 totalesGlobales.rutasPulmonar
               }</div>
             </div>
             <div class="text-center px-1 py-1" style="min-width: 80px;" title="Rutas Eléctrica">
               <div class="text-muted mb-0" style="font-size: 0.75rem;">🔌 Rutas</div>
-              <div class="fw-bold text-success text-end">${
+              <div class="fw-bold text-success text-center">${
                 totalesGlobales.rutasElectrica
+              }</div>
+            </div>
+            <div class="text-center px-1 py-1" style="min-width: 80px;" title="Sesiones Estática">
+              <div class="text-muted mb-0" style="font-size: 0.75rem;">🏠 Ses.</div>
+              <div class="fw-bold text-center" style="color: orange;">${
+                totalesGlobales.rutasEstatica
               }</div>
             </div>
             <div class="text-center px-1 py-1" style="min-width: 80px;" title="Total Rutas">
               <div class="text-muted mb-0" style="font-size: 0.75rem;">🚴‍♂️ Total</div>
-              <div class="fw-bold text-dark text-end">${totalRutas}</div>
+              <div class="fw-bold text-dark text-center">${totalRutas}</div>
             </div>
           </div>
         </div>
@@ -4182,6 +4698,7 @@ const generarAcordeonAnual = (anio, meses, expandir) => {
                                 <div class="d-flex justify-content-between mt-0 small" style="font-size: 0.75rem;">
                                     <span>🫁 ${m.kms_mes_pulmonar}</span>
                                     <span>🔌 ${m.kms_mes_electrica}</span>
+                                    <span>🏠 ${m.kms_mes_estatica}</span>
                                     <span class="">${m.rutas_mes} rut.</span>
                                 </div>
                             </div>

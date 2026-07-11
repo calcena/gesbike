@@ -6,6 +6,13 @@ get_session_status();
 debug_mode();
 $_SESSION['base_path'] = dirname(__FILE__);
 $_SESSION['base_project'] = dirname(__FILE__);
+
+// Detectar si el usuario dejó un .zip de restauración en database/
+$hayZipRestaurar = false;
+$zipDir = __DIR__ . '/database/';
+if (is_dir($zipDir)) {
+    $hayZipRestaurar = count(glob($zipDir . '*.zip')) > 0;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -35,6 +42,7 @@ $_SESSION['base_project'] = dirname(__FILE__);
     <script src="services/translate/translate.js?<?php random_file_enumerator() ?>"></script>
     <script src="services/theme/theme.js?<?php random_file_enumerator() ?>"></script>
     <script src="services/login/login.js?<?php random_file_enumerator() ?>"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <title><?php echo APP_NAME . '_' . APP_VERSION ?></title>
 </head>
 
@@ -60,9 +68,16 @@ $_SESSION['base_project'] = dirname(__FILE__);
                         <input id="pass" class="form-control login-input" type="password" placeholder="Contraseña" autocomplete="current-password">
                     </div>
                 </div>
-                <button id="btn_acceder" class="btn login-btn" onclick="auth(document.getElementById('username').value, document.getElementById('pass').value)">
-                    <i class="fas fa-sign-in-alt me-2"></i>Acceder
-                </button>
+                <div class="d-flex gap-2 align-items-stretch">
+                    <button id="btn_acceder" class="btn login-btn" style="width:auto; flex:1 1 auto;" onclick="auth(document.getElementById('username').value, document.getElementById('pass').value)">
+                        <i class="fas fa-sign-in-alt me-2"></i>Acceder
+                    </button>
+                    <?php if ($hayZipRestaurar): ?>
+                    <button type="button" class="btn btn-warning" style="flex:0 0 auto; height:48px; border-radius:12px; font-weight:600;" onclick="restaurarBackupZip()">
+                        <i class="fas fa-file-zipper me-1"></i>Extraer BD
+                    </button>
+                    <?php endif; ?>
+                </div>
                 <div id="mensaje" class="login-message"></div>
                 <span id="warn_credentials" class="mt-3 d-none text-danger fw-bolder"></span>
             </div>
@@ -71,6 +86,36 @@ $_SESSION['base_project'] = dirname(__FILE__);
             </div>
         </div>
     </div>
+    <script>
+    function restaurarBackupZip() {
+      if (typeof Swal === 'undefined') {
+        alert('SweetAlert2 no está disponible');
+        return;
+      }
+      Swal.fire({
+        title: '¿Restaurar base de datos?',
+        text: 'Se extraerá el archivo .zip que has dejado en el servidor y se sobrescribirá la base de datos actual. El .zip se eliminará tras la restauración.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Restaurar',
+        cancelButtonText: 'Cancelar'
+      }).then((result) => {
+        if (!result.isConfirmed) return;
+        Swal.fire({ title: 'Restaurando...', text: 'Por favor, espera', didOpen: () => Swal.showLoading() });
+        fetch('api/helpers/restore_zip.php', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+          .then(r => r.json())
+          .then(d => {
+            if (d.success) {
+              Swal.fire('Listo', 'BD restaurada: ' + (d.archivos || []).join(', '), 'success')
+                .then(() => location.reload());
+            } else {
+              Swal.fire('Error', d.error, 'error');
+            }
+          })
+          .catch(e => { Swal.fire('Error', 'Error al restaurar: ' + e, 'error'); });
+      });
+    }
+    </script>
 </body>
 
 </html>
