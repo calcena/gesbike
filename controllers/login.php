@@ -84,12 +84,55 @@ function handle_set_theme()
     }
 }
 
+function handle_set_fecha_nacimiento()
+{
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['success' => false, 'error' => 'Método no permitido']);
+        return;
+    }
+    $input = json_decode(file_get_contents('php://input'), true);
+    $params = $input['data'];
+
+    if (empty($params['usuario_id'])) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'usuario_id es requerido']);
+        return;
+    }
+
+    $fecha = isset($params['fecha_nacimiento']) ? trim($params['fecha_nacimiento']) : '';
+    if ($fecha !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Formato de fecha inválido (AAAA-MM-DD)']);
+        return;
+    }
+
+    try {
+        $db = conectar();
+        $stmt = $db->prepare("UPDATE usuarios SET fecha_nacimiento = ? WHERE id = ?");
+        $stmt->execute([$fecha === '' ? null : $fecha, $params['usuario_id']]);
+        echo json_encode([
+            'success' => true,
+            'message' => 'Fecha de nacimiento guardada'
+        ]);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+    }
+}
+
 switch ($action) {
     case 'auth':
         handle_login();
         break;
     case 'setTheme':
         handle_set_theme();
+        break;
+    case 'setFechaNacimiento':
+        handle_set_fecha_nacimiento();
         break;
     default:
         http_response_code(400);

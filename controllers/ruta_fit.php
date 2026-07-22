@@ -1,6 +1,7 @@
 <?php
 $root = dirname(__DIR__);
 require_once $root . '/helpers/config.php';
+require_once $root . '/helpers/helper.php';
 require_once $root . '/helpers/fit_parser.php';
 require_once $root . '/database/DatabaseConnection.php';
 require_once $root . '/models/ruta.php';
@@ -70,8 +71,30 @@ function handle_upload_fit()
         $categoria = get_categoria_vehiculo($vehiculo_id);
         $isIndoor = (strtolower((string) $categoria) === 'estatica');
 
+        // Fecha de nacimiento del usuario para zonas de FC dinámicas (snapshot a la fecha de la ruta)
+        $fechaNacimiento = null;
+        if (!empty($_SESSION['user'])) {
+            try {
+                $dbU = conectar();
+                $stU = $dbU->prepare("SELECT fecha_nacimiento FROM usuarios WHERE id = ?");
+                $stU->execute([$_SESSION['user']]);
+                $fechaNacimiento = $stU->fetchColumn();
+            } catch (Exception $e) {
+                $fechaNacimiento = null;
+            }
+        }
+
         $parser = new FitParser();
         $result = $parser->parse($file['tmp_name'], $isIndoor);
+
+        // Recalcular zonas_fc con los rangos de la edad a la fecha de la ruta (snapshot).
+        // Si no hay fecha de nacimiento se mantiene el cálculo por defecto del parser.
+        if (!empty($fechaNacimiento) && !empty($result['pulsaciones'])) {
+            $zonasDef = calcular_zonas_fc_por_edad($fechaNacimiento, $result['fecha_inicio']);
+            if (!empty($zonasDef)) {
+                $result['zonas_fc'] = zonas_fc_desde_pulsaciones($zonasDef, $result['pulsaciones']);
+            }
+        }
 
         $params = [
             'vehiculo_id' => $vehiculo_id,
@@ -97,6 +120,7 @@ function handle_upload_fit()
             'origen' => $isIndoor ? 'fit_indoor' : 'gpx',
             'categoria' => $isIndoor ? 'estatica' : null,
             'estimado' => $isIndoor ? 1 : 0,
+            'zonas_fc' => json_encode($result['zonas_fc'] ?? null),
         ];
 
         $ruta_id = create_ruta_file($params);

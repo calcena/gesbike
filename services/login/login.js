@@ -26,6 +26,8 @@ const auth = async (nombre, pass) => {
       sessionStorage.setItem("login_parent", true);
       const theme = response.data.content.theme || "light";
       sessionStorage.setItem("theme", theme);
+      const fechaNacimiento = response.data.content.fecha_nacimiento || "";
+      sessionStorage.setItem("fecha_nacimiento", fechaNacimiento);
       mensaje.innerHTML = `
                 <p class="success">
                     ¡Bienvenido ${response.data.content.nombre}!

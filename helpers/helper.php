@@ -100,3 +100,120 @@ function check_security()
     }
 }
 
+// --- Zonas de ritmo cardíaco dinámicas (segun fecha de nacimiento) ---
+
+// Bandas de porcentaje de la FC máxima (estilo Zeep):
+// Z1 50-60%, Z2 60-70%, Z3 70-80%, Z4 80-90%, Z5 90-100%
+function hr_zonas_bandas()
+{
+    return [
+        ['zona' => 'Moderado',  'lo' => 50, 'hi' => 60],
+        ['zona' => 'Intensivo', 'lo' => 60, 'hi' => 70],
+        ['zona' => 'Aeróbico', 'lo' => 70, 'hi' => 80],
+        ['zona' => 'Anaeróbico', 'lo' => 80, 'hi' => 90],
+        ['zona' => 'VO2 Max',  'lo' => 90, 'hi' => 100],
+    ];
+}
+
+// Edad (años cumplidos) en $fechaRef a partir de $fechaNac (YYYY-MM-DD).
+// Devuelve null si no se puede calcular.
+function edad_desde_fecha($fechaNac, $fechaRef = null)
+{
+    if (empty($fechaNac)) return null;
+    $nac = DateTime::createFromFormat('Y-m-d', substr(trim($fechaNac), 0, 10));
+    if (!$nac) return null;
+    if (empty($fechaRef)) {
+        $ref = new DateTime();
+    } else {
+        try {
+            $ref = new DateTime(trim($fechaRef));
+        } catch (Exception $e) {
+            $ref = new DateTime();
+        }
+    }
+    if (!$ref) return null;
+    return (int) $ref->diff($nac)->y;
+}
+
+// Devuelve la definición de zonas ([{zona,min,max}]) para la edad
+// correspondiente a la fecha de nacimiento en la fecha de referencia.
+// HRmáx = 220 - edad. Devuelve null si no hay fecha de nacimiento.
+function calcular_zonas_fc_por_edad($fechaNac, $fechaRef = null)
+{
+    $edad = edad_desde_fecha($fechaNac, $fechaRef);
+    if ($edad === null) return null;
+    $hrMax = max(1, 220 - $edad);
+    $bands = hr_zonas_bandas();
+    $n = count($bands);
+    return array_map(function ($b, $i) use ($hrMax, $n) {
+        $min = max(1, (int) round($b['lo'] / 100 * $hrMax));
+        $max = ($i === $n - 1) ? $hrMax : (int) round($b['hi'] / 100 * $hrMax);
+        return ['zona' => $b['zona'], 'min' => $min, 'max' => $max];
+    }, $bands, array_keys($bands));
+}
+
+// Calcula el tiempo (segundos) y porcentaje en cada zona a partir del
+// array de pulsaciones y una definición de zonas [{zona,min,max}].
+// El tiempo por registro se obtiene de la diferencia de timestamps.
+function zonas_fc_desde_pulsaciones($zonasDef, $pulsaciones)
+{
+    if (!is_array($zonasDef) || !is_array($pulsaciones)) return [];
+    $segundos = array_fill(0, count($zonasDef), 0);
+    $total = 0;
+    $prevTs = null;
+    $lastZone = null;
+    $firstTs = null;
+    $lastTs = null;
+
+    foreach ($pulsaciones as $p) {
+        $ts = null;
+        if (!empty($p['timestamp_fit'])) {
+            $t = strtotime($p['timestamp_fit']);
+            if ($t !== false) $ts = $t;
+        }
+        $zoneIdx = null;
+        $hr = isset($p['pulsaciones']) ? (int) $p['pulsaciones'] : 0;
+        if ($hr > 0) {
+            foreach ($zonasDef as $i => $z) {
+                if ($hr >= $z['min'] && $hr <= $z['max']) {
+                    $zoneIdx = $i;
+                    break;
+                }
+            }
+        }
+        if ($ts !== null && $prevTs !== null) {
+            $dt = $ts - $prevTs;
+            if ($dt > 0 && $dt <= 600) {
+                if ($zoneIdx === null) $zoneIdx = $lastZone;
+                if ($zoneIdx !== null) {
+                    $segundos[$zoneIdx] += $dt;
+                    $total += $dt;
+                    $lastZone = $zoneIdx;
+                }
+            }
+        }
+        if ($ts !== null) {
+            if ($firstTs === null) $firstTs = $ts;
+            $lastTs = $ts;
+            $prevTs = $ts;
+        }
+    }
+
+    // Porcentaje ABSOLUTO: respecto al tiempo total de la sesión
+    // (último - primer timestamp), igual que en Zepp.
+    $span = ($lastTs !== null && $firstTs !== null) ? ($lastTs - $firstTs) : 0;
+
+    $result = [];
+    foreach ($zonasDef as $i => $z) {
+        $pct = $span > 0 ? round(($segundos[$i] / $span) * 100) : 0;
+        $result[] = [
+            'zona'     => $z['zona'],
+            'min'      => $z['min'],
+            'max'      => $z['max'],
+            'segundos' => $segundos[$i],
+            'porcentaje' => $pct,
+        ];
+    }
+    return $result;
+}
+

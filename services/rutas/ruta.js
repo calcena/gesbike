@@ -2579,6 +2579,8 @@ const showIndoorDetails = async (ruta_id) => {
 
     const fmt = (v, dec = 2) => (parseFloat(v) || 0).toFixed(dec).replace('.', ',');
     const resumen = pulsacionesResumen(pulsaciones);
+    const zonasFc = obtenerZonasFc(ruta, pulsaciones);
+    const zonasFcHtml = ruta.categoria === 'estatica' && zonasFc ? renderZonasFcHtml(zonasFc) : '';
     const filas = [
       { label: "📆 Inicio", value: formatFechaTimeISO(ruta.fecha_inicio) },
       { label: "🕑 Tiempo total", value: ruta.tiempo_total || '—' },
@@ -2608,6 +2610,7 @@ const showIndoorDetails = async (ruta_id) => {
     const hasPulsos = Array.isArray(pulsaciones) && pulsaciones.length > 0;
     const chartsHtml = hasPulsos ? `
       ${graphSection('indoorHrChart', '❤️ Pulsaciones', false)}
+      ${zonasFcHtml}
       ${graphSection('indoorSpeedChart', '🚀 Velocidad (estimada)', false)}
       ${graphSection('indoorPowerChart', '⚡ Potencia (estimada)', false)}
     ` : '';
@@ -2666,6 +2669,180 @@ function pulsacionesResumen(pulsaciones) {
     avg: Math.round(hrs.reduce((s, v) => s + v, 0) / hrs.length),
     max: Math.max(...hrs),
   };
+}
+
+// Zonas de ritmo cardiaco (estilo Zeep)
+const HR_ZONES = [
+  { zona: 'Moderado', min: 85, max: 101 },
+  { zona: 'Intensivo', min: 102, max: 118 },
+  { zona: 'Aeróbico', min: 119, max: 135 },
+  { zona: 'Anaeróbico', min: 136, max: 152 },
+  { zona: 'VO2 Max', min: 153, max: 171 },
+];
+const ZONE_COLORS = {
+  'Moderado': '#B57FB7',
+  'Intensivo': '#4FC3F7',
+  'Aeróbico': '#66BB6A',
+  'Anaeróbico': '#FFB300',
+  'VO2 Max': '#E53935',
+};
+
+function formatTimeShort(seg) {
+  const s = Math.max(0, Math.round(seg || 0));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${String(r).padStart(2, '0')}`;
+}
+
+// Calcula el tiempo y porcentaje en cada zona de FC a partir de las pulsaciones.
+// El tiempo por registro se obtiene de la diferencia de timestamps (timestamp_fit).
+// Calcula las zonas de FC a partir de la fecha de nacimiento y una fecha
+// de referencia (p.ej. la de la ruta, para respetar el snapshot).
+// HRmáx = 220 - edad. Devuelve null si no hay fecha de nacimiento.
+function calcularZonasFcNacimiento(fechaNacimiento, fechaRef) {
+  if (!fechaNacimiento) return null;
+  const nac = new Date(fechaNacimiento);
+  const ref = fechaRef ? new Date(fechaRef) : new Date();
+  if (isNaN(nac.getTime()) || isNaN(ref.getTime())) return null;
+  let edad = ref.getFullYear() - nac.getFullYear();
+  const m = ref.getMonth() - nac.getMonth();
+  if (m < 0 || (m === 0 && ref.getDate() < nac.getDate())) edad--;
+  if (edad < 0) return null;
+  const hrMax = Math.max(1, 220 - edad);
+  const bands = [
+    ['Moderado', 50, 60], ['Intensivo', 60, 70], ['Aeróbico', 70, 80],
+    ['Anaeróbico', 80, 90], ['VO2 Max', 90, 100],
+  ];
+  return bands.map((b, i) => {
+    const min = Math.max(1, Math.round(b[1] / 100 * hrMax));
+    const max = (i === bands.length - 1) ? hrMax : Math.round(b[2] / 100 * hrMax);
+    return { zona: b[0], min, max };
+  });
+}
+
+// Devuelve la definición de zonas a usar: dinámica según la fecha de
+// nacimiento (snapshot a fechaRef) o la constante HR_ZONES por defecto.
+function obtenerZonasDef(fechaRef) {
+  const dyn = calcularZonasFcNacimiento(sessionStorage.getItem('fecha_nacimiento'), fechaRef);
+  return dyn || HR_ZONES;
+}
+
+function computeZonasFc(pulsaciones, fechaRef) {
+  const zonasDef = obtenerZonasDef(fechaRef);
+  const segundos = zonasDef.map(() => 0);
+  let prevTs = null;
+  let lastZone = null;
+  let firstTs = null;
+  let lastTs = null;
+  for (const p of pulsaciones) {
+    const ts = p.timestamp_fit ? new Date(p.timestamp_fit).getTime() : null;
+    const hr = parseInt(p.pulsaciones);
+    let zoneIdx = null;
+    if (!isNaN(hr) && hr > 0) {
+      for (let i = 0; i < zonasDef.length; i++) {
+        if (hr >= zonasDef[i].min && hr <= zonasDef[i].max) {
+          zoneIdx = i;
+          break;
+        }
+      }
+    }
+    if (ts && prevTs !== null) {
+      const dt = (ts - prevTs) / 1000;
+      if (dt > 0 && dt <= 600) {
+        if (zoneIdx === null) zoneIdx = lastZone;
+        if (zoneIdx !== null) {
+          segundos[zoneIdx] += dt;
+          lastZone = zoneIdx;
+        }
+      }
+    }
+    if (ts) {
+      if (firstTs === null) firstTs = ts;
+      lastTs = ts;
+      prevTs = ts;
+    }
+  }
+  // Porcentaje ABSOLUTO: respecto al tiempo total de la sesión
+  // (último - primer timestamp), igual que en Zepp.
+  const span = (lastTs !== null && firstTs !== null) ? (lastTs - firstTs) / 1000 : 0;
+  return zonasDef.map((z, i) => ({
+    zona: z.zona,
+    min: z.min,
+    max: z.max,
+    segundos: Math.round(segundos[i]),
+    porcentaje: span > 0 ? Math.round((segundos[i] / span) * 100) : 0,
+  }));
+}
+
+// Devuelve las zonas FC de una ruta. Prioriza el dato persistido (zonas_fc en la
+// tabla); si no existe, lo calcula directamente desde las pulsaciones.
+function obtenerZonasFc(ruta, pulsaciones) {
+  if (ruta && ruta.zonas_fc) {
+    try {
+      const parsed = typeof ruta.zonas_fc === 'string' ? JSON.parse(ruta.zonas_fc) : ruta.zonas_fc;
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch (e) { /* fallback a calculo */ }
+  }
+  if (Array.isArray(pulsaciones) && pulsaciones.length > 0) {
+    return computeZonasFc(pulsaciones, ruta ? ruta.fecha_inicio : null);
+  }
+  return null;
+}
+
+function renderZonasFcRows(zonas) {
+  if (!Array.isArray(zonas) || zonas.length === 0) return '';
+  const ordenadas = [...zonas].reverse();
+  return ordenadas.map(z => {
+    const color = ZONE_COLORS[z.zona] || '#888';
+    const pct = Math.round(z.porcentaje || 0);
+    return `
+      <div style="margin-bottom:6px;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:var(--text-primary);">
+          <span>${z.zona} <span style="font-weight:400;color:#888;">(${z.min}-${z.max} bpm)</span></span>
+          <span>${pct}% &nbsp;&nbsp; ${formatTimeShort(z.segundos)}</span>
+        </div>
+        <div style="background:#e9ecef;border-radius:6px;height:10px;overflow:hidden;margin-top:2px;">
+          <div style="width:${pct}%;background:${color};height:100%;border-radius:6px;"></div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderZonasFcHtml(zonas) {
+  const rows = renderZonasFcRows(zonas);
+  if (!rows) return '';
+  return `
+    <details class="ruta-collapse" style="margin-bottom:6px;">
+      <summary class="ruta-collapse-summary">❤️‍🔥 Zonas de ritmo cardíaco</summary>
+      <div style="padding:8px 6px;">${rows}</div>
+    </details>`;
+}
+
+// Render autocontenido de la tabla de zonas FC para la imagen compartida
+// (estilos inline explícitos para que html2canvas los capture sin depender
+// de variables CSS del tema). Devuelve '' si no hay datos.
+function renderZonasFcShareHtml(zonas) {
+  if (!Array.isArray(zonas) || zonas.length === 0) return '';
+  const ordenadas = [...zonas].reverse();
+  const rows = ordenadas.map(z => {
+    const color = ZONE_COLORS[z.zona] || '#888';
+    const pct = Math.round(z.porcentaje || 0);
+    return `
+      <div style="margin-bottom:6px;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:#333;">
+          <span>${z.zona} <span style="font-weight:400;color:#888;">(${z.min}-${z.max} bpm)</span></span>
+          <span>${pct}% &nbsp;&nbsp; ${formatTimeShort(z.segundos)}</span>
+        </div>
+        <div style="background:#e9ecef;border-radius:6px;height:10px;overflow:hidden;margin-top:2px;">
+          <div style="width:${pct}%;background:${color};height:100%;border-radius:6px;"></div>
+        </div>
+      </div>`;
+  }).join('');
+  return `
+    <div style="padding:4px 10px 8px;font-family:Arial,sans-serif;">
+      <div style="font-size:13px;font-weight:700;color:#333;margin-bottom:6px;">❤️‍🔥 Zonas de ritmo cardíaco</div>
+      ${rows}
+    </div>`;
 }
 
 // Plugin de marcadores máx/mín/media para gráficas de bicicleta estática (indoor).
@@ -2839,7 +3016,7 @@ async function compartirIndoorWhatsApp() {
 
     const titleBar = document.createElement('div');
     titleBar.style.cssText = 'text-align:center;padding:14px 10px 6px;font-size:17px;font-weight:700;color:#333;font-family:Arial,sans-serif;';
-    titleBar.innerHTML = `🏠 Bicicleta estática${fechaHora ? ' — ' + fechaHora : ''}<br><span style="font-size:13px;font-weight:600;color:#667eea;">${kms} km (estimado)</span>`;
+    titleBar.innerHTML = `🏠 ${fechaHora ? fechaHora + ' — ' : ''}${kms} km (estimado)`;
     container.appendChild(titleBar);
 
     const addSep = () => {
@@ -2882,6 +3059,15 @@ async function compartirIndoorWhatsApp() {
 
     addChart('❤️ Pulsaciones (bpm)', buildXY('pulsaciones', true), '#DC143C',
       { maxColor: '#DC143C', minColor: '#5B9BD5', avgColor: 'rgba(255,107,107,0.8)', unit: 'bpm' });
+
+    const zonasFcIndoor = obtenerZonasFc(ruta, pulsaciones);
+    if (zonasFcIndoor && zonasFcIndoor.length) {
+      const zDiv = document.createElement('div');
+      zDiv.style.cssText = 'font-family:Arial,sans-serif;';
+      zDiv.innerHTML = renderZonasFcShareHtml(zonasFcIndoor);
+      container.appendChild(zDiv);
+      addSep();
+    }
     addChart('🚀 Velocidad estimada (km/h)', buildXY('velocidad', false), '#4CAF50',
       { maxColor: '#4CAF50', minColor: '#5B9BD5', avgColor: 'rgba(255,107,107,0.8)', unit: 'km/h', decimals: 1, showMin: false, maxLabelPos: 'bottom' });
     addChart('⚡ Potencia estimada (W)', buildXY('potencia', false), '#00BCD4',
@@ -2937,7 +3123,7 @@ async function compartirIndoorWhatsApp() {
     Swal.close();
 
     const fileName = `indoor_${(fechaHora || 'estatica').replace(/[^a-zA-Z0-9]/g, '_')}.png`;
-    const texto = `🏠 Bicicleta estática${fechaHora ? ' — ' + fechaHora : ''} — ${kms} km (estimado)`;
+    const texto = `🏠 ${fechaHora ? fechaHora + ' — ' : ''}${kms} km (estimado)`;
 
     if (navigator.share && navigator.canShare) {
       const file = new File([blob], fileName, { type: 'image/png' });
@@ -2976,9 +3162,12 @@ const showGpxDetails = async (ruta_id) => {
   let rutaActualData = null;
   let pulsacionesSummary = null;
 
-  const buildFullHtml = (pulsacionesSummary = null) => {
+    const buildFullHtml = (pulsacionesSummary = null) => {
     const tempDataForStats = window.__tempPreloadedData || null;
     const statsHtml = generarContenidoRuta(rutaActualData, false, tempDataForStats, pulsacionesSummary);
+    const zonasFcInicial = (rutaActualData && rutaActualData.has_pulsaciones == 1)
+      ? renderZonasFcRows(window.__zonasFcTemp || [])
+      : '';
     if (hasMapData) {
       return `
         <div class="ruta-details-wrapper">
@@ -2998,6 +3187,10 @@ const showGpxDetails = async (ruta_id) => {
             <div id="pulsaciones-chart-wrapper" style="height: 180px; margin-top: 4px; padding: 1px; border: 1px solid #dee2e6; border-radius: 8px; display: none;">
               <canvas id="pulsacionesChart"></canvas>
             </div>
+          </details>
+          <details id="zonas-fc-details" class="ruta-collapse">
+            <summary class="ruta-collapse-summary">❤️‍🔥 Zonas de ritmo cardíaco</summary>
+            <div id="zonas-fc-wrapper" style="padding:8px 6px;">${zonasFcInicial}</div>
           </details>
           ` : ''}
           <details id="velocidad-details" class="ruta-collapse">
@@ -3169,6 +3362,10 @@ const showGpxDetails = async (ruta_id) => {
               if (pulsacionesDataCache && pulsacionesDataCache.length > 0) {
                 pulsacionesWrapper.innerHTML = '<div style="height: 180px; padding: 5px; border: 1px solid #dee2e6; border-radius: 8px;"><canvas id="pulsacionesChart"></canvas></div>';
                 initPulsacionesChart(trackPoints, pulsacionesDataCache);
+                const zonasWrapper = document.getElementById('zonas-fc-wrapper');
+                if (zonasWrapper && zonasWrapper.children.length === 0) {
+                  zonasWrapper.innerHTML = renderZonasFcRows(computeZonasFc(pulsacionesDataCache, rutaActualData ? rutaActualData.fecha_inicio : null));
+                }
               } else {
                 pulsacionesWrapper.innerHTML = '<div class="text-center text-muted p-3">No hay datos de pulsaciones disponibles</div>';
               }
@@ -3272,6 +3469,24 @@ const showGpxDetails = async (ruta_id) => {
         pulsacionesSummary = await getPulsacionesSummaryByRuta(ruta_id);
       } catch (e) {
         console.warn('Error loading pulsaciones summary:', e);
+      }
+    }
+
+    window.__zonasFcTemp = null;
+    if (rutaActualData.has_pulsaciones == 1) {
+      if (rutaActualData.zonas_fc) {
+        try {
+          const parsed = typeof rutaActualData.zonas_fc === 'string' ? JSON.parse(rutaActualData.zonas_fc) : rutaActualData.zonas_fc;
+          if (Array.isArray(parsed) && parsed.length > 0) window.__zonasFcTemp = parsed;
+        } catch (e) {}
+      }
+      if (!window.__zonasFcTemp) {
+        try {
+          const pul = await getPulsacionesByRuta(ruta_id);
+          if (Array.isArray(pul) && pul.length > 0) window.__zonasFcTemp = computeZonasFc(pul, rutaActualData ? rutaActualData.fecha_inicio : null);
+        } catch (e) {
+          console.warn('Error calculando zonas FC desde pulsaciones:', e);
+        }
       }
     }
 
@@ -3632,7 +3847,7 @@ async function compartirRutaWhatsApp() {
     titleBar.style.cssText = 'text-align:center;padding:14px 10px 6px;font-size:17px;font-weight:700;color:#333;font-family:Arial,sans-serif;';
     const kms = ruta.kms ? parseFloat(ruta.kms).toFixed(2) : '0';
     const fechaHora = ruta.fecha_inicio ? formatFechaTimeISO(ruta.fecha_inicio) : '';
-    titleBar.textContent = fechaHora ? `${fechaHora} — ${kms} km` : `${kms} km`;
+    titleBar.textContent = fechaHora ? `⛰️ ${fechaHora} — ${kms} km` : `⛰️ ${kms} km`;
     container.appendChild(titleBar);
 
     const sep = document.createElement('hr');
@@ -3668,6 +3883,17 @@ async function compartirRutaWhatsApp() {
       const sepPuls = document.createElement('hr');
       sepPuls.style.cssText = 'margin:6px 0;border:none;border-top:2px solid #6A0DAD;';
       container.appendChild(sepPuls);
+    }
+
+    const zonasFcRuta = obtenerZonasFc(ruta, pulsacionesData);
+    if (zonasFcRuta && zonasFcRuta.length) {
+      const zDiv = document.createElement('div');
+      zDiv.style.cssText = 'font-family:Arial,sans-serif;';
+      zDiv.innerHTML = renderZonasFcShareHtml(zonasFcRuta);
+      container.appendChild(zDiv);
+      const zSep = document.createElement('hr');
+      zSep.style.cssText = 'margin:6px 0;border:none;border-top:2px solid #6A0DAD;';
+      container.appendChild(zSep);
     }
 
     let velocidadChartDiv = null;
@@ -4356,7 +4582,7 @@ async function compartirRutaWhatsApp() {
     Swal.close();
 
     const fileName = `ruta_${(fechaHora || 'gpx').replace(/[^a-zA-Z0-9]/g, '_')}.png`;
-    const texto = `${fechaHora || ''} — ${kms} km`;
+    const texto = `⛰️ ${fechaHora ? fechaHora + ' — ' : ''}${kms} km`;
 
     if (navigator.share && navigator.canShare) {
       const file = new File([blob], fileName, { type: 'image/png' });

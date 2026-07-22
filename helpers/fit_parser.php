@@ -35,6 +35,15 @@ define('FIT_KCAL_TO_JOULES', 4184);          // 1 kcal = 4184 J
 define('FIT_INDOOR_HR_REST_DEFAULT', 60);    // FC reposo por defecto si no hay datos
 define('FIT_INDOOR_WATT_PER_HRR', 2.2);      // W por ppm sobre reposo (fallback sin calorias)
 
+// Zonas de ritmo cardiaco (estilo Zeep): moderado, intensivo, aerobico, anaerobico, VO2 max
+$FIT_HR_ZONES = [
+    ['zona' => 'Moderado',   'min' => 85,  'max' => 101],
+    ['zona' => 'Intensivo',  'min' => 102, 'max' => 118],
+    ['zona' => 'Aeróbico',   'min' => 119, 'max' => 135],
+    ['zona' => 'Anaeróbico', 'min' => 136, 'max' => 152],
+    ['zona' => 'VO2 Max',    'min' => 153, 'max' => 171],
+];
+
 class FitParser
 {
     private $data = '';
@@ -587,6 +596,7 @@ class FitParser
             'frecuencia_cardiaca_maxima' => $maxHr,
             'track_points' => $trackPoints,
             'pulsaciones' => $pulsaciones,
+            'zonas_fc' => $this->computeHrZones($pulsaciones),
         ];
     }
 
@@ -667,7 +677,45 @@ class FitParser
             $avgPower = max(0, ($avgHr - $hrRest)) * FIT_INDOOR_WATT_PER_HRR;
         }
 
-        // 6. Reserva de FC por registro (relleno de cortes de senal con la media)
+        // 6. Interpolacion lineal de FC para cubrir los cortes de senal (zonas)
+        // El FIT registra la FC a menor frecuencia que el resto de metricas; los
+        // huecos se rellenan interpolando entre muestras reales para no sesgar las zonas.
+        $n = count($recs);
+        $hrRaw = array_column($recs, 'hr');
+        $hrInterp = array_fill(0, $n, null);
+        $known = [];
+        for ($i = 0; $i < $n; $i++) {
+            if ($hrRaw[$i] !== null) $known[] = $i;
+        }
+        $nk = count($known);
+        for ($i = 0; $i < $n; $i++) {
+            if ($hrRaw[$i] !== null) {
+                $hrInterp[$i] = $hrRaw[$i];
+                continue;
+            }
+            if ($nk === 0) {
+                $hrInterp[$i] = $hrRest;
+                continue;
+            }
+            $prevIdx = null;
+            $nextIdx = null;
+            foreach ($known as $pos) {
+                if ($pos <= $i) $prevIdx = $pos;
+                else { $nextIdx = $pos; break; }
+            }
+            if ($prevIdx !== null && $nextIdx !== null) {
+                $t = ($i - $prevIdx) / ($nextIdx - $prevIdx);
+                $hrInterp[$i] = (int) round($hrRaw[$prevIdx] + $t * ($hrRaw[$nextIdx] - $hrRaw[$prevIdx]));
+            } elseif ($prevIdx !== null) {
+                $hrInterp[$i] = $hrRaw[$prevIdx];
+            } elseif ($nextIdx !== null) {
+                $hrInterp[$i] = $hrRaw[$nextIdx];
+            } else {
+                $hrInterp[$i] = $hrRest;
+            }
+        }
+
+        // Reserva de FC para estimacion de potencia (relleno con la media)
         $reserveByRec = [];
         $reserveSamples = [];
         foreach ($recs as $r) {
@@ -717,7 +765,7 @@ class FitParser
                 'kilometro' => round($cumDistM / 1000.0, 3),
                 'lat' => null,
                 'lon' => null,
-                'pulsaciones' => $recs[$i]['hr'],
+                'pulsaciones' => $hrInterp[$i],
                 'cadencia' => $recs[$i]['cad'],
                 'potencia' => round(max(0, $powerI)),
                 'temperatura' => null,
@@ -757,6 +805,7 @@ class FitParser
             'frecuencia_cardiaca_maxima' => $maxHr,
             'track_points' => [],
             'pulsaciones' => $pulsaciones,
+            'zonas_fc' => $this->computeHrZones($pulsaciones),
             'indoor' => true,
             'categoria' => 'estatica',
             'estimado' => 1,
@@ -788,6 +837,83 @@ class FitParser
         $dLon = deg2rad($lon2 - $lon1);
         $a = sin($dLat/2)*sin($dLat/2) + cos(deg2rad($lat1))*cos(deg2rad($lat2))*sin($dLon/2)*sin($dLon/2);
         return $R * 2 * atan2(sqrt($a), sqrt(1-$a));
+    }
+
+    /**
+     * Calcula el tiempo (segundos) y el porcentaje en cada zona de ritmo
+     * cardiaco a partir del array de pulsaciones. Las zonas siguen el esquema
+     * de Zeep: moderado (85-101), intensivo (102-118), aerobico (119-135),
+     * anaerobico (136-152), VO2 max (153-171).
+     *
+     * El tiempo por registro se obtiene de la diferencia entre sus
+     * timestamps (timestamp_fit). Los registros sin FC valida no suman tiempo.
+     */
+    private function computeHrZones($pulsaciones)
+    {
+        global $FIT_HR_ZONES;
+        $zones = $FIT_HR_ZONES;
+        $segundos = array_fill(0, count($zones), 0);
+        $total = 0;
+        $prevTs = null;
+        $lastZone = null;
+        $firstTs = null;
+        $lastTs = null;
+
+        foreach ($pulsaciones as $p) {
+            $ts = null;
+            if (!empty($p['timestamp_fit'])) {
+                $t = strtotime($p['timestamp_fit']);
+                if ($t !== false) $ts = $t;
+            }
+
+            // Zona del registro actual (null si no hay FC valida)
+            $zoneIdx = null;
+            $hr = isset($p['pulsaciones']) ? (int)$p['pulsaciones'] : 0;
+            if ($hr > 0) {
+                foreach ($zones as $i => $z) {
+                    if ($hr >= $z['min'] && $hr <= $z['max']) {
+                        $zoneIdx = $i;
+                        break;
+                    }
+                }
+            }
+
+            if ($ts !== null && $prevTs !== null) {
+                $dt = $ts - $prevTs;
+                if ($dt > 0 && $dt <= 600) {
+                    // Los registros sin FC heredan la ultima zona conocida
+                    if ($zoneIdx === null) $zoneIdx = $lastZone;
+                    if ($zoneIdx !== null) {
+                        $segundos[$zoneIdx] += $dt;
+                        $total += $dt;
+                        $lastZone = $zoneIdx;
+                    }
+                }
+            }
+
+        if ($ts !== null) {
+            if ($firstTs === null) $firstTs = $ts;
+            $lastTs = $ts;
+            $prevTs = $ts;
+        }
+    }
+
+    // Porcentaje ABSOLUTO: respecto al tiempo total de la sesión
+    // (último - primer timestamp), igual que en Zepp.
+    $span = ($lastTs !== null && $firstTs !== null) ? ($lastTs - $firstTs) : 0;
+
+    $result = [];
+    foreach ($zones as $i => $z) {
+        $pct = $span > 0 ? round(($segundos[$i] / $span) * 100) : 0;
+            $result[] = [
+                'zona'     => $z['zona'],
+                'min'      => $z['min'],
+                'max'      => $z['max'],
+                'segundos' => $segundos[$i],
+                'porcentaje' => $pct,
+            ];
+        }
+        return $result;
     }
 
     private function formatDuration($seconds)

@@ -225,6 +225,7 @@ function create_ruta_file($params)
             gpx_data = ?,
             categoria = ?,
             estimado = ?,
+            zonas_fc = ?,
             activo = 1,
             origen = ?
         WHERE vehiculo_id = ? AND fecha_inicio = ?
@@ -249,6 +250,7 @@ function create_ruta_file($params)
         $params['gpx_data'] ?? null,
         $categoria,
         $estimado,
+        $params['zonas_fc'] ?? null,
         $origen,
         $params['vehiculo_id'],
         $params['fecha_inicio']
@@ -272,8 +274,8 @@ function create_ruta_file($params)
             vehiculo_id, fecha_inicio, fecha_fin, tiempo_total, tiempo_movimiento,
             kms, metros_ascenso, metros_descenso, altitud_maxima,
             velocidad_media, velocidad_maxima, potencia_promedio_w, calorias, pct_subida, pct_plano, pct_bajada, tiempo_subida, tiempo_plano, tiempo_bajada,
-            gpx_data, categoria, estimado, activo, origen
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? , ?, ?, ?, ?, 1, ?)
+            gpx_data, categoria, estimado, zonas_fc, activo, origen
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? , ?, ?, ?, ?, ?, 1, ?)
     ");
     $ins->execute([
         $params['vehiculo_id'],
@@ -298,6 +300,7 @@ function create_ruta_file($params)
         $params['gpx_data'] ?? null,
         $categoria,
         $estimado,
+        $params['zonas_fc'] ?? null,
         $origen
     ]);
 
