@@ -89,9 +89,7 @@ const getMotorVehiculo = async (deep = 1) => {
         },
       }
     );
-    if (response.data.success) {
-      sessionStorage.setItem("motor_id", response.data.content.motor_id);
-    }
+    sessionStorage.setItem("motor_id", response.data.content ? response.data.content.id : "");
   } catch (err) {
     console.log("getMotorVehiculo", err);
   }
@@ -395,7 +393,7 @@ const openVehiculoPicker = (deep = 1) => {
   });
 };
 
-window.selectVehiculoPicker = (id, nombre) => {
+window.selectVehiculoPicker = async (id, nombre) => {
   sessionStorage.setItem("vehiculo_id", id);
   const btn = document.getElementById("vehiculo-select");
   if (btn) {
@@ -403,6 +401,8 @@ window.selectVehiculoPicker = (id, nombre) => {
     btn.dataset.selected = id;
   }
   Swal.close();
+  const deep = window.location.pathname.match(/\/views\/[^/]+\/[^/]+\.php$/) ? 2 : 1;
+  await getMotorVehiculo(deep);
   document.dispatchEvent(new CustomEvent('vehiculoChanged', { detail: { vehiculo_id: id, vehiculo_nombre: nombre } }));
 };
 

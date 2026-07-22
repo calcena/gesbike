@@ -304,6 +304,11 @@ class FitParser
         $totalPowerSec = 0;
         $maxSpeed = 0;
         $prevTs = null;
+        $segDist = 0;
+        $segAlt = 0;
+        $segTime = 0;
+        $segGradeThreshold = 2;
+        $segMinDist = 30;
 
         foreach ($this->records as $rec) {
             $ts = null;
@@ -388,13 +393,33 @@ class FitParser
                 $sp = ($speed !== null) ? $speed : ($dt > 0 ? $d / $dt : 0);
                 if ($sp > 0.2778) $totalTimeMoving += $dt;
 
-                $dAlt = null;
                 if ($prevAlt !== null && $alt !== null) {
                     $dAlt = $alt - $prevAlt;
-                    if ($dAlt > 0) { $ascent += $dAlt; $distSubida += $d; $tiempoSubida += max(0, $dt); }
-                    elseif ($dAlt < 0) { $descent += abs($dAlt); $distBajada += $d; $tiempoBajada += max(0, $dt); }
-                    else { $distPlano += $d; $tiempoPlano += max(0, $dt); }
+                    $ascent += max(0, $dAlt);
+                    $descent += max(0, -$dAlt);
+                    $segDist += $d;
+                    $segAlt += $dAlt;
+                    $segTime += max(0, $dt);
+                    if ($segDist >= $segMinDist) {
+                        $grade = $segDist > 0 ? $segAlt / $segDist * 100 : 0;
+                        if ($grade > $segGradeThreshold) {
+                            $distSubida += $segDist;
+                            $tiempoSubida += $segTime;
+                        } elseif ($grade < -$segGradeThreshold) {
+                            $distBajada += $segDist;
+                            $tiempoBajada += $segTime;
+                        } else {
+                            $distPlano += $segDist;
+                            $tiempoPlano += $segTime;
+                        }
+                        $segDist = 0; $segAlt = 0; $segTime = 0;
+                    }
                 } else {
+                    if ($segDist > 0) {
+                        $distPlano += $segDist;
+                        $tiempoPlano += $segTime;
+                        $segDist = 0; $segAlt = 0; $segTime = 0;
+                    }
                     $distPlano += $d;
                     $tiempoPlano += max(0, $dt);
                 }
@@ -434,6 +459,20 @@ class FitParser
             $prevLon = $lon;
             $prevAlt = $alt;
             $prevTs = $ts;
+        }
+
+        if ($segDist > 0) {
+            $grade = $segDist > 0 ? $segAlt / $segDist * 100 : 0;
+            if ($grade > $segGradeThreshold) {
+                $distSubida += $segDist;
+                $tiempoSubida += $segTime;
+            } elseif ($grade < -$segGradeThreshold) {
+                $distBajada += $segDist;
+                $tiempoBajada += $segTime;
+            } else {
+                $distPlano += $segDist;
+                $tiempoPlano += $segTime;
+            }
         }
 
         // Session data - FIT session field numbers may vary by device/profile

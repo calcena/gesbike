@@ -401,7 +401,7 @@ async function initRutas() {
   }
 }
 
-window.selectVehiculoPicker = (id, nombre) => {
+window.selectVehiculoPicker = async (id, nombre) => {
   sessionStorage.setItem("vehiculo_id", id);
   const btn = document.getElementById("vehiculo-select");
   if (btn) {
@@ -409,6 +409,7 @@ window.selectVehiculoPicker = (id, nombre) => {
     btn.dataset.selected = id;
   }
   Swal.close();
+  await getMotorVehiculo(2);
   const searchInput = document.getElementById("searchRutas");
   if (searchInput) searchInput.value = "";
   window.paginaActual = 1;
@@ -1253,7 +1254,7 @@ function initPulsacionesChart(trackPoints, pulsacionesData) {
 function getTrackSpeeds(trackPoints, fechaInicio, fechaFin) {
   const hasGarminSpeed = trackPoints.some(p => p.speed != null && p.speed > 0);
   if (hasGarminSpeed) {
-    return trackPoints.map((p, i) => ({ index: i, speed: p.speed }));
+    return trackPoints.map((p, i) => ({ index: i, speed: p.speed })).filter(d => d.speed != null);
   }
   const hasTime = trackPoints.some(p => p.time != null);
   if (!hasTime && fechaInicio && fechaFin && trackPoints.length >= 2) {
@@ -1307,8 +1308,9 @@ function initVelocidadChart(trackPoints, fechaInicio, fechaFin) {
   const chartData = speedPoints.map(d => ({
     x: fullDistances[d.index] / 1000,
     y: d.speed
-  }));
+  })).filter(d => !isNaN(d.y));
 
+  if (chartData.length === 0) return;
   const maxVal = Math.max(...chartData.map(d => d.y));
   const maxPoint = chartData.find(d => d.y === maxVal);
   const avgVal = chartData.reduce((s, d) => s + d.y, 0) / chartData.length;

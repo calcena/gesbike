@@ -92,7 +92,7 @@ const loadAgenda = async () => {
   }
 };
 
-window.selectVehiculoPicker = (id, nombre) => {
+window.selectVehiculoPicker = async (id, nombre) => {
   sessionStorage.setItem("vehiculo_id", id);
   const btn = document.getElementById("vehiculo-select");
   if (btn) {
@@ -100,6 +100,7 @@ window.selectVehiculoPicker = (id, nombre) => {
     btn.dataset.selected = id;
   }
   Swal.close();
+  await getMotorVehiculo(2);
   loadAgenda();
 };
 
