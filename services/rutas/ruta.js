@@ -3593,24 +3593,87 @@ function initRouteMap(trackPoints) {
 
   map.fitBounds(polyline.getBounds(), { padding: [5, 5], maxZoom: 19 });
 
-  L.marker(latlngs[0], {
+  const startLatLng = latlngs[0];
+  const endLatLng = latlngs[latlngs.length - 1];
+  const distSE = haversine(startLatLng[0], startLatLng[1], endLatLng[0], endLatLng[1]);
+  const startAnchor = distSE < 150 ? [3, 13] : [13, 13];
+  const endAnchor = distSE < 150 ? [23, 13] : [13, 13];
+  L.marker(startLatLng, {
     icon: L.divIcon({
       className: 'marker-waypoint',
-      html: '<div class="marker-waypoint-inner" style="background:linear-gradient(135deg,#2196F3,#1976D2)"><i class="fas fa-map-pin" style="font-size:16px;color:#fff"></i></div>',
-      iconSize: [36, 36],
-      iconAnchor: [18, 18]
+      html: '<div class="marker-waypoint-inner" style="background:linear-gradient(135deg,#333,#000)"><i class="fas fa-door-open" style="font-size:12px;color:#fff"></i></div>',
+      iconSize: [26, 26],
+      iconAnchor: startAnchor
     })
   }).addTo(map).bindPopup('Salida (0 km)');
-  L.marker(latlngs[latlngs.length - 1], {
+  L.marker(endLatLng, {
     icon: L.divIcon({
       className: 'marker-waypoint',
-      html: '<div class="marker-waypoint-inner" style="background:linear-gradient(135deg,#4CAF50,#388E3C)"><i class="fas fa-flag-checkered" style="font-size:16px;color:#fff"></i></div>',
-      iconSize: [36, 36],
-      iconAnchor: [18, 18]
+      html: '<div class="marker-waypoint-inner" style="background:linear-gradient(135deg,#4CAF50,#388E3C)"><i class="fas fa-flag-checkered" style="font-size:12px;color:#fff"></i></div>',
+      iconSize: [26, 26],
+      iconAnchor: endAnchor
     })
   }).addTo(map).bindPopup('Llegada');
 
   const fullDistances = computeCumulativeDistances(trackPoints);
+
+  let maxEle = -Infinity;
+  let maxIdx = 0;
+  for (let i = 0; i < trackPoints.length; i++) {
+    const ele = trackPoints[i].ele;
+    if (ele != null && ele > maxEle) {
+      maxEle = ele;
+      maxIdx = i;
+    }
+  }
+  if (maxIdx > 0 && maxIdx < trackPoints.length - 1) {
+    const maxPt = trackPoints[maxIdx];
+    const km = (fullDistances[maxIdx] / 1000).toFixed(2);
+    L.marker([maxPt.lat, maxPt.lon], {
+      icon: L.divIcon({
+        className: 'marker-maxalt',
+        html: '<div class="marker-maxalt-inner"><i class="fas fa-mountain" style="font-size:12px;color:#fff"></i></div>',
+        iconSize: [26, 26],
+        iconAnchor: [13, 13]
+      })
+    }).addTo(map).bindPopup(`<b>🏔️ Altura máxima</b><br>${maxEle} m (km ${km})`);
+  }
+
+  let hasDirectSpeed = trackPoints.some(p => p.speed != null && p.speed > 0);
+  let speedAtIndex = [];
+  if (hasDirectSpeed) {
+    speedAtIndex = trackPoints.map(p => p.speed || 0);
+  } else {
+    speedAtIndex = new Array(trackPoints.length).fill(0);
+    for (let i = 1; i < trackPoints.length; i++) {
+      const prev = trackPoints[i - 1];
+      const curr = trackPoints[i];
+      const dt = (curr.time ? new Date(curr.time) - (prev.time ? new Date(prev.time) : 0) : 0) / 1000;
+      if (dt <= 0) continue;
+      const dist = haversine(prev.lat, prev.lon, curr.lat, curr.lon);
+      speedAtIndex[i] = (dist / dt) * 3.6;
+    }
+  }
+  let maxSpeed = -Infinity;
+  let maxSpeedIdx = 0;
+  for (let i = 0; i < speedAtIndex.length; i++) {
+    if (speedAtIndex[i] > maxSpeed) {
+      maxSpeed = speedAtIndex[i];
+      maxSpeedIdx = i;
+    }
+  }
+  if (maxSpeedIdx > 0 && maxSpeedIdx < trackPoints.length - 1) {
+    const maxPt = trackPoints[maxSpeedIdx];
+    const km = (fullDistances[maxSpeedIdx] / 1000).toFixed(2);
+    L.marker([maxPt.lat, maxPt.lon], {
+      icon: L.divIcon({
+        className: 'marker-maxspeed',
+        html: '<div class="marker-maxspeed-inner"><i class="fas fa-gauge-high" style="font-size:12px;color:#fff"></i></div>',
+        iconSize: [26, 26],
+        iconAnchor: [13, 13]
+      })
+    }).addTo(map).bindPopup(`<b>🚀 Velocidad máxima</b><br>${maxSpeed} km/h (km ${km})`);
+  }
   const totalKm = fullDistances[fullDistances.length - 1] / 1000;
   const interval = 5;
   const halfwayKm = new Array(Math.floor(totalKm / interval)).fill(0).map((_, i) => (i + 1) * interval);
