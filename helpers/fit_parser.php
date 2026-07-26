@@ -383,18 +383,29 @@ class FitParser
                 $tempValues[] = $temp;
             }
 
-            if ($prevLat !== null && $prevLon !== null && $lat !== null && $lon !== null) {
-                $d = $this->haversine($prevLat, $prevLon, $lat, $lon);
-                $totalDist += $d;
+            $dt = ($ts !== null && $prevTs !== null) ? $ts - $prevTs : 1;
+            if ($dt <= 0) $dt = 1;
 
-                $dt = ($ts !== null && $prevTs !== null) ? $ts - $prevTs : 1;
-                if ($dt <= 0) $dt = 1;
+            $dAlt = ($prevAlt !== null && $alt !== null) ? $alt - $prevAlt : null;
+
+            $d = 0;
+            if ($speed !== null && $speed > 0) {
+                $d = $speed * $dt;
+            }
+            if ($d <= 0 && $prevLat !== null && $prevLon !== null && $lat !== null && $lon !== null) {
+                $d = $this->haversine($prevLat, $prevLon, $lat, $lon);
+                if ($dAlt !== null) {
+                    $d = sqrt($d * $d + $dAlt * $dAlt);
+                }
+            }
+
+            if ($d > 0) {
+                $totalDist += $d;
 
                 $sp = ($speed !== null) ? $speed : ($dt > 0 ? $d / $dt : 0);
                 if ($sp > 0.2778) $totalTimeMoving += $dt;
 
-                if ($prevAlt !== null && $alt !== null) {
-                    $dAlt = $alt - $prevAlt;
+                if ($dAlt !== null) {
                     $ascent += max(0, $dAlt);
                     $descent += max(0, -$dAlt);
                     $segDist += $d;
@@ -563,16 +574,27 @@ class FitParser
             if (isset($rec[FIT_FIELD_ENHANCED_SPEED]) && $rec[FIT_FIELD_ENHANCED_SPEED] !== null) $spd2 = ($rec[FIT_FIELD_ENHANCED_SPEED] / 1000.0) * 3.6;
             elseif (isset($rec[FIT_FIELD_SPEED]) && $rec[FIT_FIELD_SPEED] !== null) $spd2 = ($rec[FIT_FIELD_SPEED] / 1000.0) * 3.6;
 
-            $d = 0;
             $dt = 1;
-            if ($prevLat2 !== null && $lat2 !== null && $prevLon2 !== null && $lon2 !== null) {
+            if ($ts2_unix !== null && $prevTs2 !== null) {
+                $dt = $ts2_unix - $prevTs2;
+                if ($dt <= 0) $dt = 1;
+            }
+
+            $dAlt2 = ($prevAlt2 !== null && $alt2 !== null) ? $alt2 - $prevAlt2 : null;
+
+            $d = 0;
+            $spd2_ms = $spd2 !== null ? $spd2 / 3.6 : null;
+            if ($spd2_ms !== null && $spd2_ms > 0) {
+                $d = $spd2_ms * $dt;
+            }
+            if ($d <= 0 && $prevLat2 !== null && $lat2 !== null && $prevLon2 !== null && $lon2 !== null) {
                 $d = $this->haversine($prevLat2, $prevLon2, $lat2, $lon2);
-                $cumDist += $d;
-                if ($ts2_unix !== null && $prevTs2 !== null) {
-                    $dt = $ts2_unix - $prevTs2;
-                    if ($dt <= 0) $dt = 1;
+                if ($dAlt2 !== null) {
+                    $d = sqrt($d * $d + $dAlt2 * $dAlt2);
                 }
             }
+
+            $cumDist += $d;
 
             // Estimate power if no real sensor data (same as first loop)
             if ($pwr2 === null && $dt > 0 && $d > 0) {
