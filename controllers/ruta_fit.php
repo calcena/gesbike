@@ -87,6 +87,43 @@ function handle_upload_fit()
         $parser = new FitParser();
         $result = $parser->parse($file['tmp_name'], $isIndoor);
 
+        // API elevation fallback: si el FIT no trajo altitud por registro
+        // (altitud_maxima == 0), obtener altitudes desde Open Elevation API
+        // y re-procesar con el parser para que calcule porcentajes con su algoritmo.
+        if (!$isIndoor
+            && (int)$result['altitud_maxima'] === 0
+            && !empty($result['pulsaciones'])
+        ) {
+            $coords = [];
+            $idxMap = [];
+            foreach ($result['pulsaciones'] as $i => $p) {
+                if (!empty($p['lat']) && !empty($p['lon'])) {
+                    $coords[] = ['lat' => (float)$p['lat'], 'lon' => (float)$p['lon']];
+                    $idxMap[] = $i;
+                }
+            }
+            if (count($coords) >= 2) {
+                $elevations = fetch_elevations_from_api($coords);
+                if ($elevations !== null && count($elevations) === count($coords)) {
+                    $elevChart = smooth_elevations($elevations, true);
+                    $elevParser = smooth_elevations($elevations, false);
+                    // Re-procesar con altitudes inyectadas para que el parser
+                    // calcule los porcentajes con su propio algoritmo.
+                    // Usamos suavizado moderado (20pts) para preservar variación local.
+                    $result = $parser->parse($file['tmp_name'], $isIndoor, $elevParser, $idxMap);
+                    // Actualizar pulsaciones y track_points con las altitudes
+                    // del suavizado fino (80pts) para el gráfico visual
+                    foreach ($elevChart as $j => $ele) {
+                        $result['pulsaciones'][$idxMap[$j]]['altitud'] = round($ele, 1);
+                        if (isset($result['track_points'][$j])) {
+                            $result['track_points'][$j]['ele'] = round($ele, 1);
+                        }
+                    }
+                    $result['altitud_maxima'] = (int) round(max($elevChart));
+                }
+            }
+        }
+
         // Recalcular zonas_fc con los rangos de la edad a la fecha de la ruta (snapshot).
         // Si no hay fecha de nacimiento se mantiene el cálculo por defecto del parser.
         if (!empty($fechaNacimiento) && !empty($result['pulsaciones'])) {

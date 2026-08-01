@@ -3049,7 +3049,7 @@ async function compartirIndoorWhatsApp() {
         type: 'line',
         data: { datasets: [{ label: titulo, data, borderColor: color, backgroundColor: color + '33', borderWidth: 1.5, pointRadius: 0, fill: true, tension: 0.3 }] },
         options: {
-          responsive: false, animation: false, parsing: false,
+          responsive: true, maintainAspectRatio: false, animation: false, parsing: false, devicePixelRatio: 4,
           plugins: { legend: { display: false }, title: { display: true, text: titulo, align: 'start', font: { size: 13, weight: 'bold' } } },
           scales: { x: { type: 'linear', title: { display: true, text: 'km (estimado)' }, ticks: { maxTicksLimit: 8 } }, y: { beginAtZero: false } },
         },
@@ -3718,7 +3718,7 @@ function downsamplePoints(points, maxPoints) {
   return result;
 }
 
-function initElevationChart(trackPoints, canvasEl, titleText = null) {
+function initElevationChart(trackPoints, canvasEl, titleText = null, shareDpr = null) {
   const canvas = canvasEl || document.getElementById('elevationChart');
   if (!canvas) return;
 
@@ -3842,6 +3842,7 @@ function initElevationChart(trackPoints, canvasEl, titleText = null) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      ...(shareDpr ? { devicePixelRatio: shareDpr } : {}),
       animation: { duration: 500 },
       interaction: {
         mode: 'index',
@@ -3888,7 +3889,15 @@ async function compartirRutaWhatsApp() {
   Swal.showLoading();
 
   let tempData = window.__tempPreloadedData || null;
-  if (!tempData && ruta.id) {
+  if (!tempData && window.__tempPreloadedPromise) {
+    try {
+      tempData = await Promise.race([
+        window.__tempPreloadedPromise,
+        new Promise(r => setTimeout(() => r(null), 60000))
+      ]);
+    } catch (e) {}
+  }
+  if ((!tempData || tempData.length === 0) && ruta.id) {
     try {
       tempData = await loadTemperatureData(ruta.id);
     } catch (e) {}
@@ -3927,7 +3936,7 @@ async function compartirRutaWhatsApp() {
     canvas.style.cssText = 'width:100%;height:100%;';
     elevDiv.appendChild(canvas);
     container.appendChild(elevDiv);
-    initElevationChart(trackPoints, canvas, '📈 Perfil de elevación');
+    initElevationChart(trackPoints, canvas, '📈 Perfil de elevación', 4);
 
     const sep2 = document.createElement('hr');
     sep2.style.cssText = 'margin:6px 0;border:none;border-top:2px solid #6A0DAD;';
@@ -4196,6 +4205,7 @@ async function compartirRutaWhatsApp() {
           options: {
             responsive: true,
             maintainAspectRatio: false,
+            devicePixelRatio: 4,
             animation: { duration: 0 },
             plugins: { legend: { display: false }, title: { display: true, text: '❤️ Pulsaciones (bpm)', align: 'start', font: { size: 13, weight: 'bold' } } },
             scales: {
@@ -4321,6 +4331,7 @@ async function compartirRutaWhatsApp() {
           options: {
             responsive: true,
             maintainAspectRatio: false,
+            devicePixelRatio: 4,
             animation: { duration: 0 },
             plugins: { legend: { display: false }, title: { display: true, text: '🚀 Velocidad (km/h)', align: 'start', font: { size: 13, weight: 'bold' } } },
             scales: {
@@ -4446,6 +4457,7 @@ async function compartirRutaWhatsApp() {
           options: {
             responsive: true,
             maintainAspectRatio: false,
+            devicePixelRatio: 4,
             animation: { duration: 0 },
             plugins: { legend: { display: false }, title: { display: true, text: '⚡ Potencia (W)', align: 'start', font: { size: 13, weight: 'bold' } } },
             scales: {
@@ -4602,6 +4614,7 @@ async function compartirRutaWhatsApp() {
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          devicePixelRatio: 4,
           animation: { duration: 0 },
           plugins: { legend: { display: false }, title: { display: true, text: '🌡️ Temperatura (°C)', align: 'start', font: { size: 13, weight: 'bold' } } },
           scales: {
@@ -4623,7 +4636,7 @@ async function compartirRutaWhatsApp() {
     }
 
     const tileBaseUrl = `${getApiBaseUrl()}/api/helpers/tile_proxy.php?z={z}&x={x}&y={y}`;
-    const mapCanvas = await renderMapRouteToCanvas(trackPoints, 1200, 600, tileBaseUrl);
+    const mapCanvas = await renderMapRouteToCanvas(trackPoints, 1600, 800, tileBaseUrl);
     mapCanvas.style.cssText = 'width:800px;height:400px;display:block;';
     const mapTitle = document.createElement('div');
     mapTitle.style.cssText = 'width:800px;padding:8px 8px 0;font-size:13px;font-weight:700;color:#333;font-family:Arial,sans-serif;';

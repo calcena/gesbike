@@ -52,10 +52,10 @@ class FitParser
     private $definitions = [];
     private $records = [];
     private $session = null;
-    private $lap = null;
+    private $laps = [];
     private $fileId = null;
 
-    public function parse($filepath, $indoor = false)
+    public function parse($filepath, $indoor = false, $externalAltitudes = null, $altitudeIndices = null)
     {
         if (!file_exists($filepath)) {
             throw new Exception("FIT file not found: $filepath");
@@ -65,8 +65,27 @@ class FitParser
         if ($this->dataLen < 14) {
             throw new Exception("FIT file too small");
         }
+        // Reset state (allows reusing the same parser instance)
+        $this->offset = 0;
+        $this->definitions = [];
+        $this->records = [];
+        $this->session = null;
+        $this->laps = [];
+        $this->fileId = null;
         $this->parseHeader();
         $this->parseRecords();
+
+        // Inyectar altitudes externas (ej: SRTM) en los records antes de buildResult
+        // para que el algoritmo interno de clasificación de pendientes las use
+        if ($externalAltitudes !== null && $altitudeIndices !== null) {
+            foreach ($altitudeIndices as $j => $ri) {
+                if (isset($externalAltitudes[$j])) {
+                    $this->records[$ri][78] = (float)(($externalAltitudes[$j] + 500) * 5);
+                    $this->records[$ri][2] = (float)(($externalAltitudes[$j] + 500) * 5);
+                }
+            }
+        }
+
         return $indoor ? $this->buildIndoorResult() : $this->buildResult();
     }
 
@@ -214,7 +233,7 @@ class FitParser
             case FIT_MESG_FILE_ID: $this->fileId = $fieldValues; break;
             case FIT_MESG_RECORD: $this->records[] = $fieldValues; break;
             case FIT_MESG_SESSION: $this->session = $fieldValues; break;
-            case FIT_MESG_LAP: $this->lap = $fieldValues; break;
+            case FIT_MESG_LAP: $this->laps[] = $fieldValues; break;
         }
     }
 
@@ -511,6 +530,30 @@ class FitParser
             }
             if ($sessionDescent === null || $sessionDescent > 10000) {
                 if (isset($s[23]) && $s[23] !== null && $s[23] > 0 && $s[23] < 10000) $sessionDescent = $s[23];
+            }
+        }
+
+        // Third fallback: sum per-lap ascent/descent from lap messages.
+        // Some devices (e.g. Amazfit BIP Max) store elevation per-lap but not
+        // in session fields or per-record altitude.
+        if (($sessionAscent === null || $sessionDescent === null) && !empty($this->laps)) {
+            $lapAscent = 0;  $lapDescent = 0;
+            $lapHasAscent = false;  $lapHasDescent = false;
+            foreach ($this->laps as $lap) {
+                if (isset($lap[11]) && $lap[11] !== null && $lap[11] > 0 && $lap[11] < 10000) {
+                    $lapAscent += $lap[11];  $lapHasAscent = true;
+                }
+                if (isset($lap[12]) && $lap[12] !== null && $lap[12] > 0 && $lap[12] < 10000) {
+                    $lapDescent += $lap[12];  $lapHasDescent = true;
+                }
+            }
+            if ($sessionAscent === null && $lapHasAscent) $sessionAscent = (int)$lapAscent;
+            if ($sessionDescent === null && $lapHasDescent) $sessionDescent = (int)$lapDescent;
+            // If only one of ascent/descent was found, assume loop (ascent ≈ descent)
+            if ($sessionAscent !== null && $sessionDescent === null && $lapHasAscent && !$lapHasDescent) {
+                $sessionDescent = $sessionAscent;
+            } elseif ($sessionDescent !== null && $sessionAscent === null && $lapHasDescent && !$lapHasAscent) {
+                $sessionAscent = $sessionDescent;
             }
         }
 

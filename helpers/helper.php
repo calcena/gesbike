@@ -217,3 +217,180 @@ function zonas_fc_desde_pulsaciones($zonasDef, $pulsaciones)
     return $result;
 }
 
+/**
+ * Consulta la API gratuita de Open Elevation para obtener altitudes a partir
+ * de coordenadas GPS. Envía hasta 5000 puntos por lote para evitar límites.
+ * @param array $coords [['lat'=>float, 'lon'=>float], ...]
+ * @return float[]|null  Array de altitudes en metros (mismo orden) o null si falla
+ */
+function fetch_elevations_from_api($coords)
+{
+    if (empty($coords)) return null;
+
+    $batchSize = 5000;
+    $allElevations = [];
+    $total = count($coords);
+
+    for ($start = 0; $start < $total; $start += $batchSize) {
+        $batch = array_slice($coords, $start, $batchSize);
+        $locations = array_map(function ($c) {
+            return ['latitude' => $c['lat'], 'longitude' => $c['lon']];
+        }, $batch);
+
+        $payload = json_encode(['locations' => $locations]);
+        $context = stream_context_create([
+            'http' => [
+                'method'  => 'POST',
+                'header'  => "Content-Type: application/json\r\n",
+                'content' => $payload,
+                'timeout' => 30,
+            ],
+        ]);
+
+        $response = @file_get_contents('https://api.open-elevation.com/api/v1/lookup', false, $context);
+        if ($response === false) return null;
+
+        $data = json_decode($response, true);
+        if (!isset($data['results'])) return null;
+
+        $batchElevations = array_map(function ($r) {
+            return isset($r['elevation']) ? (float) $r['elevation'] : 0;
+        }, $data['results']);
+
+        $allElevations = array_merge($allElevations, $batchElevations);
+        usleep(200000); // 200ms entre lotes para no saturar
+    }
+
+    return $allElevations;
+}
+
+/**
+ * Suavizado por media móvil para eliminar escalones SRTM.
+ * SRTM tiene resolución ~30m, los puntos GPS del BIP Max cada ~5m.
+ * Las transiciones entre celdas SRTM crean saltos de hasta 100m.
+ * Con ~4400 puntos en 22km, una ventana de 80 cubre ~400m (~13 celdas),
+ * suficiente para convertir escalones en un perfil continuo.
+ * Si se solicitan datos para el gráfico (chart=true), se usa ventana
+ * más amplia para máxima suavidad visual.
+ */
+function smooth_elevations($elevations, $chart = false)
+{
+    $n = count($elevations);
+    if ($n < 5) return $elevations;
+    // Para el gráfico: ventana fija de 80pts (~400m, ~13 celdas SRTM)
+    // Para métricas (porcentajes): ventana de 20pts (~100m, ~3 celdas)
+    $window = $chart ? 80 : 20;
+    $half = (int)($window / 2);
+    $out = [];
+    for ($i = 0; $i < $n; $i++) {
+        $sum = 0; $c = 0;
+        for ($j = max(0, $i - $half); $j <= min($n - 1, $i + $half); $j++) {
+            $sum += $elevations[$j];
+            $c++;
+        }
+        $out[] = $sum / $c;
+    }
+    return $out;
+}
+
+/**
+ * Calcula métricas de elevación (ascenso, descenso, altitud máxima, porcentajes
+ * de subida/bajada/llano) a partir de un array de puntos con distancia y las
+ * altitudes obtenidas de la API.
+ *
+ * @param array $pulsaciones  Array de puntos con 'kilometro' (km) y 'timestamp_fit'
+ * @param float[] $elevations Array de altitudes (m) en el mismo orden que $pulsaciones
+ * @return array
+ */
+function compute_elevation_metrics($pulsaciones, $elevations)
+{
+    $count = min(count($pulsaciones), count($elevations));
+    if ($count < 2) {
+        return [
+            'metros_ascenso' => 0, 'metros_descenso' => 0, 'altitud_maxima' => 0,
+            'pct_subida' => 0, 'pct_bajada' => 0, 'pct_plano' => 100,
+            'tiempo_subida' => '00:00:00', 'tiempo_plano' => '00:00:00', 'tiempo_bajada' => '00:00:00',
+        ];
+    }
+
+    $ascent = 0; $descent = 0; $maxAlt = 0;
+    $prevAlt = null; $prevKm = null; $prevTs = null;
+    $distSubida = 0; $distBajada = 0; $distPlano = 0;
+    $tiempoSubida = 0; $tiempoBajada = 0; $tiempoPlano = 0;
+    $segDist = 0; $segAlt = 0; $segTime = 0;
+    $segGradeThreshold = 2; $segMinDist = 30;
+
+    for ($i = 0; $i < $count; $i++) {
+        $alt = $elevations[$i];
+        if ($alt > $maxAlt) $maxAlt = $alt;
+
+        $km = isset($pulsaciones[$i]['kilometro']) ? (float) $pulsaciones[$i]['kilometro'] : null;
+        $ts = null;
+        if (!empty($pulsaciones[$i]['timestamp_fit'])) {
+            $t = strtotime($pulsaciones[$i]['timestamp_fit']);
+            if ($t !== false) $ts = $t;
+        }
+
+        if ($prevKm !== null && $km !== null && $prevAlt !== null && $alt !== null) {
+            $dDist = ($km - $prevKm) * 1000;
+            $dAlt = $alt - $prevAlt;
+            $dTime = ($ts !== null && $prevTs !== null) ? $ts - $prevTs : 0;
+
+            if ($dAlt > 0) $ascent += $dAlt;
+            else $descent += abs($dAlt);
+
+            if ($dDist > 0 && $dDist < 500) {
+                $segDist += $dDist;
+                $segAlt += $dAlt;
+                $segTime += $dTime;
+            }
+
+            if ($segDist >= $segMinDist && $segDist > 0) {
+                $grade = $segAlt / $segDist;
+                if ($grade > $segGradeThreshold / 100) {
+                    $distSubida += $segDist; $tiempoSubida += $segTime;
+                } elseif ($grade < -$segGradeThreshold / 100) {
+                    $distBajada += $segDist; $tiempoBajada += $segTime;
+                } else {
+                    $distPlano += $segDist; $tiempoPlano += $segTime;
+                }
+                $segDist = 0; $segAlt = 0; $segTime = 0;
+            }
+        }
+
+        $prevKm = $km; $prevAlt = $alt; $prevTs = $ts;
+    }
+
+    if ($segDist >= $segMinDist && $segDist > 0) {
+        $grade = $segAlt / $segDist;
+        if ($grade > $segGradeThreshold / 100) {
+            $distSubida += $segDist; $tiempoSubida += $segTime;
+        } elseif ($grade < -$segGradeThreshold / 100) {
+            $distBajada += $segDist; $tiempoBajada += $segTime;
+        } else {
+            $distPlano += $segDist; $tiempoPlano += $segTime;
+        }
+    }
+
+    $total = $distSubida + $distBajada + $distPlano;
+    $pctSubida = $total > 0 ? round(($distSubida / $total) * 100) : 0;
+    $pctBajada = $total > 0 ? round(($distBajada / $total) * 100) : 0;
+    $pctPlano = max(0, 100 - $pctSubida - $pctBajada);
+
+    $fmt = function ($s) {
+        return $s > 0 ? sprintf('%02d:%02d:%02d', floor($s/3600), floor(($s%3600)/60), $s%60) : '00:00:00';
+    };
+
+    return [
+        'metros_ascenso' => (int) round($ascent),
+        'metros_descenso' => (int) round($descent),
+        'altitud_maxima' => (int) round($maxAlt),
+        'pct_subida' => $pctSubida,
+        'pct_bajada' => $pctBajada,
+        'pct_plano' => $pctPlano,
+        'tiempo_subida' => $fmt($tiempoSubida),
+        'tiempo_plano' => $fmt($tiempoPlano),
+        'tiempo_bajada' => $fmt($tiempoBajada),
+    ];
+}
+
