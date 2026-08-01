@@ -596,6 +596,8 @@ Cuando un vehículo es de categoría `estatica` y se importa un FIT de rodillo (
 | recambio | assets/images/Recambios/ | No (recambio.imagen) |
 | adjunto | attachments/ | Sí (adjuntos) |
 
+**Adjuntos de mantenimientos archivados**: `createAdjunto()` (`repositories/attach.php`) detecta el año del mantenimiento (`adjunto_anio_mantenimiento()`, primero en `hist/` y si no en BD) y, si el año está archivado, hace write-through a `hist/{anio}/adjuntos.json.gz` con `hist_siguiente_id('adjuntos')` sin tocar la BD. El borrado (`deleteAttachment`) ya cubría ambos orígenes.
+
 ### Compresión (`compressImage()`)
 - Redimensiona a máx. 1920px lado mayor
 - Comprime iterativamente JPEG/PNG/WebP hasta ≤200KB
@@ -650,10 +652,11 @@ El usuario deja un `.zip` (que contiene `app.db`, y opcionalmente `gesbike.db`) 
 
 - **Endpoint**: `api/helpers/restore_zip.php` (POST, **sin autenticación requerida**: debe funcionar aunque no haya sesión ni `app.db`, para permitir la recuperación).
 - **Comportamiento**:
-  1. Busca el primer `*.zip` en `database/` (la misma ubicación que la BD actual).
-  2. Lo abre con `ZipArchive` y extrae **solo** `app.db` (y `gesbike.db` si existe) en `database/`, sobrescribiendo la BD actual (no extrae otros ficheros, por seguridad).
-  3. Tras extraer, hace `@unlink($zipPath)` para borrar el `.zip` del servidor.
-  4. Devuelve JSON `{ success, message, archivos }`. Si no hay `.zip` o no contiene `app.db`, devuelve error.
+  1. Busca los `*.zip` en `database/` (la misma ubicación que la BD actual) y, si no hay, en `database/backups/`. **Se elige el `.zip` MÁS RECIENTE por fecha de modificación** (no el alfabético: evita que un zip legacy como `app.db.zip` tracked en git prevalezca sobre el que acaba de dejar el usuario).
+  2. Lo abre con `ZipArchive` y extrae **solo** `app.db`, `gesbike.db`, `comandos_voz.db` (en `database/`) y las entradas `hist/**` (en la raíz del proyecto, preservando subcarpetas). No extrae otros ficheros, por seguridad.
+  3. **Unlink previo del destino** antes de cada `extractTo`: `ZipArchive::extractTo` falla con EPERM/EACCES al sobrescribir ficheros existentes creados por otro usuario (p. ej. permisos `644` owner dccsoft y el proceso web es `www-data`).
+  4. Tras extraer hace `@unlink($zipPath)` para borrar el `.zip` del servidor y normaliza permisos `0664` en lo extraído (el grupo `www-data` debe poder escribir el histórico).
+  5. Devuelve JSON `{ success, message, archivos }`. Si no hay `.zip` o no contiene `app.db`, devuelve error.
 - **Frontend (login)**: `index.php` detecta con PHP (`glob('database/*.zip')`) si hay un `.zip` y, en ese caso, renderiza el botón **"Extraer BD"** en la **misma línea** que el botón "Acceder" (este último queda más estrecho, con `flex:1 1 auto`, y el de Extraer BD con `flex:0 0 auto`). El botón llama a `restaurarBackupZip()` (definida inline en `index.php`) que hace `fetch(POST)` al endpoint, muestra el resultado y recarga si tuvo éxito.
 - **Nota**: el usuario debe colocar el `.zip` en `database/` (vía FTP u otro medio) antes de pulsar el botón.
 - **Patrón a seguir para nuevos "botones de acción" en el menú**: añadir un `<div class="menu-item text-center" onclick="miFuncion()">` con icono FA `menu-icon`, y definir `miFuncion()` en un `<script>` al final de `sidebar.php` usando `$GLOBALS['pathUrl']` para resolver rutas relativas.
@@ -692,6 +695,13 @@ Script para envío de emails automatizados mediante SMTP Gmail.
 ```bash
 0 * * * * php /var/www/html/gesBike/jobs/cron_email.php
 ```
+
+### `jobs/rotar_anio.php`
+Archiva en `hist/{anio}/` los años cerrados (no vigentes) que aún queden en `app.db`, de forma idempotente (mismo flujo que `jobs/migrar_historico.php`, pero sin pre-backup). Recomendado al inicio de cada año:
+```bash
+0 3 1 1 * php /var/www/html/gesBike/jobs/rotar_anio.php
+```
+(Ambos jobs hacen `chdir` a `api/rutas` antes de los `require` para que `DB_PATH=../../database/app.db` resuelva igual que bajo Apache.)
 
 ## 14. Desarrollo y Contribución
 
@@ -735,4 +745,5 @@ Para agregar una nueva entidad:
 - **Login**: gradiente púrpura intenso `#667eea→#764ba2` (claro), `#0f0c29→#302b63→#24243e` (oscuro)
 - **Autologin**: detecta credenciales precargadas y ejecuta auth en intervalos de 500ms, touchstart y visibilitychange
 - **Histórico km**: query con ventanas `LEAD()` para calcular duración de recambios entre mantenimientos
+- **Permisos hist/**: los ficheros de `hist/` se escriben con `chmod 0664` explícito en `hist_escribir_tabla`/`hist_escribir_payload`/`hist_escribir_resumen`, porque Apache corre como `www-data` con umask 022 (crearía ficheros `644` que el grupo no podría sobrescribir). Los directorios `hist/{anio}/` deben ser escribibles por el grupo (`g+w`). Al restaurar desde zip, `restore_zip.php` hace unlink del destino antes de `extractTo` por el mismo motivo.
 - **Totalizador km**: suma de `kms_actuales` desde `ultimos_kms` con fallback a `kms_inicio`

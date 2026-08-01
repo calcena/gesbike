@@ -8,8 +8,13 @@ debug_mode();
 $dbDir = rtrim(ROOT_PATH . '/database/', '/') . '/';
 
 // El usuario deja el .zip en la misma ubicación (carpeta de la base de datos)
+// o en database/backups/ (zips generados por el propio backup comprimido).
+// IMPORTANTE: se elige el .zip MÁS RECIENTE (por fecha de modificación),
+// no el primero alfabéticamente (evita que zips legacy como app.db.zip
+// prevalezcan sobre el que acaba de dejar el usuario).
 $zips = glob($dbDir . '*.zip');
-if (empty($zips)) {
+$zipsBackups = glob($dbDir . 'backups/*.zip');
+if (empty($zips) && empty($zipsBackups)) {
     http_response_code(404);
     header('Content-Type: application/json');
     echo json_encode([
@@ -18,7 +23,11 @@ if (empty($zips)) {
     ]);
     exit;
 }
-$zipPath = $zips[0];
+$candidatos = !empty($zips) ? $zips : $zipsBackups;
+usort($candidatos, function ($a, $b) {
+    return filemtime($b) - filemtime($a);
+});
+$zipPath = $candidatos[0];
 
 if (!class_exists('ZipArchive')) {
     http_response_code(500);
@@ -35,14 +44,35 @@ if ($zip->open($zipPath) !== true) {
     exit;
 }
 
-// Extraer únicamente los ficheros de base de datos a la misma ubicación
-$permitidos = ['app.db', 'gesbike.db'];
+// Extraer únicamente: bases de datos (app.db, gesbike.db, comandos_voz.db)
+// y el histórico JSON (hist/**) preservando subcarpetas
+$permitidos = ['app.db', 'gesbike.db', 'comandos_voz.db'];
 $extraidos = [];
 for ($i = 0; $i < $zip->numFiles; $i++) {
     $nombre = $zip->getNameIndex($i);
+
+    // Protección contra rutas peligrosas
+    if (strpos($nombre, '..') !== false || $nombre === '' || $nombre[0] === '/') {
+        continue;
+    }
+
     if (in_array(basename($nombre), $permitidos, true)) {
+        // Unlink previo: ZipArchive::extractTo puede fallar (EPERM/EACCES) al
+        // sobrescribir un fichero existente creado por otro usuario (permisos 644)
+        $destino = $dbDir . basename($nombre);
+        if (file_exists($destino) && !@unlink($destino)) {
+            continue;
+        }
         if ($zip->extractTo($dbDir, $nombre)) {
             $extraidos[] = basename($nombre);
+        }
+    } elseif (strpos($nombre, 'hist/') === 0) {
+        $destinoHist = ROOT_PATH . '/' . $nombre;
+        if (file_exists($destinoHist) && !@unlink($destinoHist)) {
+            continue;
+        }
+        if ($zip->extractTo(ROOT_PATH . '/', $nombre)) {
+            $extraidos[] = $nombre;
         }
     }
 }
@@ -56,6 +86,14 @@ if (empty($extraidos)) {
         'error' => 'El .zip no contiene una base de datos válida (app.db)'
     ]);
     exit;
+}
+
+// Normalizar permisos 0664 en lo extraído (grupo www-data siempre escribible)
+foreach ($extraidos as $extraido) {
+    $p = in_array(basename($extraido), $permitidos, true)
+        ? $dbDir . basename($extraido)
+        : ROOT_PATH . '/' . $extraido;
+    @chmod($p, 0664);
 }
 
 // Borrar el .zip del servidor tras extraerlo

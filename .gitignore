@@ -1,0 +1,4 @@
+# Backups automáticos de BD (los de referencia ya están versionados)
+database/backups/*.db
+database/backups/*.zip
+database/backups/*.gz
