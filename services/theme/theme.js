@@ -2,8 +2,11 @@ const THEME_KEY = "theme";
 
 const getThemeBasePath = () => {
   const path = window.location.pathname;
-  if (path.includes("/views/")) {
-    return "../";
+  const viewsIndex = path.indexOf("/views/");
+  if (viewsIndex !== -1) {
+    const afterViews = path.substring(viewsIndex + 7);
+    const depth = afterViews.split("/").length;
+    return "../".repeat(depth);
   }
   return "./";
 };

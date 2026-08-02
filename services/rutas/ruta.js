@@ -20,6 +20,9 @@ const REGISTROS_POR_PAGINA = 10;
 window.paginaActual = 1;
 window.totalPaginas = 1;
 
+// Rutas seleccionadas con checkbox (para sumar kms)
+window.rutasSeleccionadas = new Set();
+
 // Función helper para obtener la URL base de la API
 function getApiBaseUrl() {
   const protocol = window.location.protocol;
@@ -413,6 +416,7 @@ window.selectVehiculoPicker = async (id, nombre) => {
   const searchInput = document.getElementById("searchRutas");
   if (searchInput) searchInput.value = "";
   window.paginaActual = 1;
+  window.rutasSeleccionadas.clear();
   getRutasByVehiculo();
   const activePane = document.querySelector('.tab-pane.show.active');
   if (activePane) {
@@ -1787,6 +1791,7 @@ const eliminarRutaFormulario = async () => {
 
     const result = await Swal.fire({
       title: 'Eliminar ruta',
+      customClass: { title: 'swal-title-sm', html: 'swal-html-sm' },
       html: `
         <div style="text-align: left;">
           <p>¿Está seguro que desea eliminar esta ruta?</p>
@@ -2218,12 +2223,14 @@ const cancelarEdicionRuta = () => {
 };
 
 const confirmarEliminarRutaGPX = async (idRuta, fecha, kms) => {
+  const fechaTexto = fecha && fecha.includes('T') ? formatFechaTimeISO(fecha) : formatFechaISO(fecha);
   const result = await Swal.fire({
     title: 'Eliminar ruta GPX',
+    customClass: { title: 'swal-title-sm', html: 'swal-html-sm' },
     html: `
       <div style="text-align: left;">
         <p>¿Está seguro que desea eliminar esta ruta?</p>
-        <p><strong>Fecha:</strong> ${formatFechaISO(fecha)}</p>
+        <p><strong>Fecha:</strong> ${fechaTexto || 'No disponible'}</p>
         <p><strong>Kilómetros:</strong> ${kms} km</p>
         <p class="text-danger mt-3"><small>Esta acción no se puede deshacer.</small></p>
       </div>
@@ -2310,6 +2317,9 @@ function configurarLongPressCards() {
     if (e.target.closest) {
       const iconArea = e.target.closest('.card-icon-area');
       if (iconArea && card.contains(iconArea)) return;
+      // No iniciar long-press si se pulsa sobre el checkbox de selección
+      const checkBox = e.target.closest('.ruta-seleccion-check');
+      if (checkBox && card.contains(checkBox)) return;
     }
 
     isPressing = true;
@@ -4751,6 +4761,36 @@ const getRutasByVehiculo = async () => {
   }
 };
 
+// ========== SELECCIÓN DE RUTAS (suma de kms) ==========
+
+function toggleRutaSeleccion(id, checked) {
+  const rid = String(id);
+  if (checked) {
+    window.rutasSeleccionadas.add(rid);
+  } else {
+    window.rutasSeleccionadas.delete(rid);
+  }
+  actualizarSumaKmsSeleccionadas();
+}
+
+function actualizarSumaKmsSeleccionadas() {
+  const el = document.getElementById("suma-kms-seleccionadas");
+  if (!el) return;
+  let total = 0;
+  let count = 0;
+  if (window.rutasOriginales) {
+    for (const r of window.rutasOriginales) {
+      if (window.rutasSeleccionadas.has(String(r.id))) {
+        total += parseFloat(r.kms) || 0;
+        count++;
+      }
+    }
+  }
+  el.textContent = total > 0
+    ? `${total.toFixed(2).replace('.', ',')} km`
+    : '0,00 km';
+}
+
 // Función para renderizar controles de paginación
 function renderizarControlesPaginacion() {
   const container = document.getElementById("main_cards");
@@ -4759,10 +4799,7 @@ function renderizarControlesPaginacion() {
     paginacionExistente.remove();
   }
 
-  if (window.totalPaginas <= 1) return;
-
-  const controlesHTML = `
-    <div id="paginacion-container" class="col-12 mt-1 mb-1">
+  const botones = window.totalPaginas > 1 ? `
       <div class="d-flex justify-content-center align-items-center" style="gap: 15px;">
         <button
           class="btn btn-sm pag-btn ${window.paginaActual === 1 ? 'disabled' : ''}"
@@ -4791,11 +4828,19 @@ function renderizarControlesPaginacion() {
           ${window.paginaActual === window.totalPaginas ? 'disabled' : ''}>
           <i class="fas fa-angles-right"></i>
         </button>
+      </div>` : '';
+
+  const controlesHTML = `
+    <div id="paginacion-container" class="col-12 mt-1 mb-1">
+      <div class="d-flex align-items-center" style="gap: 12px;">
+        <span id="suma-kms-seleccionadas" class="suma-kms-badge">0,00 km</span>
+        <div class="flex-grow-1">${botones}</div>
       </div>
     </div>
   `;
 
   container.insertAdjacentHTML('beforeend', controlesHTML);
+  actualizarSumaKmsSeleccionadas();
 }
 
 // Función para cambiar de página
@@ -4833,6 +4878,7 @@ const parseHtmlCardsRutas = async (data) => {
               <div class="flex-grow-1">
                 <div class="d-flex justify-content-between align-items-center">
                   <div class="d-flex align-items-center" style="gap: 10px;">
+                    <input class="form-check-input ruta-seleccion-check" type="checkbox" id="ruta-check-${item.id}" data-ruta-id="${item.id}" ${window.rutasSeleccionadas.has(String(item.id)) ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleRutaSeleccion(${item.id}, this.checked)" title="Seleccionar para sumar kms" style="cursor: pointer;">
                     <div class="card-icon-area" style="min-width: 25px;">${iconType}</div>
                     <p class="text-card-info mb-0">${formatFechaTimeISO(item.fecha_inicio)}${item.regulacion == 1 ? ' <span class="badge bg-warning text-dark" style="font-size:0.6rem">R</span>' : ''}</p>
                   </div>

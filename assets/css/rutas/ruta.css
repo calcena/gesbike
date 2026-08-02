@@ -67,6 +67,11 @@ html, body {
     #searchRutasMobile {
         max-width: 100%;
     }
+
+    #main_cards .text-card-info {
+        font-size: 0.62rem;
+        white-space: nowrap;
+    }
 }
 
 .pag-btn {
@@ -94,6 +99,32 @@ html, body {
     font-weight: 600;
     color: var(--text-primary, #333);
     white-space: nowrap;
+}
+
+.suma-kms-badge {
+    background: var(--card-bg, #f8f9fa);
+    border: 1px solid var(--border-color, rgba(0, 0, 0, 0.12));
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary, #333);
+    white-space: nowrap;
+    flex: 0 0 auto;
+    transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+.ruta-seleccion-check {
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.swal-title-sm {
+    font-size: 1.15rem !important;
+}
+
+.swal-html-sm {
+    font-size: 0.85rem !important;
 }
 
 * {
@@ -300,4 +331,7 @@ input:checked + .slider:before {
 }
 .swal2-actions .swal2-confirm {
     order: 1 !important;
+}
+.swal2-actions .swal2-cancel {
+    order: 2 !important;
 }
