@@ -1,12 +1,12 @@
 <?php
 require_once __DIR__ . '/../helpers/helper.php';
+require_once __DIR__ . '/../helpers/archivo.php';
 debug_mode();
 
 function get_recambio($params)
 {
     $db = conectar();
     $stmt = $db->prepare("
-                                SELECT * FROM (
                                 SELECT
                                     r.*,
                                     (
@@ -20,12 +20,21 @@ function get_recambio($params)
                                     r.grupo_id = ?
                                     AND r.vehiculo_id = ?
                                     AND r.is_active = 1
-                                ) AS tabla_stock
-                                WHERE stock > 0;
                                  ");
     $stmt->execute([$params['grupo_id'], $params['vehiculo_id']]);
     $entity = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    return $entity;
+
+    // Añadir stock de años archivados (hist/)
+    [$histCompras, $histMant] = hist_stock_por_recambio();
+    $out = [];
+    foreach ($entity as $r) {
+        $rid = (int) $r['id'];
+        $r['stock'] = (int) $r['stock'] + ($histCompras[$rid] ?? 0) - ($histMant[$rid] ?? 0);
+        if ($r['stock'] > 0) {
+            $out[] = $r;
+        }
+    }
+    return $out;
 }
 
 
@@ -35,8 +44,7 @@ function get_list_recambios($params)
     $db = conectar();
     $vehiculo_id = $params['vehiculo_id'];
     $incluye_zeros = $params['incluye_zeros'];
-    if ($incluye_zeros) {
-        $stmt = $db->prepare("
+    $stmt = $db->prepare("
                                 select
                                  r.*,
                                 ((select coalesce(sum(unidades),0) from compras where recambio_id = r.id AND is_active = 1) - (select coalesce(sum(unidades),0) from mantenimientos where recambio_id = r.id AND is_active = 1)) as stock,
@@ -46,23 +54,21 @@ function get_list_recambios($params)
                                 where  r.vehiculo_id = ?
                                 and is_active = 1
                                  ");
-    } else {
-        $stmt = $db->prepare("
-                                select
-                                 r.*,
-                                ((select coalesce(sum(unidades),0) from compras where recambio_id = r.id AND r.is_active = 1) - (select coalesce(sum(unidades),0) from mantenimientos where recambio_id = r.id AND r.is_active = 1)) as stock,
-								(select imagen from grupos where id = r.grupo_id) as img_grupo
-                                 FROM
-                                 recambios r
-                                 where  r.vehiculo_id = ?
-                                 and stock > 0
-                                 and is_active = 1
-                                 ");
-    }
-
     $stmt->execute([$vehiculo_id]);
     $entity = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    return $entity;
+
+    // Añadir stock de años archivados (hist/) y aplicar filtro de stock
+    [$histCompras, $histMant] = hist_stock_por_recambio();
+    $out = [];
+    foreach ($entity as $r) {
+        $rid = (int) $r['id'];
+        $r['stock'] = (int) $r['stock'] + ($histCompras[$rid] ?? 0) - ($histMant[$rid] ?? 0);
+        if (!$incluye_zeros && (int) $r['stock'] <= 0) {
+            continue;
+        }
+        $out[] = $r;
+    }
+    return $out;
 }
 
 function set_kilometros_by_vehiculo($params)

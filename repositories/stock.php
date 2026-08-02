@@ -2,6 +2,7 @@
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
+require_once __DIR__ . '/../helpers/archivo.php';
 function stock($params)
 {
     global $db;
@@ -12,6 +13,7 @@ function stock($params)
                                     select
                                     (select puntero from vehiculos where id = r.vehiculo_id) as bullet_vehiculo,
                                     (select imagen from grupos where id= r.grupo_id) as grupo_imagen,
+                                    r.id,
                                     coalesce(r.imagen, 'camara.png') as recambio_imagen,
                                     r.referencia,
                                     coalesce(r.observaciones,'') as observaciones,
@@ -19,7 +21,7 @@ function stock($params)
                                     FROM
                                     recambios r
                                     where r.is_active = 1
-                                    and unidades > 0;
+                                    ;
                                     ");
         $stmt->execute();
     } else {
@@ -27,6 +29,7 @@ function stock($params)
                                     select
                                     (select puntero from vehiculos where id = r.vehiculo_id) as bullet_vehiculo,
                                     (select imagen from grupos where id= r.grupo_id) as grupo_imagen,
+                                    r.id,
                                     coalesce(r.imagen, 'camara.png') as recambio_imagen,
                                     r.referencia,
                                     coalesce(r.observaciones,'') as observaciones,
@@ -35,13 +38,24 @@ function stock($params)
                                     recambios r
                                     where r.vehiculo_id= ?
                                     and r.is_active = 1
-                                    AND unidades > 0;
+                                    ;
                                      ");
         $stmt->execute([$vehiculo_id]);
 
     }
     $entity = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    return $entity;
+
+    // Añadir stock de años archivados (hist/) y filtrar los que no tienen unidades
+    [$histCompras, $histMant] = hist_stock_por_recambio();
+    $out = [];
+    foreach ($entity as $r) {
+        $rid = (int) $r['id'];
+        $r['unidades'] = (int) $r['unidades'] + ($histCompras[$rid] ?? 0) - ($histMant[$rid] ?? 0);
+        if ($r['unidades'] > 0) {
+            $out[] = $r;
+        }
+    }
+    return $out;
 }
 
 

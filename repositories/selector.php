@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../helpers/helper.php';
+require_once __DIR__ . '/../helpers/archivo.php';
 debug_mode();
 
 function get_vehiculos_by_user($params)
@@ -66,23 +67,29 @@ function get_recambios($params)
     $db = conectar();
     $vehiculo_id = $params['vehiculo_id'];
     $incluye_zeros = $params['incluye_zeros'];
-    $sql = "
+    $stmt = $db->prepare("
             select
             *,
-            coalesce((select sum(unidades) from compras where recambio_id = r.id) - (select sum(unidades) from mantenimientos where recambio_id = r.id),0) as stock
+            coalesce((select sum(unidades) from compras where recambio_id = r.id),0) - coalesce((select sum(unidades) from mantenimientos where recambio_id = r.id),0) as stock
             FROM
             recambios r
             where r.vehiculo_id = ?
-            ";
-
-    if (!$incluye_zeros) {
-        $sql .= " and stock > 0";
-
-    }
-    $stmt = $db->prepare($sql);
+            ");
     $stmt->execute([$vehiculo_id,]);
     $entity = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    return $entity;
+
+    // Añadir stock de años archivados (hist/) y aplicar filtro de stock
+    [$histCompras, $histMant] = hist_stock_por_recambio();
+    $out = [];
+    foreach ($entity as $r) {
+        $rid = (int) $r['id'];
+        $r['stock'] = (int) $r['stock'] + ($histCompras[$rid] ?? 0) - ($histMant[$rid] ?? 0);
+        if (!$incluye_zeros && (int) $r['stock'] <= 0) {
+            continue;
+        }
+        $out[] = $r;
+    }
+    return $out;
 }
 
 

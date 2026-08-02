@@ -382,6 +382,34 @@ function hist_compras_por_recambio($recambio_id)
     return $out;
 }
 
+/* ========== Stock de recambios (compras - usos) en años archivados ========== */
+
+function hist_stock_por_recambio()
+{
+    $compras = [];
+    $mantenimientos = [];
+    foreach (hist_anios_disponibles() as $anio) {
+        foreach (hist_leer_tabla($anio, 'compras') as $c) {
+            if (!(int) $c['is_active']) {
+                continue;
+            }
+            $rid = (int) $c['recambio_id'];
+            $compras[$rid] = ($compras[$rid] ?? 0) + (int) ($c['unidades'] ?? 0);
+        }
+        foreach (hist_leer_tabla($anio, 'mantenimientos') as $m) {
+            if (!(int) $m['is_active']) {
+                continue;
+            }
+            $rid = (int) ($m['recambio_id'] ?? 0);
+            if ($rid <= 0) {
+                continue;
+            }
+            $mantenimientos[$rid] = ($mantenimientos[$rid] ?? 0) + (int) ($m['unidades'] ?? 0);
+        }
+    }
+    return [$compras, $mantenimientos];
+}
+
 /* ========== Write-through: reescritura de registros archivados ========== */
 
 function hist_reescribir_registro($anio, $tabla, $id, $nuevo)
