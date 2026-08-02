@@ -208,8 +208,6 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
           }, 500);
         }
       };
-
-      startVoiceRecognition();
     }
 
     async function loadVoiceCommands() {
