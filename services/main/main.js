@@ -44,7 +44,7 @@ const parseHtmlCardMantenimientos = (grupos) => {
           ${tieneRelacionados ? 'title="Mantenga pulsado para expandir"' : ''}
         >
           <div class="card-body main-record d-flex align-items-center p-2">
-            <img class="me-2 p-1" src="${iconSrc}" alt="Vehículo" width="40">
+            <img class="me-2 p-1 cursor-pointer" src="${iconSrc}" alt="Vehículo" width="40" onclick="handleBulletClick(event, '${item.id}', ${tieneRelacionados})">
             <div class="flex-grow-1">
               <div class="d-flex justify-content-between align-items-center">
                 <div class="d-flex align-items-center">
@@ -111,8 +111,10 @@ function configurarLongPressMantenimientos() {
     return bar;
   };
 
-  const startPress = (card, state) => {
-    if (!card.classList.contains('has-related')) return;
+   const startPress = (card, state, target) => {
+     if (!card.classList.contains('has-related')) return;
+
+     if (target && (target.closest('.text-card-info') || target.closest('.cursor-pointer'))) return;
 
     // Limpiar timer previo
     if (state.pressTimer) {
@@ -175,7 +177,7 @@ function configurarLongPressMantenimientos() {
     if (!card || e.button !== 0) return;
 
     const state = getCardState(card);
-    startPress(card, state);
+    startPress(card, state, e.target);
   });
 
   newContainer.addEventListener('mouseup', (e) => {
@@ -200,7 +202,7 @@ function configurarLongPressMantenimientos() {
     if (!card) return;
 
     const state = getCardState(card);
-    startPress(card, state);
+    startPress(card, state, e.target);
   }, { passive: true });
 
   newContainer.addEventListener('touchend', (e) => {
@@ -401,6 +403,23 @@ function cambiarPaginaMain(nuevaPagina) {
   window.paginaActual = nuevaPagina;
   getListMantenimientosByVehiculo();
 }
+
+const handleBulletClick = (e, mantId, hasRelated) => {
+  e.stopPropagation();
+  if (hasRelated) {
+    const card = e.target.closest('.mantenimiento-card');
+    if (card) {
+      card.classList.toggle('expanded');
+      const indicator = card.querySelector('.expand-indicator i');
+      if (indicator) {
+        indicator.classList.toggle('fa-chevron-down');
+        indicator.classList.toggle('fa-chevron-right');
+      }
+    }
+  } else {
+    editMantenimiento(mantId);
+  }
+};
 
 const showObservacionesMantenimiento = (valor) => {
   Swal.fire({

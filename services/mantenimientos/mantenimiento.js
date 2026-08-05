@@ -593,8 +593,8 @@ const editMantenimiento = async () => {
       const locBtn = document.getElementById("localizacion_select");
       if (locBtn) {
         const loc = (window.localizacionesData || []).find(l => l.id == response.data.content.localizacion_id);
-        locBtn.textContent = loc ? loc.nombre : response.data.content.localizacion_id;
-        locBtn.dataset.selected = response.data.content.localizacion_id;
+        locBtn.textContent = loc ? loc.nombre : (response.data.content.localizacion_id && response.data.content.localizacion_id !== 0 ? response.data.content.localizacion_id : '');
+        locBtn.dataset.selected = response.data.content.localizacion_id && response.data.content.localizacion_id !== 0 ? response.data.content.localizacion_id : '';
       }
       document.getElementById("kms_mantenimiento").value =
         response.data.content.kms;

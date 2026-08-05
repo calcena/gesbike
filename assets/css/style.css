@@ -219,6 +219,10 @@ body {
   height: 2rem;
 }
 
+.cursor-pointer {
+  cursor: pointer;
+}
+
 .header-table-mini {
   font-size: 0.875rem;
 }
@@ -272,6 +276,7 @@ select {
   border-color: var(--input-border);
   color: var(--text-primary);
   transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+  min-height: 38px;
 }
 
 .form-control:disabled,
