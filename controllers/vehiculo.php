@@ -10,6 +10,31 @@ global $db;
 
 $action = defined('ACTION') ? ACTION : ($_GET ? array_keys($_GET)[0] : '');
 
+function handle_get_all_vehiculos()
+{
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['success' => false, 'error' => 'Método no permitido']);
+        return;
+    }
+    $input = json_decode(file_get_contents('php://input'), true);
+    $params = $input['data'] ?? [];
+
+    try {
+        $entity = getAllVehiculos($params);
+        echo json_encode([
+            'success' => true,
+            'content' => $entity
+        ]);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+    }
+}
+
 function handle_get_vehiculos()
 {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -236,6 +261,9 @@ function handle_nuevo_motor()
 }
 
 switch ($action) {
+    case 'getAllVehiculos':
+        handle_get_all_vehiculos();
+        break;
     case 'getVehiculos':
         handle_get_vehiculos();
         break;

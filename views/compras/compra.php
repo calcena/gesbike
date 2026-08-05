@@ -50,12 +50,16 @@ $modo = $_GET["modo"];
             <label for="compra_proveedor">Proveedor</label>
             <input class="form-control field-required" id="compra_proveedor" name="compra_proveedor" type="text" />
         </div>
-        <div class="mt-2 row w-100 d-flex align-content-around">
-            <div class="w-50">
+        <div class="mt-2 row w-100">
+            <div class="col">
                 <label for="compra_unds">Unds</label>
                 <input class="form-control field-required" id="compra_unds" name="compra_unds" type="number" />
             </div>
-            <div class="w-50">
+            <div class="col">
+                <label for="compra_precio_unitario">Precio/unitario</label>
+                <input class="form-control" id="compra_precio_unitario" name="compra_precio_unitario" type="text" disabled />
+            </div>
+            <div class="col">
                 <label for="compra_precio">Precio</label>
                 <input class="form-control" id="compra_precio" name="compra_precio" type="number" />
             </div>
@@ -68,6 +72,9 @@ $modo = $_GET["modo"];
         <div class="w-100 d-flex justify-content-around">
             <img class="icon-register-action" src="../../assets/images/icons/cancelar_icon.png" alt=""
                 onclick="cancelCompraData()">
+            <span class="icon-register-action" style="cursor:pointer" onclick="transferCompraData()">
+                <i class="fa-solid fa-exchange"></i>
+            </span>
             <img class="icon-register-action" src="../../assets/images/icons/papelera.png" alt=""
                 onclick="deleteCompraData()">
             <img class="icon-register-action" src="../../assets/images/icons/save.png" alt=""

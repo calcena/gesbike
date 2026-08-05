@@ -15,6 +15,7 @@ $db = conectar();
 $action = !empty($_GET) ? array_keys($_GET)[0] : '';
 
 switch ($action) {
+    case 'getAllVehiculos':
     case 'getVehiculos':
     case 'getVehiculoById':
     case 'nuevoVehiculo':

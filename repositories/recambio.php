@@ -112,8 +112,8 @@ function nuevo_recambio($params)
     ";
     $stmt = $db->prepare($sql);
     $stmt->execute([$fecha, $imagen, $grupo_id, $referencia, $nombre, $observaciones, $vehiculo_id]);
-    $entity = $stmt->fetch(PDO::FETCH_ASSOC);
-    return $entity;
+    $id = $db->lastInsertId();
+    return recambio_by_id(['recambio_id' => $id]);
 }
 
 

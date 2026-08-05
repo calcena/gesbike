@@ -2,6 +2,22 @@
 require_once __DIR__ . '/../helpers/helper.php';
 debug_mode();
 
+function get_all_vehiculos_repo()
+{
+    $db = conectar();
+    $stmt = $db->prepare("
+        SELECT v.*,
+            COALESCE(uk.kms, v.kms_inicio) AS kms_actuales,
+            u.nombre AS usuario_nombre
+        FROM vehiculos v
+        LEFT JOIN ultimos_kms uk ON uk.vehiculo_id = v.id
+        LEFT JOIN usuarios u ON u.id = v.usuario_id
+        ORDER BY v.is_active DESC, v.fecha_compra DESC
+    ");
+    $stmt->execute();
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
 function get_vehiculos_by_user_repo($params)
 {
     $db = conectar();

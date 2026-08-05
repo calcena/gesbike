@@ -1,6 +1,13 @@
 <?php
 require_once __DIR__ . '/../repositories/vehiculo.php';
 
+function getAllVehiculos($params)
+{
+    global $db;
+    $entity = get_all_vehiculos_repo();
+    return $entity;
+}
+
 function getVehiculos($params) {
     global $db;
     return get_vehiculos_by_user_repo($params);
