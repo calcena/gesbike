@@ -260,11 +260,13 @@ const changeRecambio = async (valueId) => {
 };
 
 const validateMantenimiento = async () => {
+  const saveBtn = document.getElementById("validate_save_icon");
   if (
-    document
-      .getElementById("validate_save_icon")
-      .src.includes("guardar_icon.png")
+    saveBtn.src.includes("guardar_icon.png")
   ) {
+    saveBtn.disabled = true;
+    saveBtn.style.opacity = "0.5";
+    saveBtn.style.pointerEvents = "none";
     // crear nuevo mantenimiento
     const data = {
       vehiculo_id: sessionStorage.getItem("vehiculo_id"),
@@ -312,6 +314,9 @@ const validateMantenimiento = async () => {
     document.getElementById("tab3-tab").classList.remove("disabled");
     document.getElementById("validate_save_icon").src =
       "../../assets/images/icons/validate_icon.png";
+    saveBtn.disabled = false;
+    saveBtn.style.opacity = "1";
+    saveBtn.style.pointerEvents = "auto";
   } else {
     window.location.href = "../main.php";
   }
