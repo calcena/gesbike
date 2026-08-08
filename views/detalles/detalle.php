@@ -42,9 +42,9 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
 </head>
 
 <body onload="initDetalles(); initTheme()">
-    <div class="container mt-2 d-flex justify-content-between align-items-center ps-0 !important" style="gap: 1rem;">
+    <div class="container mt-2 d-flex justify-content-between align-items-center detalex-header">
         <img class="icon-menu ms-2" src="../../assets/images/icons/left.png" alt="" onclick="gotoBackMantenimientos()">
-        <button id="grupo_select" class="form-select text-start" onclick="openGrupoPicker()">Selecciona...</button>
+        <button id="grupo_select" class="form-select text-start flex-grow-1 mx-2" onclick="openGrupoPicker()">Selecciona...</button>
         <img class="icon-menu me-2" src="../../assets/images/icons/menu.png" alt="" onclick="showLateralMenu()">
     </div>
     <div class="container mt-1">

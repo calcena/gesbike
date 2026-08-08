@@ -84,32 +84,45 @@ const getKmsByGrupo = async () => {
 };
 
 const parseHtmlCardKms = async (data) => {
-  return data
-    .map((item) => {
-      return `
-        <div class="card mt-2 shadow-sm">
-          <div class="card-body p-2">
-            <div class="d-flex justify-content-between align-items-center mb-1">
-              <span class="fw-bold small">${formatFechaISO(item.ultima_fecha)}</span>
-              <img class="icon-table" src="${cacheBustUrl(`../../assets/images/icons/Localizaciones/${item.img_localizacion}`)}" alt="">
-            </div>
-            <table class="table table-sm mb-0">
-              <thead class="header-table-mini text-muted">
-                <tr><th>Kms</th><th>Realizados</th><th>Tiempo</th></tr>
-              </thead>
-              <tbody>
-                <tr class="body-table-mini">
-                  <td class="fw-bold">${Number(item.kms).toLocaleString()}</td>
-                  <td class="text-success fw-bold">+${Number(item.kms_realizados).toLocaleString()}</td>
-                  <td>${item.tiempo_transcurrido}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      `;
-    })
-    .join("");
+  if (!data || data.length === 0) {
+    return `<div class="text-center text-muted mt-3"><i class="fas fa-info-circle fa-2x"></i><p class="mt-2">Sin datos de mantenimiento para este grupo</p></div>`;
+  }
+
+  let html = `
+    <div class="card mt-2 shadow-sm">
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0" style="--bs-table-bg: transparent;">
+          <thead class="header-table-mini text-muted">
+            <tr style="height: 28px;">
+              <th class="text-center" style="width: 36px;"></th>
+              <th>Últ. km</th>
+              <th>Realizados</th>
+              <th>Últ. mant.</th>
+              <th>Hace</th>
+            </tr>
+          </thead>
+          <tbody>`;
+
+  data.forEach((item) => {
+    html += `
+            <tr style="height: 32px;">
+              <td class="text-center align-middle">
+                <img src="${cacheBustUrl(`../../assets/images/icons/Localizaciones/${item.img_localizacion}`)}" alt="${item.localizacion}" title="${item.localizacion}" style="width: 24px; height: 24px; object-fit: contain;">
+              </td>
+              <td class="align-middle fw-bold">${Number(item.kms).toLocaleString()}</td>
+              <td class="align-middle text-success fw-bold">+${Number(item.kms_realizados).toLocaleString()}</td>
+              <td class="align-middle"><small>${formatFechaISO(item.ultima_fecha)}</small></td>
+              <td class="align-middle"><small class="text-muted">${item.tiempo_transcurrido}</small></td>
+            </tr>`;
+  });
+
+  html += `
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+
+  return html;
 };
 
 const getHistorico = async () => {
@@ -161,25 +174,23 @@ const parseHtmlCardHistorico = async (data) => {
   });
 
   let html = "";
-  const kmsActuales = Number(sessionStorage.getItem("kms_actuales")) || 0;
 
   for (const locId in grupos) {
     const grupo = grupos[locId];
     const totalItems = grupo.items.length;
     const recorrido = grupo.kms_max - grupo.kms_min;
-    const desde = grupo.items[0].fecha;
-    const hasta = grupo.items[totalItems - 1].fecha;
 
     html += `
       <div class="card mt-3 shadow-sm border-${grupo.color}">
         <div class="card-header p-2 bg-${grupo.color} text-light d-flex justify-content-between align-items-center">
-          <span>
-            <img class="icon-table me-1" src="${cacheBustUrl(`../../assets/images/icons/Localizaciones/${grupo.localizacion_imagen}`)}" alt="">
+          <span class="d-flex align-items-center gap-2">
+            <img src="${cacheBustUrl(`../../assets/images/icons/Localizaciones/${grupo.localizacion_imagen}`)}" alt="" style="width:20px;height:20px;object-fit:contain;filter:brightness(0) invert(1);">
             <strong>${grupo.localizacion}</strong>
+            <span class="badge bg-light text-dark" style="font-size:0.65rem;">${totalItems}</span>
           </span>
-          <small style="font-size:0.7rem;">${formatFechaISO(desde)} - ${formatFechaISO(hasta)}</small>
+          <small style="font-size:0.7rem;">+${recorrido.toLocaleString()} km</small>
         </div>
-        <div class="card-body p-0">`;
+        <div class="card-body p-2">`;
 
     grupo.items.forEach((item, idx) => {
       const duracionKms = Number(item.duracion_kms) || 0;
@@ -187,50 +198,32 @@ const parseHtmlCardHistorico = async (data) => {
       const unidades = Number(item.unidades) || 1;
 
       html += `
-        <div class="historico-item p-2 ${idx > 0 ? "border-top" : ""}">
-          <div class="d-flex justify-content-between align-items-start mb-1">
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-              <span class="fw-bold small">${formatFechaISO(item.fecha)}</span>
-              <span class="badge bg-info text-dark">${Number(item.kms).toLocaleString()} kms</span>
-              ${precio ? `<span class="badge bg-light text-dark border">${precio.toFixed(2)}€</span>` : ""}
+          <div class="py-2 ${idx > 0 ? "border-top" : ""}">
+            <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
+              <span class="fw-bold" style="font-size:0.8rem;">${formatFechaISO(item.fecha)}</span>
+              <span class="d-flex align-items-center gap-2">
+                <span class="badge bg-info text-dark" style="font-size:0.68rem;">${Number(item.kms).toLocaleString()} km</span>
+                <span class="text-success fw-bold" style="font-size:0.72rem;">+${duracionKms.toLocaleString()}</span>
+                <span class="text-muted" style="font-size:0.68rem;">${item.duracion_tiempo}</span>
+              </span>
             </div>
-            <small class="text-muted">${item.edad_vehiculo}</small>
-          </div>
-
-          <div class="d-flex align-items-center gap-2 mb-1">
-            <img class="icon-table" src="${cacheBustUrl(`../../assets/images/icons/Operaciones/${item.operacion_imagen}`)}" alt="">
-            <span class="small">${item.operacion_nombre}</span>
-          </div>
-
-          <div class="d-flex align-items-start gap-2 p-2 rounded" style="background:var(--card-bg);border:1px solid var(--border-color);">
-            ${item.recambio_imagen
-              ? `<img class="rounded" src="${cacheBustUrl(`../../assets/images/Recambios/${item.recambio_imagen}`)}" alt="" style="width:40px;height:40px;object-fit:cover;flex-shrink:0;">`
-              : `<div style="width:40px;height:40px;flex-shrink:0;" class="rounded d-flex align-items-center justify-content-center bg-light text-muted"><i class="fas fa-cog"></i></div>`}
-            <div class="flex-grow-1 min-w-0">
-              <div class="fw-bold small">${item.recambio || "—"}</div>
-              ${item.recambio_referencia ? `<small class="text-muted">Ref: ${item.recambio_referencia}</small>` : ""}
-              <div class="d-flex gap-2 mt-1 flex-wrap">
-                ${unidades > 1 ? `<small class="text-muted"><i class="fas fa-box me-1"></i>${unidades} uds.</small>` : ""}
-                ${duracionKms ? `<small class="text-success"><i class="fas fa-road me-1"></i>+${duracionKms.toLocaleString()} kms</small>` : ""}
-                ${item.duracion_tiempo ? `<small class="text-muted"><i class="far fa-clock me-1"></i>${item.duracion_tiempo}</small>` : ""}
-              </div>
+            <div class="d-flex align-items-center gap-2">
+              <img src="${cacheBustUrl(`../../assets/images/icons/Operaciones/${item.operacion_imagen}`)}" alt="" style="width:14px;height:14px;object-fit:contain;flex-shrink:0;">
+              <span class="text-truncate" style="font-size:0.75rem;">${item.recambio || "—"}</span>
+              ${item.recambio_referencia ? `<small class="text-muted flex-shrink-0" style="font-size:0.65rem;">${item.recambio_referencia}</small>` : ""}
+              ${precio ? `<small class="text-muted ms-auto flex-shrink-0" style="font-size:0.68rem;white-space:nowrap;">${precio.toFixed(2)}€${unidades > 1 ? ' ×'+unidades : ''}</small>` : ""}
+              ${item.edad_vehiculo ? `<small class="text-muted flex-shrink-0" style="font-size:0.65rem;">(${item.edad_vehiculo})</small>` : ""}
             </div>
-          </div>
-
-          ${item.observaciones ? `
-          <div class="mt-1 small">
-            <span class="text-muted">📝</span>
-            <em>${item.observaciones}</em>
-          </div>` : ""}
-        </div>`;
+            ${item.observaciones ? `<div class="mt-1 ps-3"><small class="text-muted" style="font-size:0.7rem;"><em>${item.observaciones}</em></small></div>` : ""}
+          </div>`;
     });
 
     html += `
         </div>
-        <div class="card-footer p-1 text-end small bg-light">
-          <span class="text-muted">Recorrido total: </span>
-          <span class="fw-bold">${recorrido.toLocaleString()} kms</span>
-          <span class="text-muted ms-2">(desde ${Number(grupo.kms_min).toLocaleString()} hasta ${Number(grupo.kms_max).toLocaleString()})</span>
+        <div class="card-footer p-2 text-end" style="font-size:0.72rem;">
+          <span class="text-muted">Recorrido: </span>
+          <span class="fw-bold">${recorrido.toLocaleString()} km</span>
+          <span class="text-muted ms-1">(${totalItems} mant.)</span>
         </div>
       </div>`;
   }

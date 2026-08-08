@@ -519,7 +519,7 @@ function kms_by_grupo($params)
             'localizacion' => (string) ($db->query("SELECT nombre FROM localizaciones WHERE id = " . $loc)->fetchColumn() ?: 'N/A'),
             'img_localizacion' => (string) ($db->query("SELECT imagen FROM localizaciones WHERE id = " . $loc)->fetchColumn() ?: ''),
             'kms' => $g['kms_ultima'],
-            'kms_realizados' => max(0, $kms_actuales - $g['min_kms']),
+            'kms_realizados' => max(0, $kms_actuales - $g['kms_ultima']),
             'ultima_fecha' => $ultima,
             'years' => $years,
             'months' => $months,

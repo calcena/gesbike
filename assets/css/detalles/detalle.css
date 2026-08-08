@@ -1,3 +1,18 @@
+.detallex-header {
+  padding: 0.5rem 0.75rem;
+}
+.detallex-header .icon-menu {
+  height: 1.8rem;
+}
+.detallex-header #grupo_select {
+  font-size: 0.85rem;
+  padding: 0.375rem 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
 .historico-item {
   transition: background-color 0.2s ease;
 }
