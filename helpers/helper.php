@@ -372,9 +372,12 @@ function compute_elevation_metrics($pulsaciones, $elevations)
         }
     }
 
-    $total = $distSubida + $distBajada + $distPlano;
-    $pctSubida = $total > 0 ? round(($distSubida / $total) * 100) : 0;
-    $pctBajada = $total > 0 ? round(($distBajada / $total) * 100) : 0;
+    // Los % se calculan sobre TIEMPO para que sean coherentes con los
+    // tiempo_subida/tiempo_bajada/tiempo_plano mostrados (por distancia, la
+    // bajada saldría sobrevalorada porque se rueda más rápido).
+    $total = $tiempoSubida + $tiempoBajada + $tiempoPlano;
+    $pctSubida = $total > 0 ? round(($tiempoSubida / $total) * 100) : 0;
+    $pctBajada = $total > 0 ? round(($tiempoBajada / $total) * 100) : 0;
     $pctPlano = max(0, 100 - $pctSubida - $pctBajada);
 
     $fmt = function ($s) {

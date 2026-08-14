@@ -1,46 +1,5 @@
 // ========== FUNCIONALIDAD PARA ARCHIVOS FIT ==========
 
-function setupFITUpload() {
-  const fitInput = document.getElementById("fitFile");
-  const loadingIndicator = document.getElementById("loading-indicator");
-
-  if (!fitInput) return;
-
-  fitInput.addEventListener("change", async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const loading = loadingIndicator;
-    if (loading) loading.style.display = "block";
-    document.getElementById("output-container").innerHTML = "";
-
-    try {
-      const result = await uploadFITFile(file);
-      if (result.success) {
-        const container = document.getElementById("output-container");
-        container.innerHTML = generarContenidoFIT(result.content);
-        await getRutasByVehiculo();
-        Swal.fire({
-          text: "Ruta FIT guardada correctamente",
-          icon: "success",
-          timer: 2000,
-          showConfirmButton: false,
-        });
-      }
-    } catch (err) {
-      console.error("Error FIT:", err);
-      document.getElementById("output-container").innerHTML = `
-        <div class="col-12">
-          <div class="alert alert-danger">${err.message || "Error procesando archivo FIT"}</div>
-        </div>
-      `;
-    } finally {
-      if (loading) loading.style.display = "none";
-      e.target.value = "";
-    }
-  });
-}
-
 function setupMultipleFITUpload() {
   const multipleInput = document.getElementById("fitMultipleFile");
   if (!multipleInput) return;

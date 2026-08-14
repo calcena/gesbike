@@ -575,9 +575,12 @@ class FitParser
         $avgPower = (!empty($powerValues) && $duration > 0) ? round($totalPowerSec / $duration) : 0;
         $calorias = ($sessionCalories !== null) ? (int)$sessionCalories : 0;
 
-        $totalFlatDist = $distSubida + $distBajada + $distPlano;
-        $pctSubida = ($totalFlatDist > 0) ? round(($distSubida / $totalFlatDist) * 100) : 0;
-        $pctBajada = ($totalFlatDist > 0) ? round(($distBajada / $totalFlatDist) * 100) : 0;
+        // Los % se calculan sobre TIEMPO para que sean coherentes con los
+        // tiempo_subida/tiempo_bajada/tiempo_plano mostrados (por distancia, la
+        // bajada saldría sobrevalorada porque se rueda más rápido).
+        $totalFlatTime = $tiempoSubida + $tiempoBajada + $tiempoPlano;
+        $pctSubida = ($totalFlatTime > 0) ? round(($tiempoSubida / $totalFlatTime) * 100) : 0;
+        $pctBajada = ($totalFlatTime > 0) ? round(($tiempoBajada / $totalFlatTime) * 100) : 0;
         $pctPlano = max(0, 100 - $pctSubida - $pctBajada);
 
         $fechaInicio = (!empty($timestamps)) ? date('c', $timestamps[0]) : null;

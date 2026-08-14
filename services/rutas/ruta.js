@@ -162,39 +162,6 @@ function estimateCalories(totalTimeMovingSec, massKg = 52, MET = 7.32) {
 }
 
 // Función para calcular tiempos de subida, bajada y plano
-function calcularTiemposTerreno(trkpts) {
-  let tiempoSubida = 0;
-  let tiempoBajada = 0;
-  let tiempoPlano = 0;
-
-  for (let i = 1; i < trkpts.length; i++) {
-    const prev = trkpts[i - 1];
-    const curr = trkpts[i];
-
-    const dt = (curr.time - prev.time) / 1000;
-    if (dt <= 0) continue;
-
-    const dist = haversine(prev.lat, prev.lon, curr.lat, curr.lon);
-    const dAlt = curr.ele - prev.ele;
-
-    const slopePerc = dist > 0 ? (dAlt / dist) * 100 : 0;
-
-    if (slopePerc > 1) {
-      tiempoSubida += dt;
-    } else if (slopePerc < -1) {
-      tiempoBajada += dt;
-    } else {
-      tiempoPlano += dt;
-    }
-  }
-
-  return {
-    tiempoSubida: formatTime(tiempoSubida),
-    tiempoBajada: formatTime(tiempoBajada),
-    tiempoPlano: formatTime(tiempoPlano),
-  };
-}
-
 function processGPX(text) {
 
   const parser = new DOMParser();
@@ -218,20 +185,32 @@ function processGPX(text) {
       if (!eleElem) eleElem = pt.querySelector("ele");
       if (!timeElem) timeElem = pt.querySelector("time");
 
-      let hr = null, speed = null, cad = null;
+      let hr = null, speed = null, cad = null, power = null, temp = null;
       const extElems = pt.getElementsByTagNameNS(GARMIN_NS, "hr");
       if (extElems.length > 0) hr = parseInt(extElems[0].textContent) || null;
       const spdElems = pt.getElementsByTagNameNS(GARMIN_NS, "speed");
       if (spdElems.length > 0) speed = parseFloat(spdElems[0].textContent) || null;
       const cadElems = pt.getElementsByTagNameNS(GARMIN_NS, "cad");
       if (cadElems.length > 0) cad = parseInt(cadElems[0].textContent) || null;
+      const pwrElems = pt.getElementsByTagNameNS(GARMIN_NS, "power");
+      if (pwrElems.length > 0) power = parseFloat(pwrElems[0].textContent) || null;
+      const tempElems = pt.getElementsByTagNameNS(GARMIN_NS, "atemp");
+      if (tempElems.length > 0) temp = parseFloat(tempElems[0].textContent) || null;
+      if (power == null) {
+        const pwrPlain = pt.querySelector("power");
+        if (pwrPlain) power = parseFloat(pwrPlain.textContent) || null;
+      }
+      if (temp == null) {
+        const tempPlain = pt.querySelector("atemp");
+        if (tempPlain) temp = parseFloat(tempPlain.textContent) || null;
+      }
 
       return {
         lat: parseFloat(pt.getAttribute("lat")),
         lon: parseFloat(pt.getAttribute("lon")),
         ele: eleElem ? parseFloat(eleElem.textContent) : 0,
         time: timeElem ? new Date(timeElem.textContent) : new Date(),
-        hr, speed, cad,
+        hr, speed, cad, power, temp,
       };
     })
     .filter(
@@ -259,9 +238,20 @@ function processGPX(text) {
   let maxAlt = trkpts[0].ele;
   let totalPowerSec = 0;
 
+  // Clasificación de terreno por segmentos (mismo algoritmo que el parser FIT):
+  // segmentos de distancia >= SEG_MIN_DIST y umbral de pendiente ±SEG_GRADE_THRESHOLD
+  const SEG_MIN_DIST = 30;
+  const SEG_GRADE_THRESHOLD = 2;
+
   let distSubida = 0;
   let distBajada = 0;
   let distPlano = 0;
+  let tiempoSubida = 0;
+  let tiempoBajada = 0;
+  let tiempoPlano = 0;
+  let segDist = 0;
+  let segAlt = 0;
+  let segTime = 0;
 
   for (let i = 1; i < trkpts.length; i++) {
     const prev = trkpts[i - 1];
@@ -270,8 +260,9 @@ function processGPX(text) {
     const dt = (curr.time - prev.time) / 1000;
     if (dt <= 0) continue;
 
-    const dist = haversine(prev.lat, prev.lon, curr.lat, curr.lon);
+    let dist = haversine(prev.lat, prev.lon, curr.lat, curr.lon);
     const dAlt = curr.ele - prev.ele;
+    if (dist > 0 && dAlt !== 0) dist = Math.sqrt(dist * dist + dAlt * dAlt);
     const speed = dist / dt;
 
     totalDist += dist;
@@ -281,13 +272,26 @@ function processGPX(text) {
 
     if (curr.ele > maxAlt) maxAlt = curr.ele;
 
-    const slopePerc = (dAlt / dist) * 100;
-    if (slopePerc > 1) {
-      distSubida += dist;
-    } else if (slopePerc < -1) {
-      distBajada += dist;
-    } else {
-      distPlano += dist;
+    if (dist > 0) {
+      segDist += dist;
+      segAlt += dAlt;
+      segTime += dt;
+      if (segDist >= SEG_MIN_DIST) {
+        const grade = (segAlt / segDist) * 100;
+        if (grade > SEG_GRADE_THRESHOLD) {
+          distSubida += segDist;
+          tiempoSubida += segTime;
+        } else if (grade < -SEG_GRADE_THRESHOLD) {
+          distBajada += segDist;
+          tiempoBajada += segTime;
+        } else {
+          distPlano += segDist;
+          tiempoPlano += segTime;
+        }
+        segDist = 0;
+        segAlt = 0;
+        segTime = 0;
+      }
     }
 
     const isMoving = speed > 0.2778;
@@ -300,6 +304,21 @@ function processGPX(text) {
     totalPowerSec += power * dt;
   }
 
+  // Segmento final pendiente de clasificar
+  if (segDist > 0) {
+    const grade = (segAlt / segDist) * 100;
+    if (grade > SEG_GRADE_THRESHOLD) {
+      distSubida += segDist;
+      tiempoSubida += segTime;
+    } else if (grade < -SEG_GRADE_THRESHOLD) {
+      distBajada += segDist;
+      tiempoBajada += segTime;
+    } else {
+      distPlano += segDist;
+      tiempoPlano += segTime;
+    }
+  }
+
   const filteredSpeeds = calculateSpeedWithFilter(trkpts);
   let maxSpeedFiltered = 0;
   for (let i = 1; i < filteredSpeeds.length; i++) {
@@ -309,8 +328,7 @@ function processGPX(text) {
     }
   }
 
-  // Calcular tiempos por tipo de terreno
-  const tiemposTerreno = calcularTiemposTerreno(trkpts);
+  // Calcular tiempos por tipo de terreno (acumulados en el bucle principal)
 
   const totalTimeElapsed =
     (trkpts[trkpts.length - 1].time - trkpts[0].time) / 1000;
@@ -320,13 +338,15 @@ function processGPX(text) {
 
   const calories = estimateCalories(totalTimeMoving, MASSBIKER, 7.32);
 
-  const totalDistRuta = distSubida + distBajada + distPlano;
+  // Los % se calculan sobre TIEMPO para que sean coherentes con los
+  // tiempo_subida/tiempo_bajada/tiempo_plano mostrados (por distancia, la
+  // bajada saldría sobrevalorada porque se rueda más rápido).
+  const totalTimeRuta = tiempoSubida + tiempoBajada + tiempoPlano;
   const subidaPerc =
-    totalDistRuta > 0 ? ((distSubida / totalDistRuta) * 100).toFixed(0) : 0;
+    totalTimeRuta > 0 ? Math.round((tiempoSubida / totalTimeRuta) * 100) : 0;
   const bajadaPerc =
-    totalDistRuta > 0 ? ((distBajada / totalDistRuta) * 100).toFixed(0) : 0;
-  const planoPerc =
-    totalDistRuta > 0 ? ((distPlano / totalDistRuta) * 100).toFixed(0) : 0;
+    totalTimeRuta > 0 ? Math.round((tiempoBajada / totalTimeRuta) * 100) : 0;
+  const planoPerc = Math.max(0, 100 - subidaPerc - bajadaPerc);
 
   const hrValues = trkpts.filter(p => p.hr != null && p.hr > 0).map(p => p.hr);
   const frecuencia_cardiaca_promedio = hrValues.length > 0 ? Math.round(hrValues.reduce((a, b) => a + b, 0) / hrValues.length) : null;
@@ -345,9 +365,9 @@ function processGPX(text) {
     pct_subida: parseInt(subidaPerc),
     pct_plano: parseInt(planoPerc),
     pct_bajada: parseInt(bajadaPerc),
-    tiempo_subida: tiemposTerreno.tiempoSubida,
-    tiempo_bajada: tiemposTerreno.tiempoBajada,
-    tiempo_plano: tiemposTerreno.tiempoPlano,
+    tiempo_subida: formatTime(tiempoSubida),
+    tiempo_bajada: formatTime(tiempoBajada),
+    tiempo_plano: formatTime(tiempoPlano),
     velocidad_media: Number(avgSpeedMoving.toFixed(1)),
     velocidad_maxima: Number(maxSpeedFiltered.toFixed(1)),
     frecuencia_cardiaca_promedio: frecuencia_cardiaca_promedio,
@@ -362,6 +382,8 @@ function processGPX(text) {
       ...(p.hr != null && p.hr > 0 ? { hr: p.hr } : {}),
       ...(p.speed != null ? { speed: parseFloat((p.speed * 3.6).toFixed(1)) } : {}),
       ...(p.cad != null ? { cad: p.cad } : {}),
+      ...(p.power != null && p.power > 0 ? { power: p.power } : {}),
+      ...(p.temp != null ? { temp: p.temp } : {}),
     })),
   };
 }
@@ -378,9 +400,7 @@ async function initRutas() {
   document.getElementById("fecha_ruta").value = await loadDefaultDate();
   await selectVehiculo(2);
   await getRutasByVehiculo();
-  setupGPXUpload();
   setupMultipleGPXUpload();
-  setupFITUpload();
   setupMultipleFITUpload();
 
   const params = new URLSearchParams(window.location.search);
@@ -425,44 +445,6 @@ window.selectVehiculoPicker = async (id, nombre) => {
     else if (id === 'tab6' || id === 'tab7') cargarGraficasAnalisis();
   }
 };
-
-// ========== FUNCIONALIDAD PARA UN SOLO ARCHIVO ==========
-function setupGPXUpload() {
-  const inputs = ["gpxFile", "gpxFileOrux"];
-  const loadingIndicator = document.getElementById("loading-indicator");
-
-  inputs.forEach(id => {
-    const input = document.getElementById(id);
-    if (!input) return;
-
-    input.addEventListener("change", async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-
-      const loading = loadingIndicator;
-      if (loading) loading.style.display = "block";
-      document.getElementById("output-container").innerHTML = "";
-
-      try {
-        const text = await file.text();
-        let result;
-        result = processGPX(text);
-        const container = document.getElementById("output-container");
-        container.innerHTML = generarContenidoGPX(result);
-        await sendToAPI(result);
-      } catch (err) {
-        console.error("💥 Error:", err);
-        document.getElementById("output-container").innerHTML = `
-          <div class="col-12">
-            <div class="alert alert-danger">${err.message}</div>
-          </div>
-        `;
-      } finally {
-        if (loading) loading.style.display = "none";
-      }
-    });
-  });
-}
 
 // ========== FUNCIONALIDAD PARA MÚLTIPLES ARCHIVOS ==========
 function setupMultipleGPXUpload() {
@@ -525,6 +507,8 @@ async function handleMultipleGPXFiles(e) {
   if (successCount > 0 || errorCount > 0) {
     await showBatchResult(files.length, successCount, errorCount);
   }
+
+  if (successCount > 0) await crearBackup();
 
   await getRutasByVehiculo();
   e.target.value = "";
@@ -598,78 +582,6 @@ async function showBatchResult(totalFiles, successCount, errorCount) {
     icon: errorCount === 0 ? "success" : "warning",
     confirmButtonText: "Aceptar",
   });
-}
-
-async function sendToAPI(result) {
-  const vehiculoId = sessionStorage.getItem("vehiculo_id");
-
-  if (!vehiculoId) {
-    await Swal.fire({
-      text: "Error: No hay vehículo seleccionado",
-      icon: "error",
-      timer: 3000,
-    });
-    return;
-  }
-
-  const data = {
-    vehiculo_id: vehiculoId,
-    kms: result.kms,
-    tiempo_movimiento: result.tiempo_movimiento,
-    tiempo_total: result.tiempo_total,
-    velocidad_media: result.velocidad_media,
-    velocidad_maxima: result.velocidad_maxima,
-    metros_ascenso: result.metros_ascenso,
-    metros_descenso: result.metros_descenso,
-    altitud_maxima: result.altitud_maxima,
-    potencia_promedio_w: result.potencia_promedio_w,
-    calorias: result.calorias,
-    pct_subida: result.pct_subida,
-    pct_plano: result.pct_plano,
-    pct_bajada: result.pct_bajada,
-    tiempo_subida: result.tiempo_subida,
-    tiempo_plano: result.tiempo_plano,
-    tiempo_bajada: result.tiempo_bajada,
-    fecha_inicio: result.fecha_inicio,
-    fecha_fin: result.fecha_fin,
-    frecuencia_cardiaca_promedio: result.frecuencia_cardiaca_promedio,
-    frecuencia_cardiaca_maxima: result.frecuencia_cardiaca_maxima,
-    gpx_data: JSON.stringify(result.track_points),
-  };
-
-  try {
-    const response = await axios.post(
-      getApiUrl('ruta.php?guardarRutaGPX'),
-      { data },
-      {
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    if (response.data.success) {
-      Swal.fire({
-        text: "✅ Ruta guardada correctamente",
-        icon: "success",
-        toast: true,
-        position: 'top-end',
-        timer: 2000,
-        showConfirmButton: false,
-      });
-      await getRutasByVehiculo();
-      await crearBackup();
-    } else {
-      throw new Error(response.data.message || "Error del servidor");
-    }
-  } catch (err) {
-    console.error("Error al enviar a API:", err);
-    await Swal.fire({
-      text: `❌ Error al guardar: ${err.response?.data?.message || err.message}`,
-      icon: "error",
-      timer: 3000,
-    });
-  }
 }
 
 function samplePointsByDistance(trackPoints, intervalKm = 1) {
@@ -2400,54 +2312,6 @@ function configurarLongPressCards() {
 }
 
 // Función para generar resumen compacto de GPX (similar a FIT)
-function generarContenidoGPX(ruta) {
-  const hasHR = ruta.frecuencia_cardiaca_promedio != null;
-  const hasPower = ruta.potencia_promedio_w != null && ruta.potencia_promedio_w > 0;
-  return `
-    <div class="ruta-details-captura" style="background: #fff; border: 2px solid #667eea; border-radius: 10px; padding: 15px; max-height: 400px; overflow-y: auto;">
-      <h6 style="color: #667eea; font-weight: bold; margin-bottom: 10px;">
-        <i class="fas fa-check-circle text-success"></i> Ruta GPX importada
-      </h6>
-      <div class="detail-row-captura" style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee;">
-        <span style="font-weight: 500;">Distancia</span>
-        <span style="font-weight: 600;">${ruta.kms} km</span>
-      </div>
-      <div class="detail-row-captura" style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee;">
-        <span style="font-weight: 500;">Velocidad media</span>
-        <span style="font-weight: 600;">${ruta.velocidad_media} km/h</span>
-      </div>
-      <div class="detail-row-captura" style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee;">
-        <span style="font-weight: 500;">Velocidad máxima</span>
-        <span style="font-weight: 600;">${ruta.velocidad_maxima} km/h</span>
-      </div>
-      <div class="detail-row-captura" style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee;">
-        <span style="font-weight: 500;">Ascenso</span>
-        <span style="font-weight: 600;">${ruta.metros_ascenso} m</span>
-      </div>
-      <div class="detail-row-captura" style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee;">
-        <span style="font-weight: 500;">Pulsaciones promedio</span>
-        <span style="font-weight: 600;">${hasHR ? ruta.frecuencia_cardiaca_promedio + " bpm" : "N/A"}</span>
-      </div>
-      <div class="detail-row-captura" style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee;">
-        <span style="font-weight: 500;">Pulsaciones máximas</span>
-        <span style="font-weight: 600;">${hasHR ? ruta.frecuencia_cardiaca_maxima + " bpm" : "N/A"}</span>
-      </div>
-      <div class="detail-row-captura" style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee;">
-        <span style="font-weight: 500;">Potencia promedio</span>
-        <span style="font-weight: 600;">${hasPower ? ruta.potencia_promedio_w + " W" : "N/A"}</span>
-      </div>
-      <div class="detail-row-captura" style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee;">
-        <span style="font-weight: 500;">Calorías</span>
-        <span style="font-weight: 600;">${ruta.calorias || "—"}</span>
-      </div>
-      <div class="detail-row-captura" style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee;">
-        <span style="font-weight: 500;">Puntos del track</span>
-        <span style="font-weight: 600;">${ruta.track_points?.length || 0}</span>
-      </div>
-    </div>
-  `;
-}
-
 // Función para generar el contenido HTML de la ruta
 function renderStatsCaptura(fields) {
   return `
@@ -4654,8 +4518,12 @@ async function compartirRutaWhatsApp() {
     container.insertBefore(mapTitle, sep);
     container.insertBefore(mapCanvas, sep);
 
+    // Calidad máxima: escala lo mayor que permita el límite del canvas (16384px por lado)
+    const maxCanvasDim = 16384;
+    const contW = container.offsetWidth || 800;
+    const contH = container.offsetHeight || 400;
     const resultCanvas = await html2canvas(container, {
-      scale: 4,
+      scale: Math.min(8, Math.floor(maxCanvasDim / Math.max(contW, contH))),
       backgroundColor: '#ffffff',
       logging: false,
       useCORS: true,

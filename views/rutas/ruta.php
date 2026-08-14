@@ -181,26 +181,16 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
             </div>
             <div class="tab-pane fade" id="tab3" role="tabpanel" aria-labelledby="tab3-tab">
                 <div class="row">
-                    <div class="col-12 d-flex justify-content-center flex-wrap" style="gap: 40px;">
-                        <div class="action-icon-wrapper" style="cursor: pointer; position: relative;">
-                            <img height="50px" src="../../assets/images/icons/importar_gpx.png"
-                                alt="Importar archivo GPX">
-                            <input type="file" id="gpxFile" accept=".gpx,application/gpx+xml" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;" />
+                    <div class="col-12 d-flex flex-row" style="gap: 20px;">
+                        <div class="import-btn">
+                            <i class="fas fa-route"></i>
+                            <span>Importar archivos GPX</span>
+                            <input type="file" id="gpxMultipleFile" multiple accept=".gpx,application/gpx+xml" class="import-input" />
                         </div>
-                        <div class="action-icon-wrapper" style="cursor: pointer; position: relative;">
-                            <img height="50px" src="../../assets/images/icons/importar_varios_gpx.png"
-                                alt="Importar multiples archivos GPX">
-                            <input type="file" id="gpxMultipleFile" multiple accept=".gpx,application/gpx+xml" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;" />
-                        </div>
-                        <div class="action-icon-wrapper" style="cursor: pointer; position: relative;">
-                            <img height="50px" src="../../assets/images/icons/importar_fit.png"
-                                alt="Importar archivo FIT">
-                            <input type="file" id="fitFile" accept=".fit" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;" />
-                        </div>
-                        <div class="action-icon-wrapper" style="cursor: pointer; position: relative;">
-                            <img height="50px" src="../../assets/images/icons/importar_varios_fit.png"
-                                alt="Importar multiples archivos FIT">
-                            <input type="file" id="fitMultipleFile" multiple accept=".fit" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;" />
+                        <div class="import-btn">
+                            <i class="fas fa-heart-pulse"></i>
+                            <span>Importar archivos FIT</span>
+                            <input type="file" id="fitMultipleFile" multiple accept=".fit" class="import-input" />
                         </div>
                     </div>
                 </div>

@@ -2,3 +2,12 @@
 database/backups/*.db
 database/backups/*.zip
 database/backups/*.gz
+
+# Bases de datos SQLite (no versionar)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.db.gz
+*.db.gz.*
+*.db.7z.*

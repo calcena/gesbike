@@ -7,12 +7,17 @@ debug_mode();
 $_SESSION['base_path'] = dirname(__FILE__);
 $_SESSION['base_project'] = dirname(__FILE__);
 
-// Detectar si el usuario dejó un .zip de restauración en database/
+// Detectar si el usuario dejó un .zip, volúmenes .7z.001 o partes .gz.001 de restauración en database/
 $hayZipRestaurar = false;
+$hay7zRestaurar = false;
+$hayGzRestaurar = false;
 $zipDir = __DIR__ . '/database/';
 if (is_dir($zipDir)) {
     $hayZipRestaurar = count(glob($zipDir . '*.zip')) > 0;
+    $hay7zRestaurar = count(glob($zipDir . '*.7z.*')) > 0;
+    $hayGzRestaurar = count(glob($zipDir . '*.gz.*')) > 0;
 }
+$hayBackupRestaurar = $hayZipRestaurar || $hay7zRestaurar || $hayGzRestaurar;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -72,7 +77,7 @@ if (is_dir($zipDir)) {
                     <button id="btn_acceder" class="btn login-btn" style="width:auto; flex:1 1 auto;" onclick="auth(document.getElementById('username').value, document.getElementById('pass').value)">
                         <i class="fas fa-sign-in-alt me-2"></i>Acceder
                     </button>
-                    <?php if ($hayZipRestaurar): ?>
+                    <?php if ($hayBackupRestaurar): ?>
                     <button type="button" class="btn btn-warning" style="flex:0 0 auto; height:48px; border-radius:12px; font-weight:600;" onclick="restaurarBackupZip()">
                         <i class="fas fa-file-zipper me-1"></i>Extraer BD
                     </button>
@@ -94,7 +99,7 @@ if (is_dir($zipDir)) {
       }
       Swal.fire({
         title: '¿Restaurar base de datos?',
-        text: 'Se extraerá el archivo .zip que has dejado en el servidor y se sobrescribirá la base de datos actual. El .zip se eliminará tras la restauración.',
+        text: 'Se extraerá el archivo .zip, los volúmenes .7z.001 o las partes .gz.001 que has dejado en el servidor y se sobrescribirá la base de datos actual. El archivo se eliminará tras la restauración.',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonText: 'Restaurar',
@@ -103,8 +108,15 @@ if (is_dir($zipDir)) {
         if (!result.isConfirmed) return;
         Swal.fire({ title: 'Restaurando...', text: 'Por favor, espera', didOpen: () => Swal.showLoading() });
         fetch('api/helpers/restore_zip.php', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
-          .then(r => r.json())
-          .then(d => {
+          .then(r => r.text())
+          .then(txt => {
+            let d;
+            try {
+              d = JSON.parse(txt);
+            } catch (e) {
+              Swal.fire('Error', 'El servidor no devolvió JSON válido:\n' + txt.substring(0, 300), 'error');
+              return;
+            }
             if (d.success) {
               Swal.fire('Listo', 'BD restaurada: ' + (d.archivos || []).join(', '), 'success')
                 .then(() => location.reload());

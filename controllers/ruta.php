@@ -2,6 +2,7 @@
 
 $root = dirname(__DIR__);
 require_once $root . '/helpers/config.php';
+require_once $root . '/helpers/helper.php';
 require_once $root . '/database/DatabaseConnection.php';
 require_once $root . '/models/ruta.php';
 require_once $root . '/models/ruta_fit.php';
@@ -25,51 +26,83 @@ function handle_crear_ruta_gpx()
     $params = $input['data'];
 
     try {
-        $entity = create_ruta_gpx($params);
-
-        if ($entity && !empty($params['gpx_data'])) {
+        // Construir pulsaciones desde el track. Solo se guardan los datos
+        // informados en el archivo; los que no vengan quedan descartados
+        // (null) y no se visualizan.
+        $pulsaciones = [];
+        $hasHr = false;
+        $totalKm = (float)($params['kms'] ?? 1);
+        $totalMs = 0;
+        if (!empty($params['fecha_inicio']) && !empty($params['fecha_fin'])) {
+            $start = new DateTime($params['fecha_inicio']);
+            $end = new DateTime($params['fecha_fin']);
+            $totalMs = ($end->getTimestamp() - $start->getTimestamp()) * 1000;
+        }
+        $trackPoints = [];
+        if (!empty($params['gpx_data'])) {
             $trackPoints = json_decode($params['gpx_data'], true);
-            if (is_array($trackPoints) && count($trackPoints) > 0) {
-                $pulsaciones = [];
-                $totalKm = (float)($params['kms'] ?? 1);
-                $totalMs = 0;
-                if (!empty($params['fecha_inicio']) && !empty($params['fecha_fin'])) {
-                    $start = new DateTime($params['fecha_inicio']);
-                    $end = new DateTime($params['fecha_fin']);
-                    $totalMs = ($end->getTimestamp() - $start->getTimestamp()) * 1000;
+        }
+        if (is_array($trackPoints) && count($trackPoints) > 0) {
+            $startTs = !empty($trackPoints[0]['time']) ? strtotime($trackPoints[0]['time']) : 0;
+            foreach ($trackPoints as $tp) {
+                $hr = isset($tp['hr']) && $tp['hr'] !== null ? $tp['hr'] : null;
+                $spd = $tp['speed'] ?? null;
+                $cad = $tp['cad'] ?? null;
+                $pwr = $tp['power'] ?? null;
+                $tmp = $tp['temp'] ?? null;
+                if ($hr === null && $spd === null && $cad === null && $pwr === null && $tmp === null) continue;
+                if ($hr !== null) $hasHr = true;
+
+                $pul = [
+                    'pulsaciones' => $hr,
+                    'cadencia' => $cad,
+                    'potencia' => $pwr,
+                    'temperatura' => $tmp,
+                    'lat' => $tp['lat'] ?? null,
+                    'lon' => $tp['lon'] ?? null,
+                    'altitud' => $tp['ele'] ?? null,
+                    'velocidad' => $spd,
+                    'timestamp_fit' => $tp['time'] ?? null,
+                    'kilometro' => 0,
+                ];
+                if (!empty($pul['timestamp_fit']) && $startTs > 0) {
+                    $pulTs = strtotime($pul['timestamp_fit']);
+                    $frac = $totalMs > 0 ? (($pulTs - $startTs) * 1000) / $totalMs : 0;
+                    $pul['kilometro'] = round($frac * $totalKm, 3);
                 }
-                foreach ($trackPoints as $tp) {
-                    $hr = $tp['hr'] ?? null;
-                    $spd = $tp['speed'] ?? null;
-                    $cad = $tp['cad'] ?? null;
-                    if ($hr === null && $spd === null && $cad === null) continue;
-                    $p = [
-                        'pulsaciones' => $hr,
-                        'cadencia' => $cad,
-                        'potencia' => null,
-                        'temperatura' => null,
-                        'lat' => $tp['lat'] ?? null,
-                        'lon' => $tp['lon'] ?? null,
-                        'altitud' => $tp['ele'] ?? null,
-                        'velocidad' => $spd,
-                        'timestamp_fit' => $tp['time'] ?? null,
-                        'kilometro' => 0,
-                    ];
-                    $pulsaciones[] = $p;
-                }
-                if (!empty($pulsaciones)) {
-                    $startTs = !empty($trackPoints[0]['time']) ? strtotime($trackPoints[0]['time']) : 0;
-                    foreach ($pulsaciones as &$pul) {
-                        if (!empty($pul['timestamp_fit']) && $startTs > 0) {
-                            $pulTs = strtotime($pul['timestamp_fit']);
-                            $frac = $totalMs > 0 ? (($pulTs - $startTs) * 1000) / $totalMs : 0;
-                            $pul['kilometro'] = round($frac * $totalKm, 3);
-                        }
-                    }
-                    unset($pul);
-                    createRutaPulsacion($entity, $pulsaciones);
+                $pulsaciones[] = $pul;
+            }
+        }
+
+        // Zonas de FC dinámicas por edad (snapshot a la fecha de la ruta),
+        // igual que en la importación FIT. Solo si hay FC informada.
+        if ($hasHr && !empty($pulsaciones)) {
+            $fechaNacimiento = null;
+            if (!empty($_SESSION['user'])) {
+                try {
+                    $dbU = conectar();
+                    $stU = $dbU->prepare("SELECT fecha_nacimiento FROM usuarios WHERE id = ?");
+                    $stU->execute([$_SESSION['user']]);
+                    $fechaNacimiento = $stU->fetchColumn();
+                } catch (Exception $e) {
+                    $fechaNacimiento = null;
                 }
             }
+            if (!empty($fechaNacimiento)) {
+                $zonasDef = calcular_zonas_fc_por_edad($fechaNacimiento, $params['fecha_inicio'] ?? null);
+                if (!empty($zonasDef)) {
+                    $params['zonas_fc'] = json_encode(zonas_fc_desde_pulsaciones($zonasDef, $pulsaciones));
+                }
+            }
+        }
+
+        $entity = create_ruta_gpx($params);
+
+        // Pulsaciones solo si hay FC u otros datos informados (si no hay
+        // ningún dato, no se persisten y las secciones no se muestran).
+        $pulsacionesCount = 0;
+        if (!empty($pulsaciones)) {
+            $pulsacionesCount = createRutaPulsacion($entity, $pulsaciones);
         }
 
         echo json_encode([
