@@ -107,7 +107,8 @@ gesBike/
 ├── helpers/
 │   ├── backup.php
 │   ├── config.php                # Carga de variables de entorno (.env)
-│   └── helper.php                # Funciones auxiliares PHP (random_file_enumerator, new_guui_generator, etc.)
+│   ├── helper.php                # Funciones auxiliares PHP (random_file_enumerator, new_guui_generator, etc.)
+│   └── partir_backup.php         # Parte app.db en volúmenes .gz.00x (CLI + web, solo local)
 ├── jobs/
 │   └── cron_email.php            # Tareas programadas (SMTP Gmail)
 ├── models/                       # Modelos PHP (wrappers)
@@ -663,6 +664,14 @@ El usuario deja un `.zip` (o un 7z partido en volúmenes `.7z.001`, `.7z.002`, .
 - **Frontend (login)**: `index.php` detecta con PHP (`glob('database/*.zip')`, `glob('database/*.7z.*')` y `glob('database/*.gz.*')`) si hay un backup y, en ese caso, renderiza el botón **"Extraer BD"** en la **misma línea** que el botón "Acceder" (este último queda más estrecho, con `flex:1 1 auto`, y el de Extraer BD con `flex:0 0 auto`). El botón llama a `restaurarBackupZip()` (definida inline en `index.php`) que hace `fetch(POST)` al endpoint, lee la respuesta como texto y la parsea con `JSON.parse` (si falla, muestra el texto crudo para diagnosticar), muestra el resultado y recarga si tuvo éxito.
 - **Nota**: el usuario debe colocar el `.zip` (o las partes `.7z.001`/`.gz.001`...) en `database/` (vía FTP u otro medio, cada parte por debajo del límite de subida del hosting) antes de pulsar el botón.
 - **Patrón a seguir para nuevos "botones de acción" en el menú**: añadir un `<div class="menu-item text-center" onclick="miFuncion()">` con icono FA `menu-icon`, y definir `miFuncion()` en un `<script>` al final de `sidebar.php` usando `$GLOBALS['pathUrl']` para resolver rutas relativas.
+
+### 10.2 Partir BD (solo modo local)
+Para generar desde el propio equipo local los volúmenes `.gz.001/.002/...` que luego se suben al hosting y se restauran con el botón "Extraer BD" (sección 10.1), el login muestra un tercer botón **"Partir backup (local)"** **únicamente cuando `APP_ENV=local`** en `.env`. Los tres botones (`Acceder`, `Extraer BD` si hay candidatos de restauración, `Partir backup (local)`) pueden coexistir en la misma pantalla: "Extraer BD" y "Partir backup" son independientes (el primero se muestra según los globs de `database/`, el segundo según `APP_ENV`).
+
+- **Script**: `helpers/partir_backup.php` (antes en la raíz del proyecto). Es **dual CLI/web**: define la función `partir_backup($src, $partSize)` y solo ejecuta el bloque CLI cuando `php_sapi_name() === 'cli'` (guard `realpath($argv[0]) === __FILE__` para que un `require` desde web no ejecute nada). Uso CLI: `php helpers/partir_backup.php [archivo] [bytes_por_parte]`.
+- **Salida**: `database/backups/partes/app.db.gz.001, .002, ...` (gzip nivel 9 en streaming, 2 MB por parte por defecto). Las partes viejas del mismo `app.db` se eliminan antes de regenerar.
+- **Endpoint**: `api/helpers/partir_backup.php` (POST). Rechaza con **403** si `APP_ENV !== 'local'` (herramienta de desarrollo, nunca en producción) y devuelve **SIEMPRE JSON puro** (mismo patrón de limpieza de buffers que `restore_zip.php`): `{ success, message, partes[], directorio }`.
+- **Frontend (login)**: `index.php` calcula `$esModoLocal = defined('APP_ENV') && APP_ENV === 'local'` y, si es true, renderiza el botón `.login-btn-util` (borde dashed, ancho completo) en una segunda fila bajo `Acceder`/`Extraer BD`. `partirBackup()` (inline en `index.php`) hace `fetch(POST)` al endpoint y muestra las partes generadas con SweetAlert2.
 
 ### Terminología "Sesiones"
 - En el menú hamburguesa, el item de rutas se etiqueta **"Sesiones"** (icono `fa-stopwatch`). La acción de navegación sigue siendo `menuAction('rutas', ...)` (no cambiar el case de routing).

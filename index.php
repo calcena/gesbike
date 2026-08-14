@@ -18,6 +18,7 @@ if (is_dir($zipDir)) {
     $hayGzRestaurar = count(glob($zipDir . '*.gz.*')) > 0;
 }
 $hayBackupRestaurar = $hayZipRestaurar || $hay7zRestaurar || $hayGzRestaurar;
+$esModoLocal = defined('APP_ENV') && APP_ENV === 'local';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -83,6 +84,13 @@ $hayBackupRestaurar = $hayZipRestaurar || $hay7zRestaurar || $hayGzRestaurar;
                     </button>
                     <?php endif; ?>
                 </div>
+                <?php if ($esModoLocal): ?>
+                <div class="d-flex gap-2 align-items-stretch mt-2">
+                    <button type="button" class="login-btn-util" onclick="partirBackup()">
+                        <i class="fas fa-scissors me-2"></i>Partir backup (local)
+                    </button>
+                </div>
+                <?php endif; ?>
                 <div id="mensaje" class="login-message"></div>
                 <span id="warn_credentials" class="mt-3 d-none text-danger fw-bolder"></span>
             </div>
@@ -92,6 +100,41 @@ $hayBackupRestaurar = $hayZipRestaurar || $hay7zRestaurar || $hayGzRestaurar;
         </div>
     </div>
     <script>
+    function partirBackup() {
+      if (typeof Swal === 'undefined') {
+        alert('SweetAlert2 no está disponible');
+        return;
+      }
+      Swal.fire({
+        title: '¿Partir base de datos?',
+        text: 'Se generará un backup comprimido (app.db.gz) de la base de datos local, partido en volúmenes app.db.gz.001, .002... dentro de database/backups/partes/. Luego podrás subir esas partes al hosting y pulsar allí "Extraer BD".',
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonText: 'Partir',
+        cancelButtonText: 'Cancelar'
+      }).then((result) => {
+        if (!result.isConfirmed) return;
+        Swal.fire({ title: 'Partiendo...', text: 'Por favor, espera', didOpen: () => Swal.showLoading() });
+        fetch('api/helpers/partir_backup.php', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+          .then(r => r.text())
+          .then(txt => {
+            let d;
+            try {
+              d = JSON.parse(txt);
+            } catch (e) {
+              Swal.fire('Error', 'El servidor no devolvió JSON válido:\n' + txt.substring(0, 300), 'error');
+              return;
+            }
+            if (d.success) {
+              Swal.fire('Listo', (d.partes || []).join('\n') + '\n\n' + (d.directorio || ''), 'success');
+            } else {
+              Swal.fire('Error', d.error, 'error');
+            }
+          })
+          .catch(e => { Swal.fire('Error', 'Error al partir: ' + e, 'error'); });
+      });
+    }
+
     function restaurarBackupZip() {
       if (typeof Swal === 'undefined') {
         alert('SweetAlert2 no está disponible');
