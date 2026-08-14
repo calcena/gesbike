@@ -2875,6 +2875,24 @@ function renderIndoorCharts(pulsaciones) {
 }
 
 // Compartir sesión de bicicleta estática (indoor) por WhatsApp como imagen.
+// El aviso del sistema "No se ha podido abrir este enlace" aparece cuando se
+// navega a wa.me desde JS sin gesto del usuario (iOS/Android bloquean los
+// universal links programáticos) o si WhatsApp no está instalado. Por eso la
+// apertura se hace SIEMPRE desde el toque del usuario en un botón real.
+function abrirWhatsAppEnlace() {
+  Swal.fire({
+    icon: 'info',
+    title: 'Imagen descargada',
+    text: 'Se ha descargado la imagen. Pulsa el botón y elige el chat de WhatsApp donde adjuntarla.',
+    confirmButtonText: 'Abrir WhatsApp',
+    showCancelButton: false,
+    allowOutsideClick: true
+  }).then((result) => {
+    if (!result.isConfirmed) return;
+    window.open('https://wa.me/', '_blank');
+  });
+}
+
 async function compartirIndoorWhatsApp() {
   const ruta = window.__indoorRuta;
   const pulsaciones = window.__indoorPulsaciones || [];
@@ -2986,23 +3004,25 @@ async function compartirIndoorWhatsApp() {
     statsDiv.innerHTML = shareStatsHtml;
     container.appendChild(statsDiv);
 
+    // Escala 2 + JPEG: suficiente para WhatsApp sin generar archivos enormes
+    // que rompen la navegación a wa.me en móviles
     const resultCanvas = await html2canvas(container, {
-      scale: 4, backgroundColor: '#ffffff', logging: false, useCORS: true, allowTaint: false
+      scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true, allowTaint: false
     });
 
     chartInstances.forEach(c => { try { c.destroy(); } catch (e) {} });
     document.body.removeChild(container);
 
-    const blob = await new Promise(resolve => resultCanvas.toBlob(resolve, 'image/png', 1.0));
+    const blob = await new Promise(resolve => resultCanvas.toBlob(resolve, 'image/jpeg', 0.92));
     if (!blob) throw new Error('No se pudo generar la imagen');
 
     Swal.close();
 
-    const fileName = `indoor_${(fechaHora || 'estatica').replace(/[^a-zA-Z0-9]/g, '_')}.png`;
+    const fileName = `indoor_${(fechaHora || 'estatica').replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
     const texto = `🏠 ${fechaHora ? fechaHora + ' — ' : ''}${kms} km (estimado)`;
 
     if (navigator.share && navigator.canShare) {
-      const file = new File([blob], fileName, { type: 'image/png' });
+      const file = new File([blob], fileName, { type: 'image/jpeg' });
       const shareData = { text: texto, files: [file] };
       if (navigator.canShare(shareData)) {
         try { await navigator.share(shareData); return; }
@@ -3015,14 +3035,10 @@ async function compartirIndoorWhatsApp() {
     link.href = url;
     link.download = fileName;
     link.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
 
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (isMobile) {
-      window.location.href = 'https://wa.me/';
-    } else {
-      window.open('https://wa.me/', '_blank');
-    }
+    // Apertura de wa.me iniciada por el usuario (ver abrirWhatsAppEnlace)
+    abrirWhatsAppEnlace();
   } catch (err) {
     console.error('Error al compartir sesión indoor:', err);
     Swal.hideLoading();
@@ -4518,12 +4534,11 @@ async function compartirRutaWhatsApp() {
     container.insertBefore(mapTitle, sep);
     container.insertBefore(mapCanvas, sep);
 
-    // Calidad máxima: escala lo mayor que permita el límite del canvas (16384px por lado)
-    const maxCanvasDim = 16384;
-    const contW = container.offsetWidth || 800;
-    const contH = container.offsetHeight || 400;
+    // Calidad equilibrada para WhatsApp: escala 2 + JPEG. A escala 8 en PNG el
+    // archivo superaba los 20 MB, agotaba la memoria del móvil y la navegación
+    // a wa.me no llegaba a completarse.
     const resultCanvas = await html2canvas(container, {
-      scale: Math.min(8, Math.floor(maxCanvasDim / Math.max(contW, contH))),
+      scale: 2,
       backgroundColor: '#ffffff',
       logging: false,
       useCORS: true,
@@ -4532,16 +4547,16 @@ async function compartirRutaWhatsApp() {
 
     document.body.removeChild(container);
 
-    const blob = await new Promise(resolve => resultCanvas.toBlob(resolve, 'image/png', 1.0));
+    const blob = await new Promise(resolve => resultCanvas.toBlob(resolve, 'image/jpeg', 0.92));
     if (!blob) throw new Error('No se pudo generar la imagen');
 
     Swal.close();
 
-    const fileName = `ruta_${(fechaHora || 'gpx').replace(/[^a-zA-Z0-9]/g, '_')}.png`;
+    const fileName = `ruta_${(fechaHora || 'gpx').replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
     const texto = `⛰️ ${fechaHora ? fechaHora + ' — ' : ''}${kms} km`;
 
     if (navigator.share && navigator.canShare) {
-      const file = new File([blob], fileName, { type: 'image/png' });
+      const file = new File([blob], fileName, { type: 'image/jpeg' });
       const shareData = { text: texto, files: [file] };
       if (navigator.canShare(shareData)) {
         try { await navigator.share(shareData); return; }
@@ -4554,14 +4569,10 @@ async function compartirRutaWhatsApp() {
     link.href = url;
     link.download = fileName;
     link.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
 
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (isMobile) {
-      window.location.href = 'https://wa.me/';
-    } else {
-      window.open('https://wa.me/', '_blank');
-    }
+    // Apertura de wa.me iniciada por el usuario (ver abrirWhatsAppEnlace)
+    abrirWhatsAppEnlace();
 
   } catch (err) {
     console.error('Error al compartir ruta:', err);
