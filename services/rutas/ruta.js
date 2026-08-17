@@ -105,7 +105,7 @@ function calculateSpeedWithFilter(trkpts) {
     const prev = trkpts[i - 1];
     const curr = trkpts[i];
     
-    const dt = (curr.time - prev.time) / 1000;
+    const dt = ((new Date(curr.time)) - (new Date(prev.time))) / 1000;
     if (dt <= 0) continue;
     
     const dist = haversine(prev.lat, prev.lon, curr.lat, curr.lon);
@@ -3688,6 +3688,39 @@ function computeCumulativeDistances(points) {
   return distances;
 }
 
+// Puntos de altura y velocidad máximas (velocidad con el mismo filtro de
+// promediado que en la importación, SPEED_WINDOW_SIZE): compartido por el
+// mapa Leaflet y por el mapa de la imagen de compartir en WhatsApp.
+function findRouteExtremes(points) {
+  let maxEle = -Infinity;
+  let maxEleIdx = 0;
+  for (let i = 0; i < points.length; i++) {
+    const ele = points[i].ele;
+    if (ele != null && ele > maxEle) {
+      maxEle = ele;
+      maxEleIdx = i;
+    }
+  }
+
+  const filteredSpeeds = calculateSpeedWithFilter(points);
+  let maxSpeedKmh = -Infinity;
+  let maxSpeedIdx = 0;
+  for (let i = 1; i < filteredSpeeds.length; i++) {
+    const speedKmh = filteredSpeeds[i] * 3.6;
+    if (speedKmh > maxSpeedKmh) {
+      maxSpeedKmh = speedKmh;
+      maxSpeedIdx = i;
+    }
+  }
+
+  return {
+    maxEle: maxEle > -Infinity ? maxEle : null,
+    maxEleIdx,
+    maxSpeedKmh: maxSpeedKmh > 0 ? maxSpeedKmh : null,
+    maxSpeedIdx
+  };
+}
+
 function initRouteMap(trackPoints) {
   const container = document.getElementById('map-container');
   if (!container) return;
@@ -3732,18 +3765,10 @@ function initRouteMap(trackPoints) {
 
   const fullDistances = computeCumulativeDistances(trackPoints);
 
-  let maxEle = -Infinity;
-  let maxIdx = 0;
-  for (let i = 0; i < trackPoints.length; i++) {
-    const ele = trackPoints[i].ele;
-    if (ele != null && ele > maxEle) {
-      maxEle = ele;
-      maxIdx = i;
-    }
-  }
-  if (maxIdx > 0 && maxIdx < trackPoints.length - 1) {
-    const maxPt = trackPoints[maxIdx];
-    const km = (fullDistances[maxIdx] / 1000).toFixed(2);
+  const extremes = findRouteExtremes(trackPoints);
+  if (extremes.maxEle != null && extremes.maxEleIdx > 0 && extremes.maxEleIdx < trackPoints.length - 1) {
+    const maxPt = trackPoints[extremes.maxEleIdx];
+    const km = (fullDistances[extremes.maxEleIdx] / 1000).toFixed(2);
     L.marker([maxPt.lat, maxPt.lon], {
       icon: L.divIcon({
         className: 'marker-maxalt',
@@ -3751,35 +3776,12 @@ function initRouteMap(trackPoints) {
         iconSize: [26, 26],
         iconAnchor: [13, 13]
       })
-    }).addTo(map).bindPopup(`<b>🏔️ Altura máxima</b><br>${maxEle} m (km ${km})`);
+    }).addTo(map).bindPopup(`<b>🏔️ Altura máxima</b><br>${extremes.maxEle} m (km ${km})`);
   }
 
-  let hasDirectSpeed = trackPoints.some(p => p.speed != null && p.speed > 0);
-  let speedAtIndex = [];
-  if (hasDirectSpeed) {
-    speedAtIndex = trackPoints.map(p => p.speed || 0);
-  } else {
-    speedAtIndex = new Array(trackPoints.length).fill(0);
-    for (let i = 1; i < trackPoints.length; i++) {
-      const prev = trackPoints[i - 1];
-      const curr = trackPoints[i];
-      const dt = (curr.time ? new Date(curr.time) - (prev.time ? new Date(prev.time) : 0) : 0) / 1000;
-      if (dt <= 0) continue;
-      const dist = haversine(prev.lat, prev.lon, curr.lat, curr.lon);
-      speedAtIndex[i] = (dist / dt) * 3.6;
-    }
-  }
-  let maxSpeed = -Infinity;
-  let maxSpeedIdx = 0;
-  for (let i = 0; i < speedAtIndex.length; i++) {
-    if (speedAtIndex[i] > maxSpeed) {
-      maxSpeed = speedAtIndex[i];
-      maxSpeedIdx = i;
-    }
-  }
-  if (maxSpeedIdx > 0 && maxSpeedIdx < trackPoints.length - 1) {
-    const maxPt = trackPoints[maxSpeedIdx];
-    const km = (fullDistances[maxSpeedIdx] / 1000).toFixed(2);
+  if (extremes.maxSpeedKmh != null && extremes.maxSpeedIdx > 0 && extremes.maxSpeedIdx < trackPoints.length - 1) {
+    const maxPt = trackPoints[extremes.maxSpeedIdx];
+    const km = (fullDistances[extremes.maxSpeedIdx] / 1000).toFixed(2);
     L.marker([maxPt.lat, maxPt.lon], {
       icon: L.divIcon({
         className: 'marker-maxspeed',
@@ -3787,7 +3789,7 @@ function initRouteMap(trackPoints) {
         iconSize: [26, 26],
         iconAnchor: [13, 13]
       })
-    }).addTo(map).bindPopup(`<b>🚀 Velocidad máxima</b><br>${maxSpeed} km/h (km ${km})`);
+    }).addTo(map).bindPopup(`<b>🚀 Velocidad máxima</b><br>${extremes.maxSpeedKmh.toFixed(1)} km/h (km ${km})`);
   }
   const totalKm = fullDistances[fullDistances.length - 1] / 1000;
   const interval = 5;
@@ -5584,6 +5586,41 @@ async function renderMapRouteToCanvas(routePoints, canvasWidth, canvasHeight, ti
     else ctx.lineTo(vx, vy);
   }
   ctx.stroke();
+
+  // Marcadores de altura y velocidad máximas (solo icono, sin etiqueta)
+  const extremes = findRouteExtremes(routePoints);
+  const drawRouteMarker = (idx, color1, color2, iconChar) => {
+    if (idx <= 0 || idx >= routePoints.length - 1) return;
+    const px = latLngToPixel(routePoints[idx].lat, routePoints[idx].lon, zoom);
+    const vx = px.x - vpLeft;
+    const vy = px.y - vpTop;
+    const radius = 18;
+    const grad = ctx.createLinearGradient(vx, vy - radius, vx, vy + radius);
+    grad.addColorStop(0, color1);
+    grad.addColorStop(1, color2);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(vx, vy, radius, 0, 2 * Math.PI);
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = '#fff';
+    ctx.stroke();
+    ctx.font = '900 20px "Font Awesome 6 Free"';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff';
+    ctx.fillText(iconChar, vx, vy + 1);
+    ctx.restore();
+  };
+
+  await document.fonts.load('900 20px "Font Awesome 6 Free"').catch(() => {});
+  if (extremes.maxEle != null) {
+    drawRouteMarker(extremes.maxEleIdx, '#dc3545', '#a71d2a', '\uf6fc');
+  }
+  if (extremes.maxSpeedKmh != null) {
+    drawRouteMarker(extremes.maxSpeedIdx, '#87CEEB', '#5BA3D9', '\uf625');
+  }
 
   return canvas;
 }
