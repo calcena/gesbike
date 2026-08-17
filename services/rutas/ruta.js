@@ -402,6 +402,9 @@ async function initRutas() {
   await getRutasByVehiculo();
   setupMultipleGPXUpload();
   setupMultipleFITUpload();
+  setupFTPUpload();
+  setupProcesarPendientes();
+  refreshProcesarPendientes();
 
   const params = new URLSearchParams(window.location.search);
   if (params.get('tab') === '4') {
@@ -512,6 +515,228 @@ async function handleMultipleGPXFiles(e) {
 
   await getRutasByVehiculo();
   e.target.value = "";
+}
+
+// ========== PROCESAR PENDIENTES (/pending_uploads/ → base de datos) ==========
+function setupProcesarPendientes() {
+  const btn = document.getElementById("procesarPendientesBtn");
+  if (!btn) {
+    console.error("❌ Elemento #procesarPendientesBtn no encontrado");
+    return;
+  }
+  btn.addEventListener("click", handleProcesarPendientes);
+}
+
+async function handleProcesarPendientes() {
+  const btn = document.getElementById("procesarPendientesBtn");
+  if (btn && btn.classList.contains("disabled")) return;
+
+  const loadingIndicator = document.getElementById("loading-indicator");
+
+  let files = [];
+  try {
+    const res = await axios.post(getApiBaseUrl() + "/api/helpers/pendientes.php?list");
+    if (!res.data || !res.data.success) {
+      throw new Error((res.data && res.data.error) || "Error al listar los pendientes");
+    }
+    files = (res.data.files || []).filter((f) => f.name.toLowerCase().endsWith(".gpx"));
+  } catch (err) {
+    console.error("💥 Error listando pendientes:", err);
+    await Swal.fire({
+      title: "Error",
+      text: err.message || "No se pudo listar /pending_uploads/",
+      icon: "error",
+      confirmButtonText: "Aceptar",
+    });
+    return;
+  }
+
+  if (files.length === 0) {
+    await Swal.fire({
+      title: "Sin archivos pendientes",
+      text: "No hay archivos .gpx en /pending_uploads/.",
+      icon: "info",
+      confirmButtonText: "Aceptar",
+    });
+    return;
+  }
+
+  const listHtml = files
+    .map((f) => `<li>${f.name} (${(f.size / 1024).toFixed(0)} KB)</li>`)
+    .join("");
+
+  const { value: confirmar } = await Swal.fire({
+    title: `Procesar ${files.length} archivo(s) pendiente(s)`,
+    html: `
+      <div class="text-start">
+        <p>Se importarán a la base de datos los siguientes archivos de /pending_uploads/:</p>
+        <ul class="mb-0 text-start">${listHtml}</ul>
+      </div>
+    `,
+    icon: "question",
+    showCancelButton: true,
+    confirmButtonText: "Procesar",
+    cancelButtonText: "Cancelar",
+  });
+  if (!confirmar) return;
+
+  if (loadingIndicator) {
+    loadingIndicator.style.display = "block";
+    loadingIndicator.innerHTML = `Procesando 0/${files.length} archivos...`;
+  }
+
+  let processedCount = 0;
+  let successCount = 0;
+  let errorCount = 0;
+
+  for (const file of files) {
+    try {
+      if (loadingIndicator) {
+        loadingIndicator.innerHTML = `Procesando ${processedCount + 1}/${files.length}: ${file.name}`;
+      }
+
+      const contentRes = await axios.post(
+        getApiBaseUrl() + "/api/helpers/pendientes.php?content",
+        { data: { file: file.name } },
+        { headers: { "Content-Type": "application/json" } }
+      );
+      if (!contentRes.data || !contentRes.data.success) {
+        throw new Error((contentRes.data && contentRes.data.error) || "No se pudo leer el archivo");
+      }
+
+      const result = processGPX(contentRes.data.content);
+      await sendToAPISilent(result);
+
+      try {
+        await axios.post(
+          getApiBaseUrl() + "/api/helpers/pendientes.php?delete",
+          { data: { file: file.name } },
+          { headers: { "Content-Type": "application/json" } }
+        );
+      } catch (delErr) {
+        console.warn(`⚠️ Importado pero no se pudo borrar ${file.name}:`, delErr);
+      }
+      successCount++;
+    } catch (err) {
+      console.error(`💥 Error al procesar ${file.name}:`, err);
+      errorCount++;
+
+      await Swal.fire({
+        title: `Error en ${file.name}`,
+        text: err.message,
+        icon: "error",
+        timer: 3000,
+        showConfirmButton: false,
+      });
+    } finally {
+      processedCount++;
+    }
+  }
+
+  if (loadingIndicator) {
+    loadingIndicator.style.display = "none";
+    loadingIndicator.innerHTML = "Procesando archivo GPX...";
+  }
+
+  if (successCount > 0 || errorCount > 0) {
+    await showBatchResult(files.length, successCount, errorCount);
+  }
+
+  // El refresco del botón NO debe depender de que el backup/recarga acaben bien:
+  // si fallan, el estado del botón se actualiza igualmente.
+  try {
+    if (successCount > 0) {
+      await crearBackup();
+      await getRutasByVehiculo();
+    }
+  } catch (err) {
+    console.error("💥 Error post-procesado:", err);
+  }
+
+  await refreshProcesarPendientes();
+}
+
+async function refreshProcesarPendientes() {
+  const btn = document.getElementById("procesarPendientesBtn");
+  if (!btn) return;
+  try {
+    const res = await axios.post(getApiBaseUrl() + "/api/helpers/pendientes.php?list");
+    const files = ((res.data && res.data.success && res.data.files) || []).filter((f) =>
+      f.name.toLowerCase().endsWith(".gpx")
+    );
+    btn.classList.toggle("disabled", files.length === 0);
+
+    const badge = document.getElementById("pendientesBadge");
+    if (badge) {
+      badge.textContent = files.length;
+      badge.style.display = files.length > 0 ? "" : "none";
+    }
+  } catch (err) {
+    console.error("💥 Error al refrescar el estado de pendientes:", err);
+  }
+}
+// ========== SUBIDA AL FTP DEL SERVIDOR COMPARTIDO (/pending_uploads/) ==========
+function setupFTPUpload() {
+  const ftpInput = document.getElementById("ftpUploadFile");
+  if (!ftpInput) return; // Botón solo visible en APP_ENV=local
+  ftpInput.addEventListener("change", handleFTPUpload);
+}
+
+async function handleFTPUpload(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+
+  const loadingIndicator = document.getElementById("loading-indicator");
+  if (loadingIndicator) {
+    loadingIndicator.style.display = "block";
+    loadingIndicator.innerHTML = `Subiendo ${file.name} al FTP...`;
+  }
+
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await axios.post(
+      getApiBaseUrl() + "/api/helpers/upload_ftp.php",
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 300000,
+      }
+    );
+
+    if (!response.data || !response.data.success) {
+      throw new Error((response.data && response.data.error) || "Error del servidor");
+    }
+
+    await Swal.fire({
+      title: "Archivo subido al FTP",
+      html: `
+        <div class="text-start">
+          <p><strong>${file.name}</strong></p>
+          <p class="text-success">${response.data.message || "Subido correctamente"}</p>
+        </div>
+      `,
+      icon: "success",
+      confirmButtonText: "Aceptar",
+    });
+
+    refreshProcesarPendientes();
+  } catch (err) {
+    console.error("💥 Error al subir al FTP:", err);
+    await Swal.fire({
+      title: "Error al subir al FTP",
+      text: err.message || "No se pudo completar la subida",
+      icon: "error",
+      confirmButtonText: "Aceptar",
+    });
+  } finally {
+    if (loadingIndicator) {
+      loadingIndicator.style.display = "none";
+      loadingIndicator.innerHTML = "Procesando archivo GPX...";
+    }
+    e.target.value = "";
+  }
 }
 
 async function sendToAPISilent(result) {

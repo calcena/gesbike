@@ -88,6 +88,29 @@ function load_env($max_levels = 3)
         }
     }
 
+    // Definir también el resto de claves presentes en el .env (FTP_*, etc.)
+    foreach ($lines as $key => $value) {
+        if (!defined($key)) {
+            define($key, $value);
+        }
+    }
+
+    // Resolver PENDING_UPLOADS_PATH → PENDING_UPLOADS_DIR (ruta absoluta real).
+    // Acepta rutas absolutas o relativas al raíz del proyecto. En hostings con
+    // chroot FTP (p. ej. InfinityFree, donde el webroot real es /htdocs) la ruta
+    // absoluta "/htdocs/..." que ve el FTP NO existe en el filesystem de PHP;
+    // usar ruta relativa: PENDING_UPLOADS_PATH=pending_uploads → <raíz>/pending_uploads.
+    if (defined('PENDING_UPLOADS_PATH') && trim(PENDING_UPLOADS_PATH) !== '') {
+        $pending = trim(PENDING_UPLOADS_PATH);
+        if (strpos($pending, '/') === 0) {
+            define('PENDING_UPLOADS_DIR', rtrim($pending, '/'));
+        } else {
+            define('PENDING_UPLOADS_DIR', rtrim(dirname(__DIR__), '/') . '/' . trim($pending, '/'));
+        }
+    } else {
+        define('PENDING_UPLOADS_DIR', '');
+    }
+
     return true;
 }
 

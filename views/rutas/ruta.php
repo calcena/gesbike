@@ -10,6 +10,17 @@ $url = isset($_SERVER['HTTPS']) &&
     $_SERVER['HTTPS'] === 'on' ? "https://" : "http://";
 $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
 
+// Archivos pendientes en pending_uploads/ (para activar/desactivar "Procesar pendientes")
+$pendientesCount = 0;
+$pendingDir = (defined('PENDING_UPLOADS_DIR') && PENDING_UPLOADS_DIR !== '') ? PENDING_UPLOADS_DIR : null;
+if ($pendingDir !== null && is_dir($pendingDir)) {
+    foreach (glob($pendingDir . '/*') as $f) {
+        if (is_file($f) && strtolower(pathinfo($f, PATHINFO_EXTENSION)) === 'gpx') {
+            $pendientesCount++;
+        }
+    }
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -191,6 +202,20 @@ $_SESSION['index_url'] = $url . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
                             <i class="fas fa-heart-pulse"></i>
                             <span>Importar archivos FIT</span>
                             <input type="file" id="fitMultipleFile" multiple accept=".fit" class="import-input" />
+                        </div>
+                    </div>
+                    <div class="col-12 d-flex flex-row mt-2" style="gap: 20px;">
+                        <?php if (defined('APP_ENV') && APP_ENV === 'local'): ?>
+                        <div class="import-btn">
+                            <i class="fas fa-cloud-arrow-up"></i>
+                            <span>Subir a FTP</span>
+                            <input type="file" id="ftpUploadFile" class="import-input" />
+                        </div>
+                        <?php endif; ?>
+                        <div class="import-btn<?php echo $pendientesCount > 0 ? '' : ' disabled'; ?>" id="procesarPendientesBtn">
+                            <i class="fas fa-database"></i>
+                            <span>Procesar pendientes</span>
+                            <span class="import-badge" id="pendientesBadge"<?php echo $pendientesCount > 0 ? '' : ' style="display: none;"'; ?>><?php echo $pendientesCount; ?></span>
                         </div>
                     </div>
                 </div>

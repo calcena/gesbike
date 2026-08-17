@@ -248,6 +248,32 @@ input:checked + .slider:before {
     cursor: pointer;
     z-index: 1;
 }
+.import-btn.disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+.import-btn.disabled:hover {
+    border-color: var(--border-color, rgba(0, 0, 0, 0.2));
+    box-shadow: none;
+    transform: none;
+}
+.import-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 10px;
+    background: #dc3545;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 20px;
+    text-align: center;
+    z-index: 2;
+}
 #searchMobileOverlay {
     position: absolute;
     top: 0;
