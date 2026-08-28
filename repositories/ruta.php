@@ -568,6 +568,7 @@ function resumem_usuario($params)
     $stmt = $db->prepare("
 SELECT
     strftime('%Y', r1.fecha_inicio) AS anio,
+    strftime('%m', r1.fecha_inicio) AS mes,
     CASE strftime('%m', r1.fecha_inicio)
         WHEN '01' THEN 'Enero' WHEN '02' THEN 'Febrero' WHEN '03' THEN 'Marzo'
         WHEN '04' THEN 'Abril' WHEN '05' THEN 'Mayo'    WHEN '06' THEN 'Junio'
@@ -609,6 +610,19 @@ ORDER BY anio DESC, strftime('%m', r1.fecha_inicio) DESC;
             }
         }
     }
+    // Re-ordenar todo (BD + histórico) por año DESC, mes DESC
+    usort($entity, function ($a, $b) {
+        $anioA = (int)($a['anio'] ?? 0);
+        $anioB = (int)($b['anio'] ?? 0);
+        if ($anioA !== $anioB) return $anioB - $anioA;
+        
+        // Extraer mes: si existe 'mes' úsalo, si no, deriva de 'mes_nombre'
+        $mesesMap = ['Enero'=>1, 'Febrero'=>2, 'Marzo'=>3, 'Abril'=>4, 'Mayo'=>5, 'Junio'=>6,
+                     'Julio'=>7, 'Agosto'=>8, 'Septiembre'=>9, 'Octubre'=>10, 'Noviembre'=>11, 'Diciembre'=>12];
+        $mesA = isset($a['mes']) && $a['mes'] !== '' ? (int)$a['mes'] : ($mesesMap[$a['mes_nombre'] ?? ''] ?? 0);
+        $mesB = isset($b['mes']) && $b['mes'] !== '' ? (int)$b['mes'] : ($mesesMap[$b['mes_nombre'] ?? ''] ?? 0);
+        return $mesB - $mesA;
+    });
     return $entity;
 }
 

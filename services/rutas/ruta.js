@@ -4984,8 +4984,8 @@ const parseHtmlCardsRutas = async (data) => {
               <div class="flex-grow-1">
                 <div class="d-flex justify-content-between align-items-center">
                   <div class="d-flex align-items-center" style="gap: 10px;">
-                    <input class="form-check-input ruta-seleccion-check" type="checkbox" id="ruta-check-${item.id}" data-ruta-id="${item.id}" ${window.rutasSeleccionadas.has(String(item.id)) ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleRutaSeleccion(${item.id}, this.checked)" title="Seleccionar para sumar kms" style="cursor: pointer;">
                     <div class="card-icon-area" style="min-width: 25px;">${iconType}</div>
+                    <input class="form-check-input ruta-seleccion-check" type="checkbox" id="ruta-check-${item.id}" data-ruta-id="${item.id}" ${window.rutasSeleccionadas.has(String(item.id)) ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleRutaSeleccion(${item.id}, this.checked)" title="Seleccionar para sumar kms" style="cursor: pointer;">
                     <p class="text-card-info mb-0">${formatFechaTimeISO(item.fecha_inicio)}${item.regulacion == 1 ? ' <span class="badge bg-warning text-dark" style="font-size:0.6rem">R</span>' : ''}</p>
                   </div>
                   <div class="d-flex align-items-center" style="gap: 25px; margin-left: auto; margin-right: 5px;">
@@ -5026,25 +5026,21 @@ const getResumenBiker = async () => {
         (acc, item) => {
           acc.kmsPulmonar += parseFloat(item.kms_mes_pulmonar || 0);
           acc.kmsElectrica += parseFloat(item.kms_mes_electrica || 0);
-          acc.kmsEstatica += parseFloat(item.kms_mes_estatica || 0);
           acc.rutasPulmonar += parseInt(item.rutas_mes_pulmonar || 0);
           acc.rutasElectrica += parseInt(item.rutas_mes_electrica || 0);
-          acc.rutasEstatica += parseInt(item.rutas_mes_estatica || 0);
           return acc;
         },
         {
           kmsPulmonar: 0,
           kmsElectrica: 0,
-          kmsEstatica: 0,
           rutasPulmonar: 0,
           rutasElectrica: 0,
-          rutasEstatica: 0,
         }
       );
 
-      const totalKms = totalesGlobales.kmsPulmonar + totalesGlobales.kmsElectrica + totalesGlobales.kmsEstatica;
+      const totalKms = totalesGlobales.kmsPulmonar + totalesGlobales.kmsElectrica;
       const totalRutas =
-        totalesGlobales.rutasPulmonar + totalesGlobales.rutasElectrica + totalesGlobales.rutasEstatica;
+        totalesGlobales.rutasPulmonar + totalesGlobales.rutasElectrica;
 
       // 3. Generar HTML del resumen superior
       let htmlResumen = `
@@ -5060,13 +5056,6 @@ const getResumenBiker = async () => {
             <div class="text-center px-1 py-1" style="min-width: 80px;" title="Kms Eléctrica">
               <div class="text-muted mb-0" style="font-size: 0.75rem;">🔌 Kms</div>
               <div class="fw-bold text-success text-center">${totalesGlobales.kmsElectrica.toLocaleString(
-                undefined,
-                { minimumFractionDigits: 0, maximumFractionDigits: 1 }
-              )}</div>
-            </div>
-            <div class="text-center px-1 py-1" style="min-width: 80px;" title="Kms Estática">
-              <div class="text-muted mb-0" style="font-size: 0.75rem;">🏠 Kms</div>
-              <div class="fw-bold text-center" style="color: orange;">${totalesGlobales.kmsEstatica.toLocaleString(
                 undefined,
                 { minimumFractionDigits: 0, maximumFractionDigits: 1 }
               )}</div>
@@ -5090,12 +5079,6 @@ const getResumenBiker = async () => {
               <div class="text-muted mb-0" style="font-size: 0.75rem;">🔌 Rutas</div>
               <div class="fw-bold text-success text-center">${
                 totalesGlobales.rutasElectrica
-              }</div>
-            </div>
-            <div class="text-center px-1 py-1" style="min-width: 80px;" title="Sesiones Estática">
-              <div class="text-muted mb-0" style="font-size: 0.75rem;">🏠 Ses.</div>
-              <div class="fw-bold text-center" style="color: orange;">${
-                totalesGlobales.rutasEstatica
               }</div>
             </div>
             <div class="text-center px-1 py-1" style="min-width: 80px;" title="Total Rutas">
@@ -5128,6 +5111,16 @@ const generarAcordeonAnual = (anio, meses, expandir) => {
   const collapseClass = expandir ? "show" : "";
   const buttonClass = expandir ? "" : "collapsed";
 
+  // Ordenar meses de Diciembre (arriba) a Enero (abajo) - orden descendente
+  // Usa mes numérico si existe, si no extrae de mes_nombre (para histórico antiguo)
+  const getMesNum = (m) => {
+    if (m.mes != null && m.mes !== '') return parseInt(m.mes);
+    const nombres = { 'Enero':1, 'Febrero':2, 'Marzo':3, 'Abril':4, 'Mayo':5, 'Junio':6,
+                      'Julio':7, 'Agosto':8, 'Septiembre':9, 'Octubre':10, 'Noviembre':11, 'Diciembre':12 };
+    return nombres[m.mes_nombre] || 0;
+  };
+  const mesesOrdenados = [...meses].sort((a, b) => getMesNum(b) - getMesNum(a));
+
   return `
         <div class="accordion-item mb-1 shadow-sm border-0">
             <h2 class="accordion-header" id="heading_${anio}">
@@ -5142,7 +5135,7 @@ const generarAcordeonAnual = (anio, meses, expandir) => {
             </h2>
             <div id="collapse_${anio}" class="accordion-collapse collapse ${collapseClass}" aria-labelledby="heading_${anio}" data-bs-parent="#accordionSummary">
                 <div class="accordion-body p-1 bg-light">
-                    ${meses
+                    ${mesesOrdenados
                       .map(
                         (m) => `
                         <div class="card mb-1 border-0 shadow-sm">
@@ -5154,7 +5147,6 @@ const generarAcordeonAnual = (anio, meses, expandir) => {
                                 <div class="d-flex justify-content-between mt-0 small" style="font-size: 0.75rem;">
                                     <span>🫁 ${m.kms_mes_pulmonar}</span>
                                     <span>🔌 ${m.kms_mes_electrica}</span>
-                                    <span>🏠 ${m.kms_mes_estatica}</span>
                                     <span class="">${m.rutas_mes} rut.</span>
                                 </div>
                             </div>

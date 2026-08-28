@@ -601,6 +601,7 @@ function archivar_resumen($anio, $rutasMeta)
         if (!isset($porUsuario[$uid][$mes])) {
             $porUsuario[$uid][$mes] = [
                 'anio' => (int) $anio,
+                'mes' => (int) $mes,
                 'mes_nombre' => $MESES[$mes],
                 'rutas_mes' => 0,
                 'kms_mes_electrica' => 0.0,
