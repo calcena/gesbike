@@ -4760,7 +4760,7 @@ async function compartirRutaWhatsApp() {
     }
 
     const tileBaseUrl = `${getApiBaseUrl()}/api/helpers/tile_proxy.php?z={z}&x={x}&y={y}`;
-    const mapCanvas = await renderMapRouteToCanvas(trackPoints, 1600, 800, tileBaseUrl);
+    const mapCanvas = await renderMapRouteToCanvas(trackPoints, 2400, 1200, tileBaseUrl);
     mapCanvas.style.cssText = 'width:800px;height:400px;display:block;';
     const mapTitle = document.createElement('div');
     mapTitle.style.cssText = 'width:800px;padding:8px 8px 0;font-size:13px;font-weight:700;color:#333;font-family:Arial,sans-serif;';
@@ -5533,7 +5533,7 @@ async function renderMapRouteToCanvas(routePoints, canvasWidth, canvasHeight, ti
     const maxPx = latLngToPixel(minLat, maxLng, z);
     const pw = Math.abs(maxPx.x - minPx.x);
     const ph = Math.abs(maxPx.y - minPx.y);
-    if (pw <= canvasWidth * 0.95 && ph <= canvasHeight * 0.95) {
+    if (pw <= canvasWidth * 0.98 && ph <= canvasHeight * 0.98) {
       zoom = z;
       break;
     }
