@@ -3114,7 +3114,13 @@ function abrirWhatsAppEnlace() {
     allowOutsideClick: true
   }).then((result) => {
     if (!result.isConfirmed) return;
-    window.open('https://wa.me/', '_blank');
+    const a = document.createElement('a');
+    a.href = 'https://wa.me/';
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   });
 }
 
@@ -3246,13 +3252,15 @@ async function compartirIndoorWhatsApp() {
     const fileName = `indoor_${(fechaHora || 'estatica').replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
     const texto = `🏠 ${fechaHora ? fechaHora + ' — ' : ''}${kms} km (estimado)`;
 
-    if (navigator.share && navigator.canShare) {
+    if (navigator.share) {
       const file = new File([blob], fileName, { type: 'image/jpeg' });
       const shareData = { text: texto, files: [file] };
-      if (navigator.canShare(shareData)) {
+      if (navigator.canShare && navigator.canShare(shareData)) {
         try { await navigator.share(shareData); return; }
         catch (e) { if (e.name === 'AbortError') return; }
       }
+      try { await navigator.share({ text: texto }); return; }
+      catch (e) { if (e.name === 'AbortError') return; }
     }
 
     const url = URL.createObjectURL(blob);
@@ -3262,7 +3270,6 @@ async function compartirIndoorWhatsApp() {
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 60000);
 
-    // Apertura de wa.me iniciada por el usuario (ver abrirWhatsAppEnlace)
     abrirWhatsAppEnlace();
   } catch (err) {
     console.error('Error al compartir sesión indoor:', err);
@@ -4782,13 +4789,15 @@ async function compartirRutaWhatsApp() {
     const fileName = `ruta_${(fechaHora || 'gpx').replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
     const texto = `⛰️ ${fechaHora ? fechaHora + ' — ' : ''}${kms} km`;
 
-    if (navigator.share && navigator.canShare) {
+    if (navigator.share) {
       const file = new File([blob], fileName, { type: 'image/jpeg' });
       const shareData = { text: texto, files: [file] };
-      if (navigator.canShare(shareData)) {
+      if (navigator.canShare && navigator.canShare(shareData)) {
         try { await navigator.share(shareData); return; }
         catch (e) { if (e.name === 'AbortError') return; }
       }
+      try { await navigator.share({ text: texto }); return; }
+      catch (e) { if (e.name === 'AbortError') return; }
     }
 
     const url = URL.createObjectURL(blob);
@@ -4798,7 +4807,6 @@ async function compartirRutaWhatsApp() {
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 60000);
 
-    // Apertura de wa.me iniciada por el usuario (ver abrirWhatsAppEnlace)
     abrirWhatsAppEnlace();
 
   } catch (err) {
