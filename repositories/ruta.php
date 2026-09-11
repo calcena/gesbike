@@ -136,6 +136,13 @@ function get_rutas_by_vehiculo($params)
     // Añadir rutas de años archivados (hist/)
     $rows = array_merge($rows, hist_rutas_por_vehiculo($params['vehiculo_id']));
 
+    // Redondear kms de rutas archivadas a 1 decimal para consistencia con rutas activas
+    foreach ($rows as $i => $r) {
+        if (isset($r['_anio']) && $r['_anio'] !== '') {
+            $rows[$i]['kms'] = round((float) $r['kms'], 1);
+        }
+    }
+
     // Orden ascendente para acumulado_kms
     usort($rows, 'cmp_rutas_asc');
     $acum = 0.0;
@@ -503,13 +510,13 @@ function hist_upsert_ruta_gpx($anio, $params, $origen, $categoria, $estimado)
 
 function actualizar_ultimos_kms($db, $vehiculo_id) {
     // Calcular la suma total de kms para el vehiculo (BD + años archivados)
-    $stmt = $db->prepare("SELECT COALESCE(SUM(kms), 0) as total_kms FROM rutas WHERE vehiculo_id = ? AND activo = 1");
+    $stmt = $db->prepare("SELECT COALESCE(ROUND(SUM(kms), 1), 0) as total_kms FROM rutas WHERE vehiculo_id = ? AND activo = 1");
     $stmt->execute([$vehiculo_id]);
     $total_kms = (float) $stmt->fetchColumn();
     $total_kms += hist_total_kms_vehiculo($vehiculo_id);
     
-    // Tomar solo la parte entera sin redondear
-    $total_kms = (int) $total_kms;
+    // Redondear y convertir a entero para coincidir con acumulado_kms de tab1-tab
+    $total_kms = (int) round($total_kms);
     
     // Verificar si ya existe un registro para este vehiculo
     $stmt = $db->prepare("SELECT id FROM ultimos_kms WHERE vehiculo_id = ?");
@@ -597,21 +604,127 @@ ORDER BY anio DESC, strftime('%m', r1.fecha_inicio) DESC;
     $stmt->execute([$params['usuario_id']]);
     $entity = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Añadir meses de años archivados (resumen precalculado por año)
+    // Cargar categorías de vehículos del usuario para clasificar rutas archivadas
+    $categoriasVehiculo = [];
+    $stmtV = $db->query("SELECT id, categoria FROM vehiculos WHERE usuario_id = " . (int) $params['usuario_id']);
+    while ($v = $stmtV->fetch(PDO::FETCH_ASSOC)) {
+        $categoriasVehiculo[(int) $v['id']] = $v['categoria'];
+    }
+
+    // Fusionar rutas de años archivados (hist/) calculando desde los datos crudos
+    // Esto asegura que modificaciones a regularizaciones de años anteriores
+    // se reflejen inmediatamente sin depender del fichero resumen.json.gz precalculado
+    $allRows = $entity;
+
     foreach (hist_anios_disponibles() as $anio) {
-        $res = hist_leer_resumen($anio);
-        if (!$res || empty($res['usuarios'])) {
-            continue;
-        }
-        foreach ($res['usuarios'] as $row) {
-            if ((int) $row['usuario_id'] === (int) $params['usuario_id']) {
-                unset($row['usuario_id']);
-                $entity[] = $row;
+        $rutasAnio = hist_leer_tabla($anio, 'rutas');
+        foreach ($rutasAnio as $r) {
+            // Filtrar solo rutas que pertenecen al usuario actual
+            $vehId = (int) $r['vehiculo_id'];
+            if (!isset($categoriasVehiculo[$vehId])) {
+                // Si no conocemos la categoría, intentar obtenerla de la BD
+                $stmtV2 = $db->prepare("SELECT categoria FROM vehiculos WHERE id = ?");
+                $stmtV2->execute([$vehId]);
+                $catRow = $stmtV2->fetch(PDO::FETCH_ASSOC);
+                $categoriasVehiculo[$vehId] = $catRow['categoria'] ?? '';
+            }
+            $cat = $categoriasVehiculo[$vehId] ?? '';
+
+            // Saltar si la categoría no es conocida o la ruta no pertenece al usuario
+            // (vehiculos de otros usuarios pueden aparecer en hist/ pero no deberían contar aquí)
+            if ($cat === '') continue;
+
+            // Extraer año/mes del fecha_inicio archivado
+            $fecha = (string) ($r['fecha_inicio'] ?? '');
+            if ($fecha === '') continue;
+            $anioR = substr($fecha, 0, 4);
+            $mesR = substr($fecha, 5, 2);
+
+            // Buscar si ya existe una entrada para este año/mes en el entity
+            $indice = null;
+            foreach ($allRows as $i => $row) {
+                if ((int) $row['anio'] === (int) $anioR && (int) $row['mes'] === (int) $mesR) {
+                    $indice = $i;
+                    break;
+                }
+            }
+
+            if ($indice !== null) {
+                // Acumular kms y counts en la entrada existente
+                $row =& $allRows[$indice];
+                $catKey = 'kms_mes_'.$cat;
+                $row[$catKey] = (
+                    (float) ($row[$catKey] ?? 0)
+                    + (float) $r['kms']
+                );
+                $row['total_kms_mes'] = (
+                    (float) ($row['total_kms_mes'] ?? 0) + (float) $r['kms']
+                );
+                // Incrementar counts dependiendo de la categoría
+                switch ($cat) {
+                    case 'electrica':
+                        $row['rutas_mes_electrica'] = ((int) ($row['rutas_mes_electrica'] ?? 0)) + 1;
+                        break;
+                    case 'pulmonar':
+                        $row['rutas_mes_pulmonar'] = ((int) ($row['rutas_mes_pulmonar'] ?? 0)) + 1;
+                        break;
+                    case 'estatica':
+                        $row['rutas_mes_estatica'] = ((int) ($row['rutas_mes_estatica'] ?? 0)) + 1;
+                        break;
+                }
+                $row['rutas_mes'] = ((int) ($row['rutas_mes'] ?? 0)) + 1;
+                unset($row);
+            } else {
+                // Crear nueva entrada para este año/mes
+                $mesesMap = ['01' => 'Enero', '02' => 'Febrero', '03' => 'Marzo', '04' => 'Abril', '05' => 'Mayo', '06' => 'Junio',
+                             '07' => 'Julio', '08' => 'Agosto', '09' => 'Septiembre', '10' => 'Octubre', '11' => 'Noviembre', '12' => 'Diciembre'];
+                $mesNombre = $mesesMap[$mesR] ?? 'Desconocido';
+                $kmsCat = 0; $rutasCat = 0;
+                if ($cat === 'electrica') { $kmsCat = (float) $r['kms']; $rutasCat = 1; }
+                elseif ($cat === 'pulmonar') { $kmsCat = (float) $r['kms']; $rutasCat = 1; }
+                elseif ($cat === 'estatica') { $kmsCat = (float) $r['kms']; $rutasCat = 1; }
+                $allRows[] = [
+                    'anio' => $anioR,
+                    'mes' => $mesR,
+                    'mes_nombre' => $mesNombre,
+                    'rutas_mes' => 1,
+                    'kms_mes_electrica' => $cat === 'electrica' ? (float) $r['kms'] : 0,
+                    'kms_mes_pulmonar' => $cat === 'pulmonar' ? (float) $r['kms'] : 0,
+                    'kms_mes_estatica' => $cat === 'estatica' ? (float) $r['kms'] : 0,
+                    'total_kms_mes' => (float) $r['kms'],
+                    'rutas_mes_electrica' => $cat === 'electrica' ? 1 : 0,
+                    'rutas_mes_pulmonar' => $cat === 'pulmonar' ? 1 : 0,
+                    'rutas_mes_estatica' => $cat === 'estatica' ? 1 : 0,
+                    'total_anual_kms_global' => 0,
+                    'rutas_anio' => 0,
+                ];
             }
         }
     }
+
+    // Calcular totales anuales a partir de los datos combinados
+    $totalesAnio = [];
+    foreach ($allRows as $row) {
+        $anioKey = (int) $row['anio'];
+        if (!isset($totalesAnio[$anioKey])) {
+            $totalesAnio[$anioKey] = ['rutas_anio' => 0, 'total_anual_kms_global' => 0.0];
+        }
+        $totalesAnio[$anioKey]['rutas_anio'] += (int) ($row['rutas_mes'] ?? 0);
+        $totalesAnio[$anioKey]['total_anual_kms_global'] += (float) ($row['total_kms_mes'] ?? 0);
+    }
+
+    // Anotar totals en cada fila
+    foreach ($allRows as &$row) {
+        $anioKey = (int) $row['anio'];
+        if (isset($totalesAnio[$anioKey])) {
+            $row['rutas_anio'] = $totalesAnio[$anioKey]['rutas_anio'];
+            $row['total_anual_kms_global'] = $totalesAnio[$anioKey]['total_anual_kms_global'];
+        }
+    }
+    unset($row);
+
     // Re-ordenar todo (BD + histórico) por año DESC, mes DESC
-    usort($entity, function ($a, $b) {
+    usort($allRows, function ($a, $b) {
         $anioA = (int)($a['anio'] ?? 0);
         $anioB = (int)($b['anio'] ?? 0);
         if ($anioA !== $anioB) return $anioB - $anioA;
@@ -623,7 +736,8 @@ ORDER BY anio DESC, strftime('%m', r1.fecha_inicio) DESC;
         $mesB = isset($b['mes']) && $b['mes'] !== '' ? (int)$b['mes'] : ($mesesMap[$b['mes_nombre'] ?? ''] ?? 0);
         return $mesB - $mesA;
     });
-    return $entity;
+
+    return $allRows;
 }
 
 function get_rutas_chart_data($params)

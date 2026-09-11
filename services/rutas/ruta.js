@@ -100,40 +100,40 @@ function smoothElevation(eles) {
 
 function calculateSpeedWithFilter(trkpts) {
   const speeds = new Array(trkpts.length).fill(0);
-  
+
   for (let i = 1; i < trkpts.length; i++) {
     const prev = trkpts[i - 1];
     const curr = trkpts[i];
-    
+
     const dt = ((new Date(curr.time)) - (new Date(prev.time))) / 1000;
     if (dt <= 0) continue;
-    
+
     const dist = haversine(prev.lat, prev.lon, curr.lat, curr.lon);
     const speed = dist / dt;
     speeds[i] = speed;
   }
-  
+
   const filteredSpeeds = new Array(trkpts.length).fill(0);
   const windowSize = SPEED_WINDOW_SIZE;
   const halfWindow = Math.floor(windowSize / 2);
-  
+
   for (let i = 1; i < trkpts.length; i++) {
     let sum = 0;
     let count = 0;
-    
+
     const start = Math.max(1, i - halfWindow);
     const end = Math.min(trkpts.length - 1, i + halfWindow);
-    
+
     for (let j = start; j <= end; j++) {
       if (speeds[j] > 0) {
         sum += speeds[j];
         count++;
       }
     }
-    
+
     filteredSpeeds[i] = count > 0 ? sum / count : 0;
   }
-  
+
   return filteredSpeeds;
 }
 
@@ -5022,6 +5022,9 @@ const getResumenBiker = async () => {
     if (response.data.success) {
       const contenido = response.data.content;
 
+      // Formateador para 2 decimales con punto miles y coma decimal (ej 1.234,56) - manual para que 1.000-9.999 sí lleve punto
+      const f2 = (v) => { const n = Number(v || 0).toFixed(2); const [intPart, decPart] = n.split('.'); return intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + decPart; };
+
       // 1. Agrupar por año
       const datosPorAnio = contenido.reduce((acc, item) => {
         if (!acc[item.anio]) acc[item.anio] = [];
@@ -5056,42 +5059,29 @@ const getResumenBiker = async () => {
           <div class="d-flex justify-content-around" style="font-size: 0.9rem;">
             <div class="text-center px-1 py-1" style="min-width: 80px;" title="Kms Pulmonar">
               <div class="text-muted mb-0" style="font-size: 0.75rem;">🫁 Kms</div>
-              <div class="fw-bold text-primary text-center">${totalesGlobales.kmsPulmonar.toLocaleString(
-                undefined,
-                { minimumFractionDigits: 0, maximumFractionDigits: 1 }
-              )}</div>
+              <div class="fw-bold text-primary text-center">${f2(totalesGlobales.kmsPulmonar)}</div>
             </div>
             <div class="text-center px-1 py-1" style="min-width: 80px;" title="Kms Eléctrica">
               <div class="text-muted mb-0" style="font-size: 0.75rem;">🔌 Kms</div>
-              <div class="fw-bold text-success text-center">${totalesGlobales.kmsElectrica.toLocaleString(
-                undefined,
-                { minimumFractionDigits: 0, maximumFractionDigits: 1 }
-              )}</div>
+              <div class="fw-bold text-success text-center">${f2(totalesGlobales.kmsElectrica)}</div>
             </div>
             <div class="text-center px-1 py-1" style="min-width: 80px;" title="Total Kms">
               <div class="text-muted mb-0" style="font-size: 0.75rem;">🧭 Total</div>
-              <div class="fw-bold text-dark text-center">${totalKms.toLocaleString(
-                undefined,
-                { minimumFractionDigits: 0, maximumFractionDigits: 1 }
-              )}</div>
+              <div class="fw-bold text-dark text-center">${f2(totalKms)}</div>
             </div>
           </div>
           <div class="d-flex justify-content-around" style="font-size: 0.9rem; margin-top: -5px;">
             <div class="text-center px-1 py-1" style="min-width: 80px;" title="Rutas Pulmonar">
               <div class="text-muted mb-0" style="font-size: 0.75rem;">🫁 Rutas</div>
-              <div class="fw-bold text-primary text-center">${
-                totalesGlobales.rutasPulmonar
-              }</div>
+              <div class="fw-bold text-primary text-center">${String(totalesGlobales.rutasPulmonar).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}</div>
             </div>
             <div class="text-center px-1 py-1" style="min-width: 80px;" title="Rutas Eléctrica">
               <div class="text-muted mb-0" style="font-size: 0.75rem;">🔌 Rutas</div>
-              <div class="fw-bold text-success text-center">${
-                totalesGlobales.rutasElectrica
-              }</div>
+              <div class="fw-bold text-success text-center">${String(totalesGlobales.rutasElectrica).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}</div>
             </div>
             <div class="text-center px-1 py-1" style="min-width: 80px;" title="Total Rutas">
               <div class="text-muted mb-0" style="font-size: 0.75rem;">🚴‍♂️ Total</div>
-              <div class="fw-bold text-dark text-center">${totalRutas}</div>
+              <div class="fw-bold text-dark text-center">${String(totalRutas).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}</div>
             </div>
           </div>
         </div>
@@ -5119,6 +5109,8 @@ const generarAcordeonAnual = (anio, meses, expandir) => {
   const collapseClass = expandir ? "show" : "";
   const buttonClass = expandir ? "" : "collapsed";
 
+  const f2 = (v) => { const n = Number(v || 0).toFixed(2); const [intPart, decPart] = n.split('.'); return intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + decPart; };
+
   // Ordenar meses de Diciembre (arriba) a Enero (abajo) - orden descendente
   // Usa mes numérico si existe, si no extrae de mes_nombre (para histórico antiguo)
   const getMesNum = (m) => {
@@ -5136,7 +5128,7 @@ const generarAcordeonAnual = (anio, meses, expandir) => {
                     data-bs-target="#collapse_${anio}" aria-expanded="${expandir}">
                     <div class="d-flex w-100 pe-3 align-items-center" style="display: flex; justify-content: space-between;">
                         <span class="fw-bold" style="flex: 0 0 auto;">${anio}</span>
-                        <span class="small" style="flex: 1; text-align: center;">🧭 ${(() => { const n = Number(global.total_anual_kms_global); const [int, dec] = n.toFixed(2).split('.'); return int.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + dec; })()} km</span>
+                        <span class="small mx-auto text-center" style="flex: 1;">🧭 ${f2(global.total_anual_kms_global)} km</span>
                         <span class="small" style="flex: 0 0 auto;">🚴‍♂️ ${global.rutas_anio}</span>
                     </div>
                 </button>
@@ -5150,12 +5142,11 @@ const generarAcordeonAnual = (anio, meses, expandir) => {
                             <div class="card-body p-1">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span class="fw-bold text-primary small">${m.mes_nombre}</span>
-                                    <span class="fw-bold small">${m.total_kms_mes} <small>km</small></span>
                                 </div>
                                 <div class="d-flex justify-content-between mt-0 small" style="font-size: 0.75rem;">
-                                    <span>🫁 ${m.kms_mes_pulmonar}</span>
-                                    <span>🔌 ${m.kms_mes_electrica}</span>
-                                    <span class="">${m.rutas_mes} rut.</span>
+                                    <span>🫁 ${f2(m.kms_mes_pulmonar)}</span>
+                                    <span class="mx-auto text-start">🔌 ${f2(m.kms_mes_electrica)}</span>
+                                    <span>${m.rutas_mes} rut.</span>
                                 </div>
                             </div>
                         </div>
