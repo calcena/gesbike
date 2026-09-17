@@ -103,11 +103,20 @@ function hist_recalcular_ultimos_kms()
 {
     $db = conectar();
     $ids = $db->query("SELECT id FROM vehiculos")->fetchAll(PDO::FETCH_COLUMN);
-    $stmt = $db->prepare("SELECT COALESCE(SUM(kms), 0) FROM rutas WHERE vehiculo_id = ? AND activo = 1");
     $n = 0;
     foreach ($ids as $vid) {
+        // Misma lógica que actualizar_ultimos_kms / acumulado_kms de tab1-tab:
+        // redondear cada ruta a 1 decimal antes de sumar (BD + años archivados)
+        $total = 0.0;
+        $stmt = $db->prepare("SELECT kms FROM rutas WHERE vehiculo_id = ? AND activo = 1");
         $stmt->execute([$vid]);
-        $total = (int) ((float) $stmt->fetchColumn() + hist_total_kms_vehiculo($vid));
+        while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $total += round((float) $r['kms'], 1);
+        }
+        foreach (hist_rutas_por_vehiculo($vid, true) as $hr) {
+            $total += round((float) $hr['kms'], 1);
+        }
+        $total = round($total, 1);
         $chk = $db->prepare("SELECT id FROM ultimos_kms WHERE vehiculo_id = ?");
         $chk->execute([$vid]);
         if ($chk->fetchColumn()) {

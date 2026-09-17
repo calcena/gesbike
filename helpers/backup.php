@@ -1,9 +1,29 @@
 <?php
+define('ROOT_PATH', dirname(__DIR__));
+define('BACKUP_LOG', ROOT_PATH . '/database/backups/backup_cli.log');
+
+/* ================================================================
+ * MODO CLI: ejecuta el backup real en un proceso PHP separado
+ * (lanza el proceso web sin bloquearlo). El resultado se registra
+ * en database/backups/backup_cli.log.
+ * ================================================================ */
+if (php_sapi_name() === 'cli' && realpath($argv[0] ?? '') === __FILE__) {
+    ignore_user_abort(true);
+    $resultado = realizarBackupSQLite();
+    $logDir = dirname(BACKUP_LOG);
+    if (!is_dir($logDir)) {
+        @mkdir($logDir, 0755, true);
+    }
+    $linea = date('Y-m-d H:i:s') . ' ' . json_encode($resultado) . "\n";
+    if (file_put_contents(BACKUP_LOG, $linea, FILE_APPEND | LOCK_EX) === false) {
+        // Si no se puede loguear, intentar en el directorio temporal del sistema
+        @file_put_contents(sys_get_temp_dir() . '/backup_cli.log', $linea, FILE_APPEND);
+    }
+    exit(0);
+}
+
 session_start();
 header('Content-Type: application/json');
-
-// Definir la ruta base del proyecto
-define('ROOT_PATH', dirname(__DIR__));
 
 function addDirToZip($zip, $dir, $baseDir)
 {
@@ -16,6 +36,58 @@ function addDirToZip($zip, $dir, $baseDir)
             $zip->addFile($file, $relative);
         }
     }
+}
+
+function php_cli_binary()
+{
+    if (defined('PHP_BINDIR') && PHP_BINDIR && is_file(rtrim(PHP_BINDIR, '/') . '/' . 'php')) {
+        return rtrim(PHP_BINDIR, '/') . '/' . 'php';
+    }
+    // En algunos hostings PHP_BINDIR no contiene el binario; usar el PATH
+    if (PHP_OS_FAMILY === 'Windows') {
+        return 'php.exe';
+    }
+    return 'php';
+}
+
+function lanzar_backup_segundo_plano()
+{
+    $backupDir = ROOT_PATH . '/database/backups/';
+    if (!is_dir($backupDir)) {
+        @mkdir($backupDir, 0755, true);
+    }
+    $cmd = sprintf(
+        '%s %s > %s 2>&1 &',
+        escapeshellarg(php_cli_binary()),
+        escapeshellarg(__FILE__),
+        escapeshellarg(BACKUP_LOG)
+    );
+    if (function_exists('exec')) {
+        @exec($cmd, $out, $code);
+        if ($code === 0) {
+            return true;
+        }
+    }
+    if (function_exists('popen')) {
+        $p = @popen($cmd, 'r');
+        if (is_resource($p)) {
+            @pclose($p);
+            return true;
+        }
+    }
+    if (function_exists('proc_open')) {
+        $descriptors = [
+            0 => ['file', '/dev/null', 'r'],
+            1 => ['file', BACKUP_LOG, 'a'],
+            2 => ['file', BACKUP_LOG, 'a'],
+        ];
+        $proc = @proc_open($cmd, $descriptors, $pipes);
+        if (is_resource($proc)) {
+            @proc_close($proc);
+            return true;
+        }
+    }
+    return false;
 }
 
 function realizarBackupSQLite()
@@ -112,15 +184,24 @@ function realizarBackupSQLite()
 
 // 2. Procesamiento de la Petición
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $resultado = realizarBackupSQLite();
-
-    if ($resultado['success']) {
+    // Prioridad: lanzar en un proceso PHP separado para no bloquear el servidor.
+    // Si el hosting no permite ejecutar procesos (exec/popen/proc_open), se
+    // ejecuta de forma síncrona (comportamiento histórico).
+    if (lanzar_backup_segundo_plano()) {
         http_response_code(200);
+        echo json_encode([
+            'success' => true,
+            'message' => 'Backup iniciado en segundo plano'
+        ]);
     } else {
-        http_response_code(500);
+        $resultado = realizarBackupSQLite();
+        if ($resultado['success']) {
+            http_response_code(200);
+        } else {
+            http_response_code(500);
+        }
+        echo json_encode($resultado);
     }
-
-    echo json_encode($resultado);
 } else {
     http_response_code(405);
     echo json_encode(['success' => false, 'message' => 'Método no permitido.']);

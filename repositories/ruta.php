@@ -509,14 +509,25 @@ function hist_upsert_ruta_gpx($anio, $params, $origen, $categoria, $estimado)
 }
 
 function actualizar_ultimos_kms($db, $vehiculo_id) {
-    // Calcular la suma total de kms para el vehiculo (BD + años archivados)
-    $stmt = $db->prepare("SELECT COALESCE(ROUND(SUM(kms), 1), 0) as total_kms FROM rutas WHERE vehiculo_id = ? AND activo = 1");
+    // Calcular la suma total de kms para el vehiculo (BD + años archivados).
+    // IMPORTANTE: se redondea cada ruta a 1 decimal ANTES de sumar, igual que
+    // acumulado_kms de tab1-tab (get_rutas_by_vehiculo), para que ambos coincidan.
+    $total_kms = 0.0;
+
+    // Rutas activas en BD (ROUND(kms, 1) igual que en el listado)
+    $stmt = $db->prepare("SELECT kms FROM rutas WHERE vehiculo_id = ? AND activo = 1");
     $stmt->execute([$vehiculo_id]);
-    $total_kms = (float) $stmt->fetchColumn();
-    $total_kms += hist_total_kms_vehiculo($vehiculo_id);
-    
-    // Redondear y convertir a entero para coincidir con acumulado_kms de tab1-tab
-    $total_kms = (int) round($total_kms);
+    while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $total_kms += round((float) $r['kms'], 1);
+    }
+
+    // Rutas de años archivados (hist/) con el mismo redondeo por ruta
+    foreach (hist_rutas_por_vehiculo($vehiculo_id, true) as $r) {
+        $total_kms += round((float) $r['kms'], 1);
+    }
+
+    // Redondear total a 1 decimal para coincidir con acumulado_kms de tab1-tab
+    $total_kms = round($total_kms, 1);
     
     // Verificar si ya existe un registro para este vehiculo
     $stmt = $db->prepare("SELECT id FROM ultimos_kms WHERE vehiculo_id = ?");

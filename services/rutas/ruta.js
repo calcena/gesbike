@@ -1861,7 +1861,10 @@ const guardarRutaManual = async () => {
       tab1.classList.add("show", "active");
 
       await getRutasByVehiculo();
-      await crearBackup();
+      await getKmsDetail();
+      // Backup en segundo plano (sin await): no debe bloquear la recarga de la
+      // lista ni la navegación de paginación tras guardar.
+      crearBackup();
     } else {
       throw new Error(response.data.message || "Error del servidor");
     }
@@ -1983,6 +1986,7 @@ const eliminarRutaFormulario = async () => {
           tab1.classList.add("show", "active");
 
           await getRutasByVehiculo();
+          await getKmsDetail();
         }
       } catch (err) {
         Swal.fire({
