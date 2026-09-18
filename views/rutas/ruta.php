@@ -114,10 +114,10 @@ if ($pendingDir !== null && is_dir($pendingDir)) {
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link px-2 px-md-3" id="tab7-tab" data-bs-toggle="tab" data-bs-target="#tab7" type="button"
-                        role="tab" aria-controls="tab7" aria-selected="false" onclick="cargarGraficasAnalisis()">
-                        <span style="font-size: 22px" class="d-md-none">🔬</span>
-                        <span style="font-size: 25px" class="d-none d-md-inline">🔬</span>
+                    <button class="nav-link disabled px-2 px-md-3" id="tab8-tab" data-bs-toggle="tab" data-bs-target="#tab8" type="button"
+                        role="tab" aria-controls="tab8" aria-selected="false" onclick="initComparacionTab()">
+                        <span style="font-size: 22px" class="d-md-none">⚖️</span>
+                        <span style="font-size: 25px" class="d-none d-md-inline">⚖️</span>
                     </button>
                 </li>
                 <li class="nav-item ms-auto d-flex align-items-end" role="presentation" style="padding-left: 5px;">
@@ -262,10 +262,7 @@ if ($pendingDir !== null && is_dir($pendingDir)) {
                     <div class="chart-container" style="position: relative; height: 350px;">
                         <canvas id="chart-cumulativa"></canvas>
                     </div>
-                </div>
-            </div>
-            <div class="tab-pane fade" id="tab7" role="tabpanel" aria-labelledby="tab7-tab">
-                <div class="container-fluid p-0">
+                    <hr class="my-3">
                     <div class="chart-container" style="position: relative; height: 350px;">
                         <canvas id="chart-corr-desnivel"></canvas>
                     </div>
@@ -273,6 +270,11 @@ if ($pendingDir !== null && is_dir($pendingDir)) {
                     <div class="chart-container" style="position: relative; height: 350px;">
                         <canvas id="chart-corr-velocidad"></canvas>
                     </div>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="tab8" role="tabpanel" aria-labelledby="tab8-tab">
+                <div class="container-fluid p-0">
+                    <div id="comparar-resultado"></div>
                 </div>
             </div>
         </div>

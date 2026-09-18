@@ -91,6 +91,80 @@ function eliminar_ruta($params)
     return 0;
 }
 
+/**
+ * Carga el track points (gpx_data) de una ruta, con fallback a hist/
+ * para rutas archivadas. Devuelve [ruta, trackPoints] o null si no hay
+ * datos GPS utilizables.
+ */
+function comparar_cargar_ruta($rutaId)
+{
+    $db = conectar();
+    $stmt = $db->prepare("SELECT id, vehiculo_id, fecha_inicio, fecha_fin, kms, origen, categoria, gpx_data FROM rutas WHERE id = ?");
+    $stmt->execute([(int)$rutaId]);
+    $ruta = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (empty($ruta)) {
+        $found = hist_buscar_ruta((int)$rutaId);
+        if (!$found) return null;
+        [$anio, $r] = $found;
+        $ruta = $r;
+    }
+
+    // gpx_data puede venir en la fila (BD) o hay que leerlo del histórico
+    $gpx = $ruta['gpx_data'] ?? null;
+    if ((is_string($gpx) && $gpx !== '' && $gpx !== 'null' && $gpx !== '[]')) {
+        $track = json_decode($gpx, true);
+    } else {
+        $anio = substr((string)$ruta['fecha_inicio'], 0, 4);
+        $track = hist_leer_payload($anio, 'gpx', $ruta['id']);
+    }
+    if (!is_array($track) || count($track) < 2) return null;
+    return [$ruta, $track];
+}
+
+/**
+ * Comparación de tramos coincidentes entre dos rutas GPX.
+ * Requiere que ambas tengan track points con lat/lon/time.
+ */
+function comparar_rutas_repo($params)
+{
+    require_once __DIR__ . '/../helpers/analisis_rutas.php';
+
+    $idA = (int)($params['ruta_id_a'] ?? 0);
+    $idB = (int)($params['ruta_id_b'] ?? 0);
+    if ($idA <= 0 || $idB <= 0 || $idA === $idB) {
+        throw new Exception('Debes indicar dos rutas distintas (ruta_id_a, ruta_id_b)');
+    }
+
+    $opts = [];
+    if (isset($params['epsilon_m'])) $opts['epsilon_m'] = (float)$params['epsilon_m'];
+    if (isset($params['min_tramo_m'])) $opts['min_tramo_m'] = (float)$params['min_tramo_m'];
+
+    $cargadas = [];
+    foreach ([$idA, $idB] as $id) {
+        $c = comparar_cargar_ruta($id);
+        if ($c === null) {
+            throw new Exception("La ruta $id no tiene datos GPS utilizables (¿es manual o indoor?)");
+        }
+        $cargadas[] = $c;
+    }
+
+    $res = comp_analizar_tramos($cargadas[0][1], $cargadas[1][1], $opts);
+
+    $meta = [];
+    foreach ($cargadas as $c) {
+        $r = $c[0];
+        $meta[] = [
+            'id' => (int)$r['id'],
+            'fecha_inicio' => $r['fecha_inicio'] ?? null,
+            'kms' => $r['kms'] ?? null,
+            'origen' => $r['origen'] ?? null,
+        ];
+    }
+
+    return ['rutas' => $meta, 'tramos' => $res['tramos'], 'resumen' => $res['resumen']];
+}
+
 
 
 

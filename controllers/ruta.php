@@ -350,10 +350,31 @@ function handle_get_temperaturas()
     }
 }
 
+function handle_comparar_rutas()
+{
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['success' => false, 'error' => 'Método no permitido']);
+        return;
+    }
+    $input = json_decode(file_get_contents('php://input'), true);
+    $params = $input['data'] ?? [];
+    try {
+        $entity = comparar_rutas($params);
+        echo json_encode(['success' => true, 'content' => $entity]);
+    } catch (Exception $e) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+}
+
 // === Enrutar según acción ===
 switch ($action) {
     case 'guardarRutaGPX':
         handle_crear_ruta_gpx();
+        break;
+    case 'compararRutas':
+        handle_comparar_rutas();
         break;
     case 'getRutasByVehiculo':
         handle_get_rutas_vehiculo();

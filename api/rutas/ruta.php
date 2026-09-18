@@ -26,6 +26,7 @@ switch ($action) {
     case 'getRutasChartData':
     case 'guardarTemperaturas':
     case 'getTemperaturas':
+    case 'compararRutas':
         $controllerFile = ROOT_PATH . '/controllers/ruta.php';
         if (!file_exists($controllerFile)) {
             http_response_code(500);

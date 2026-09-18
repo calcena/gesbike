@@ -58,9 +58,11 @@ const parseHtmlVehiculos = (data) => {
       const imgSrc = item.imagen
         ? cacheBustUrl(`../../assets/images/Vehiculos/${item.imagen}`)
         : cacheBustUrl(`../../assets/images/icons/vehiculos_ico.png`);
-      const thumbSrc = item.imagen
-        ? cacheBustUrl(`../../assets/images/Vehiculos/thumbs/${item.imagen}`)
-        : imgSrc;
+      let thumbSrc = imgSrc;
+      if (item.imagen) {
+        const baseName = item.imagen.replace(/\.[^.]+$/, '');
+        thumbSrc = cacheBustUrl(`../../assets/images/Vehiculos/thumbs/${baseName}.jpg`);
+      }
       const isInactive = item.is_active == 0;
       const cardClass = isInactive ? "card vehiculo-card inactive" : "card vehiculo-card";
 

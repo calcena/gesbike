@@ -192,8 +192,8 @@ input:checked + .slider:before {
     border-radius: 50%;
 }
 
-#tab7 .chart-container,
-#tab7 .chart-container canvas {
+#tab6 .chart-container,
+#tab6 .chart-container canvas {
     touch-action: pan-y !important;
     -ms-touch-action: pan-y !important;
     -webkit-touch-callout: none !important;
@@ -404,3 +404,88 @@ input:checked + .slider:before {
 .swal2-actions .swal2-cancel {
     order: 2 !important;
 }
+
+/* ========== COMPARACIÓN DE RUTAS ========== */
+
+.comparar-resumen {
+    background: var(--card-bg, #f8f9fa);
+    border: 1px solid var(--border-color, #dee2e6);
+    border-radius: 10px;
+    padding: 12px 10px;
+}
+.comparar-resumen-label {
+    font-size: 0.7rem;
+    color: var(--text-secondary, #6c757d);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+.comparar-resumen-value {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-primary, #212529);
+}
+.comparar-resumen-sub {
+    font-size: 0.7rem;
+    color: var(--text-muted, #999);
+}
+
+.comparar-collapse {
+    margin-bottom: 8px;
+    border: 1px solid var(--border-color, #dee2e6);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.comparar-summary {
+    padding: 8px 10px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-primary, #333);
+    background: var(--card-bg, #f8f9fa);
+    user-select: none;
+    text-align: left;
+    transition: background 0.2s;
+}
+.comparar-summary:hover {
+    background: var(--hover-bg, #e9ecef);
+}
+.comparar-collapse[open] .comparar-summary {
+    border-bottom: 1px solid var(--border-color, #dee2e6);
+}
+
+.comparar-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.comparar-table {
+    font-size: 0.78rem;
+    white-space: nowrap;
+}
+.comparar-table th {
+    background: var(--card-bg, #f8f9fa);
+    font-weight: 700;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: var(--text-secondary, #6c757d);
+    border-bottom: 2px solid var(--border-color, #dee2e6);
+    padding: 6px 8px;
+    position: sticky;
+    top: 0;
+}
+.comparar-table td {
+    padding: 5px 8px;
+    vertical-align: middle;
+    color: var(--text-primary, #212529);
+}
+.comparar-table tbody tr:hover {
+    background: var(--hover-bg, rgba(102,126,234,0.06));
+}
+
+#tab8-tab.disabled {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+

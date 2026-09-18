@@ -294,7 +294,20 @@ function processGPX(text) {
       }
     }
 
-    const isMoving = speed > 0.2778;
+    const GPS_GAP_SECONDS = 30;
+    const isGap = dt > GPS_GAP_SECONDS;
+    const hrCurr = curr.hr;
+    const hrPrev = prev.hr;
+    const hrActivo = hrCurr != null && hrCurr > 80 && hrPrev != null && hrPrev > 80;
+
+    let isMoving;
+    if (isGap && hrActivo) {
+      isMoving = true;
+    } else if (isGap && dist > 5) {
+      isMoving = true;
+    } else {
+      isMoving = speed > 0.2778;
+    }
     if (isMoving) totalTimeMoving += dt;
 
     const speedKmh = speed * 3.6;
@@ -440,12 +453,13 @@ window.selectVehiculoPicker = async (id, nombre) => {
   if (searchInput) searchInput.value = "";
   window.paginaActual = 1;
   window.rutasSeleccionadas.clear();
+  window.comparacionActiva = false;
   getRutasByVehiculo();
   const activePane = document.querySelector('.tab-pane.show.active');
   if (activePane) {
     const id = activePane.id;
     if (id === 'tab5') cargarGraficaVelocidades();
-    else if (id === 'tab6' || id === 'tab7') cargarGraficasAnalisis();
+    else if (id === 'tab6') cargarGraficasAnalisis();
   }
 };
 
@@ -4888,6 +4902,7 @@ function toggleRutaSeleccion(id, checked) {
   } else {
     window.rutasSeleccionadas.delete(rid);
   }
+  window.comparacionActiva = false;
   actualizarSumaKmsSeleccionadas();
 }
 
@@ -4907,6 +4922,16 @@ function actualizarSumaKmsSeleccionadas() {
   el.textContent = total > 0
     ? `${total.toFixed(2).replace('.', ',')} km`
     : '0,00 km';
+
+  actualizarEstadoTabComparacion();
+}
+
+function actualizarEstadoTabComparacion() {
+  const tab8 = document.getElementById('tab8-tab');
+  if (!tab8) return;
+  const tieneSeleccion = window.rutasSeleccionadas.size === 2;
+  const tieneResultados = !!window.comparacionActiva;
+  tab8.classList.toggle('disabled', !tieneSeleccion && !tieneResultados);
 }
 
 // Función para renderizar controles de paginación
@@ -5618,4 +5643,279 @@ async function renderMapRouteToCanvas(routePoints, canvasWidth, canvasHeight, ti
   }
 
   return canvas;
+}
+
+// ========== COMPARACIÓN DE RUTAS ==========
+
+function initComparacionTab() {
+  const resultadoDiv = document.getElementById('comparar-resultado');
+  if (!resultadoDiv) return;
+
+  const seleccionadas = Array.from(window.rutasSeleccionadas || []);
+
+  if (seleccionadas.length === 2) {
+    ejecutarComparacion(seleccionadas[0], seleccionadas[1]);
+  } else if (!window.comparacionActiva) {
+    resultadoDiv.innerHTML = '<div class="text-center py-4 text-muted"><i class="fas fa-info-circle me-2"></i>Selecciona exactamente 2 rutas en la pestaña 📋 para compararlas.</div>';
+  }
+}
+
+async function ejecutarComparacion(idA, idB) {
+  if (!idA || !idB || String(idA) === String(idB)) return;
+
+  const resultadoDiv = document.getElementById('comparar-resultado');
+  resultadoDiv.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 text-muted">Analizando tramos coincidentes...</p></div>';
+
+  try {
+    const response = await axios.post(
+      getApiUrl('ruta.php?compararRutas'),
+      { data: { ruta_id_a: parseInt(idA), ruta_id_b: parseInt(idB) } },
+      { headers: { 'Content-Type': 'application/json' } }
+    );
+
+    if (!response.data.success) {
+      window.comparacionActiva = false;
+      resultadoDiv.innerHTML = `<div class="alert alert-warning text-center">${response.data.error || 'No se pudo comparar las rutas'}</div>`;
+      actualizarEstadoTabComparacion();
+      return;
+    }
+
+    renderComparacionResult(response.data.content, idA, idB);
+  } catch (err) {
+    console.error('Error comparando rutas:', err);
+    window.comparacionActiva = false;
+    const msg = err.response?.data?.error || err.message || 'Error al comparar';
+    resultadoDiv.innerHTML = `<div class="alert alert-danger text-center">${msg}</div>`;
+    actualizarEstadoTabComparacion();
+  }
+}
+
+function renderComparacionResult(data, idA, idB) {
+  const { rutas, tramos, resumen } = data;
+  const resultadoDiv = document.getElementById('comparar-resultado');
+  if (!resultadoDiv) return;
+
+  const f2 = (v) => {
+    const n = Number(v || 0).toFixed(2);
+    const [intPart, decPart] = n.split('.');
+    return intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + decPart;
+  };
+  const fmtTime = (s) => {
+    if (!s || s <= 0) return '0:00';
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = Math.round(s % 60);
+    if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+    return `${m}:${String(sec).padStart(2,'0')}`;
+  };
+  const fmtDelta = (s) => {
+    const sign = s > 0 ? '+' : '';
+    return sign + fmtTime(Math.abs(s));
+  };
+  const deltaClass = (s) => s < 0 ? 'text-success' : s > 0 ? 'text-danger' : 'text-muted';
+
+  const metaA = rutas.find(r => String(r.id) === String(idA));
+  const metaB = rutas.find(r => String(r.id) === String(idB));
+
+  let html = '';
+
+  // Resumen
+  html += `
+    <div class="comparar-resumen mb-3">
+      <div class="row text-center g-2">
+        <div class="col-4">
+          <div class="comparar-resumen-label">Total ruta A</div>
+          <div class="comparar-resumen-value">${f2(resumen.km_a)} km</div>
+          <div class="comparar-resumen-sub">${metaA ? formatFechaTimeISO(metaA.fecha_inicio) : ''}</div>
+        </div>
+        <div class="col-4">
+          <div class="comparar-resumen-label">Coincidente</div>
+          <div class="comparar-resumen-value">${f2(resumen.total_coincidente_km)} km</div>
+          <div class="comparar-resumen-sub">Δ ${fmtDelta(resumen.delta_total_s)}</div>
+        </div>
+        <div class="col-4">
+          <div class="comparar-resumen-label">Total ruta B</div>
+          <div class="comparar-resumen-value">${f2(resumen.km_b)} km</div>
+          <div class="comparar-resumen-sub">${metaB ? formatFechaTimeISO(metaB.fecha_inicio) : ''}</div>
+        </div>
+      </div>
+      <div class="row text-center g-2 mt-1">
+        <div class="col-6">
+          <div class="comparar-resumen-label">Cobertura A</div>
+          <div class="comparar-resumen-value">${f2(resumen.cobertura_a_pct)}%</div>
+        </div>
+        <div class="col-6">
+          <div class="comparar-resumen-label">Cobertura B</div>
+          <div class="comparar-resumen-value">${f2(resumen.cobertura_b_pct)}%</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  if (tramos.length === 0) {
+    html += '<div class="text-center text-muted py-3">No se encontraron tramos coincidentes entre ambas rutas.</div>';
+  } else {
+    // Mapa
+    html += `
+      <details class="ruta-collapse comparar-collapse" open>
+        <summary class="ruta-collapse-summary comparar-summary">🗺️ Mapa comparativo</summary>
+        <div id="comparar-map" style="height: 300px; border-radius: 8px; border: 1px solid var(--border-color, #dee2e6); display: block;"></div>
+      </details>
+    `;
+
+    // Tabla de tramos
+    html += `
+      <details class="ruta-collapse comparar-collapse" open>
+        <summary class="ruta-collapse-summary comparar-summary">📊 Tramos coincidentes (${tramos.length})</summary>
+        <div class="comparar-table-wrapper">
+          <table class="table table-sm comparar-table mb-0">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Km A</th>
+                <th>Km B</th>
+                <th>Dist.</th>
+                <th>Tiempo A</th>
+                <th>Tiempo B</th>
+                <th>Δ</th>
+                <th>Vel A</th>
+                <th>Vel B</th>
+              </tr>
+            </thead>
+            <tbody>
+    `;
+
+    tramos.forEach((t, i) => {
+      const sentido = t.sentido === 'contrario' ? ' <span class="badge bg-info" style="font-size:0.55rem">⟲</span>' : '';
+      const coloresTramos = [
+        '#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4',
+        '#42d4f4', '#f032e6', '#bfef45', '#fabed4', '#469990',
+        '#dcbeff', '#9A6324', '#fffac8', '#800000', '#aaffc3',
+        '#808000', '#ffd8b1', '#000075', '#a9a9a9', '#e6beff'
+      ];
+      const tramoColor = coloresTramos[i % coloresTramos.length];
+      html += `
+        <tr style="border-left: 4px solid ${tramoColor};">
+          <td class="fw-bold" style="color:${tramoColor}">${i + 1}${sentido}</td>
+          <td>${f2(t.km_inicio_a)}–${f2(t.km_fin_a)}</td>
+          <td>${f2(t.km_inicio_b)}–${f2(t.km_fin_b)}</td>
+          <td>${f2(t.dist_km)}</td>
+          <td>${fmtTime(t.t_a_s)}</td>
+          <td>${fmtTime(t.t_b_s)}</td>
+          <td class="${deltaClass(t.delta_s)} fw-bold">${fmtDelta(t.delta_s)}</td>
+          <td>${f2(t.vel_a)}</td>
+          <td>${f2(t.vel_b)}</td>
+        </tr>
+      `;
+    });
+
+    html += `
+            </tbody>
+          </table>
+        </div>
+      </details>
+    `;
+  }
+
+  resultadoDiv.innerHTML = html;
+  window.comparacionActiva = true;
+  actualizarEstadoTabComparacion();
+
+  // Renderizar mapa si hay tramos
+  if (tramos.length > 0) {
+    renderComparacionMap(idA, idB, tramos);
+  }
+}
+
+async function renderComparacionMap(idA, idB, tramos) {
+  const mapDiv = document.getElementById('comparar-map');
+  if (!mapDiv) return;
+
+  try {
+    const [resA, resB] = await Promise.all([
+      axios.post(getApiUrl('ruta.php?getRutasById'), { data: { ruta_id: parseInt(idA) } }),
+      axios.post(getApiUrl('ruta.php?getRutasById'), { data: { ruta_id: parseInt(idB) } })
+    ]);
+
+    let trackA = [], trackB = [];
+    if (resA.data.success && resA.data.content[0]?.gpx_data) {
+      try { trackA = JSON.parse(resA.data.content[0].gpx_data); } catch(e) {}
+    }
+    if (resB.data.success && resB.data.content[0]?.gpx_data) {
+      try { trackB = JSON.parse(resB.data.content[0].gpx_data); } catch(e) {}
+    }
+
+    if (trackA.length < 2 && trackB.length < 2) {
+      mapDiv.innerHTML = '<div class="text-center text-muted py-3">No hay datos GPS para mostrar el mapa</div>';
+      return;
+    }
+
+    const map = L.map(mapDiv).setView([40, -3], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+
+    // Precalcular km acumulados de trackA una sola vez — O(n)
+    const cumKmA = new Array(trackA.length).fill(0);
+    for (let i = 1; i < trackA.length; i++) {
+      cumKmA[i] = cumKmA[i - 1] + haversine(
+        trackA[i - 1].lat, trackA[i - 1].lon,
+        trackA[i].lat, trackA[i].lon
+      ) / 1000;
+    }
+
+    // Dibujar ruta A completa (azul claro)
+    if (trackA.length >= 2) {
+      const coordsA = trackA.filter(p => p.lat != null && p.lon != null).map(p => [p.lat, p.lon]);
+      if (coordsA.length >= 2) {
+        L.polyline(coordsA, { color: '#3498db', weight: 3, opacity: 0.5, dashArray: '8,6' }).addTo(map);
+      }
+    }
+
+    // Dibujar ruta B completa (naranja claro)
+    if (trackB.length >= 2) {
+      const coordsB = trackB.filter(p => p.lat != null && p.lon != null).map(p => [p.lat, p.lon]);
+      if (coordsB.length >= 2) {
+        L.polyline(coordsB, { color: '#e67e22', weight: 3, opacity: 0.5, dashArray: '8,6' }).addTo(map);
+      }
+    }
+
+    // Paleta de colores diferenciados para tramos
+    const coloresTramos = [
+      '#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4',
+      '#42d4f4', '#f032e6', '#bfef45', '#fabed4', '#469990',
+      '#dcbeff', '#9A6324', '#fffac8', '#800000', '#aaffc3',
+      '#808000', '#ffd8b1', '#000075', '#a9a9a9', '#e6beff'
+    ];
+
+    // Dibujar tramos coincidentes — O(n) por tramo
+    const allCoords = [];
+    tramos.forEach((t, idx) => {
+      const pts = [];
+      for (let i = 0; i < trackA.length; i++) {
+        if (trackA[i].lat == null || trackA[i].lon == null) continue;
+        if (cumKmA[i] >= t.km_inicio_a - 0.05 && cumKmA[i] <= t.km_fin_a + 0.05) {
+          pts.push([trackA[i].lat, trackA[i].lon]);
+        }
+      }
+      if (pts.length >= 2) {
+        const color = coloresTramos[idx % coloresTramos.length];
+        L.polyline(pts, { color, weight: 5, opacity: 0.85 }).addTo(map);
+        pts.forEach(p => allCoords.push(p));
+      }
+    });
+
+    // Ajustar vista: priorizar tramos coincidentes, luego rutas completas
+    if (allCoords.length >= 2) {
+      map.fitBounds(allCoords, { padding: [30, 30], maxZoom: 18 });
+    } else {
+      const allPts = [...trackA, ...trackB].filter(p => p.lat != null && p.lon != null).map(p => [p.lat, p.lon]);
+      if (allPts.length > 0) {
+        map.fitBounds(allPts, { padding: [20, 20], maxZoom: 18 });
+      }
+    }
+  } catch (err) {
+    console.error('Error renderizando mapa comparativo:', err);
+    mapDiv.innerHTML = '<div class="text-center text-muted py-3">Error al cargar el mapa</div>';
+  }
 }

@@ -29,6 +29,7 @@
     height: 100%;
     object-fit: cover;
     border: 2px solid var(--vehiculo-card-img-border);
+    background-color: #fff;
 }
 
 .fab-button {

@@ -53,6 +53,11 @@ function get_rutas_chart($params) {
     return get_rutas_chart_data($params);
 }
 
+function comparar_rutas($params) {
+    global $db;
+    return comparar_rutas_repo($params);
+}
+
 function createRutaTemperatura($ruta_id, $temperaturas) {
     return create_temperaturas_repo($ruta_id, $temperaturas);
 }
