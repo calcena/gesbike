@@ -295,16 +295,12 @@ function processGPX(text) {
     }
 
     const GPS_GAP_SECONDS = 30;
+    const GAP_SPEED_MOVING = 0.7;
     const isGap = dt > GPS_GAP_SECONDS;
-    const hrCurr = curr.hr;
-    const hrPrev = prev.hr;
-    const hrActivo = hrCurr != null && hrCurr > 80 && hrPrev != null && hrPrev > 80;
 
     let isMoving;
-    if (isGap && hrActivo) {
-      isMoving = true;
-    } else if (isGap && dist > 5) {
-      isMoving = true;
+    if (isGap) {
+      isMoving = (dist / dt) >= GAP_SPEED_MOVING;
     } else {
       isMoving = speed > 0.2778;
     }
